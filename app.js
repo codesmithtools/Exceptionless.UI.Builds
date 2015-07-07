@@ -90916,7 +90916,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   ])
   .config(['$locationProvider', '$stateProvider', '$uiViewScrollProvider', '$urlRouterProvider', 'dialogsProvider', 'gravatarServiceProvider', 'RestangularProvider', 'BASE_URL', 'EXCEPTIONLESS_API_KEY', '$ExceptionlessClient', 'stripeProvider', 'STRIPE_PUBLISHABLE_KEY', 'USE_HTML5_MODE', function ($locationProvider, $stateProvider, $uiViewScrollProvider, $urlRouterProvider, dialogsProvider, gravatarServiceProvider, RestangularProvider, BASE_URL, EXCEPTIONLESS_API_KEY, $ExceptionlessClient, stripeProvider, STRIPE_PUBLISHABLE_KEY, USE_HTML5_MODE) {
     $ExceptionlessClient.config.apiKey = EXCEPTIONLESS_API_KEY;
-    $ExceptionlessClient.config.serverUrl = BASE_URL.substring(0, BASE_URL.indexOf('/api/'));
+    $ExceptionlessClient.config.serverUrl = BASE_URL;
     $ExceptionlessClient.config.defaultTags.push('UI');
 
     $locationProvider.html5Mode({
@@ -90932,7 +90932,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       'default': 'mm'
     };
 
-    RestangularProvider.setBaseUrl(BASE_URL);
+    RestangularProvider.setBaseUrl(BASE_URL + '/api/v2');
     RestangularProvider.setFullResponse(true);
     //RestangularProvider.setDefaultHttpFields({ timeout: 10 * 1000 });
 
@@ -94823,7 +94823,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       _signalRTimeout = $timeout(function () {
         _hub = new Hub('messages', {
-          rootPath: BASE_URL + '/push',
+          rootPath: BASE_URL + '/api/v2/push',
 
           // client side methods
           listeners: {
@@ -96924,7 +96924,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless.validators'
   ])
   .config(['$authProvider', '$stateProvider', 'BASE_URL', 'FACEBOOK_APPID', 'GOOGLE_APPID', 'GITHUB_APPID', 'LIVE_APPID', function ($authProvider, $stateProvider, BASE_URL, FACEBOOK_APPID, GOOGLE_APPID, GITHUB_APPID, LIVE_APPID) {
-    $authProvider.baseUrl = BASE_URL;
+    $authProvider.baseUrl = BASE_URL + '/api/v2';
     $authProvider.loginRedirect = false;
     $authProvider.logoutRedirect = '/login';
     $authProvider.signupRedirect = false;
