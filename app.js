@@ -19803,7 +19803,7 @@ return /******/ (function(modules) { // webpackBootstrap
 })(jQuery);
 
 /**
- * @license AngularJS v1.3.17
+ * @license AngularJS v1.3.16
  * (c) 2010-2014 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -19858,7 +19858,7 @@ function minErr(module, ErrorConstructor) {
       return match;
     });
 
-    message = message + '\nhttp://errors.angularjs.org/1.3.17/' +
+    message = message + '\nhttp://errors.angularjs.org/1.3.16/' +
       (module ? module + '/' : '') + code;
     for (i = 2; i < arguments.length; i++) {
       message = message + (i == 2 ? '?' : '&') + 'p' + (i - 2) + '=' +
@@ -21943,11 +21943,11 @@ function toDebugString(obj) {
  * - `codeName` – `{string}` – Code name of the release, such as "jiggling-armfat".
  */
 var version = {
-  full: '1.3.17',    // all of these placeholder strings will be replaced by grunt's
+  full: '1.3.16',    // all of these placeholder strings will be replaced by grunt's
   major: 1,    // package task
   minor: 3,
-  dot: 17,
-  codeName: 'tsktskskly-euouae'
+  dot: 16,
+  codeName: 'cookie-oatmealification'
 };
 
 
@@ -24758,7 +24758,7 @@ function Browser(window, document, $log, $sniffer) {
 
   function getHash(url) {
     var index = url.indexOf('#');
-    return index === -1 ? '' : url.substr(index);
+    return index === -1 ? '' : url.substr(index + 1);
   }
 
   /**
@@ -24885,7 +24885,7 @@ function Browser(window, document, $log, $sniffer) {
         // Do the assignment again so that those two variables are referentially identical.
         lastHistoryState = cachedState;
       } else {
-        if (!sameBase || reloadLocation) {
+        if (!sameBase) {
           reloadLocation = url;
         }
         if (replace) {
@@ -27758,7 +27758,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
 
       $compileNode.empty();
 
-      $templateRequest(templateUrl)
+      $templateRequest($sce.getTrustedResourceUrl(templateUrl))
         .then(function(content) {
           var compileNode, tempTemplateAttrs, $template, childBoundTranscludeFn;
 
@@ -30564,7 +30564,7 @@ function LocationHashbangUrl(appBase, hashPrefix) {
     var withoutBaseUrl = beginsWith(appBase, url) || beginsWith(appBaseNoFile, url);
     var withoutHashUrl;
 
-    if (!isUndefined(withoutBaseUrl) && withoutBaseUrl.charAt(0) === '#') {
+    if (withoutBaseUrl.charAt(0) === '#') {
 
       // The rest of the url starts with a hash so we have
       // got either a hashbang path or a plain hash fragment
@@ -30578,15 +30578,7 @@ function LocationHashbangUrl(appBase, hashPrefix) {
       // There was no hashbang path nor hash fragment:
       // If we are in HTML5 mode we use what is left as the path;
       // Otherwise we ignore what is left
-      if (this.$$html5) {
-        withoutHashUrl = withoutBaseUrl;
-      } else {
-        withoutHashUrl = '';
-        if (isUndefined(withoutBaseUrl)) {
-          appBase = url;
-          this.replace();
-        }
-      }
+      withoutHashUrl = this.$$html5 ? withoutBaseUrl : '';
     }
 
     parseAppUrl(withoutHashUrl, this);
@@ -35981,14 +35973,12 @@ var $compileMinErr = minErr('$compile');
  * @name $templateRequest
  *
  * @description
- * The `$templateRequest` service runs security checks then downloads the provided template using
- * `$http` and, upon success, stores the contents inside of `$templateCache`. If the HTTP request
- * fails or the response data of the HTTP request is empty, a `$compile` error will be thrown (the
- * exception can be thwarted by setting the 2nd parameter of the function to true). Note that the
- * contents of `$templateCache` are trusted, so the call to `$sce.getTrustedUrl(tpl)` is omitted
- * when `tpl` is of type string and `$templateCache` has the matching entry.
+ * The `$templateRequest` service downloads the provided template using `$http` and, upon success,
+ * stores the contents inside of `$templateCache`. If the HTTP request fails or the response data
+ * of the HTTP request is empty, a `$compile` error will be thrown (the exception can be thwarted
+ * by setting the 2nd parameter of the function to true).
  *
- * @param {string|TrustedResourceUrl} tpl The HTTP request template URL
+ * @param {string} tpl The HTTP request template URL
  * @param {boolean=} ignoreRequestError Whether or not to ignore the exception when the request fails or the template is empty
  *
  * @return {Promise} the HTTP Promise for the given.
@@ -35996,18 +35986,9 @@ var $compileMinErr = minErr('$compile');
  * @property {number} totalPendingRequests total amount of pending template requests being downloaded.
  */
 function $TemplateRequestProvider() {
-  this.$get = ['$templateCache', '$http', '$q', '$sce', function($templateCache, $http, $q, $sce) {
+  this.$get = ['$templateCache', '$http', '$q', function($templateCache, $http, $q) {
     function handleRequestFn(tpl, ignoreRequestError) {
       handleRequestFn.totalPendingRequests++;
-
-      // We consider the template cache holds only trusted templates, so
-      // there's no need to go through whitelisting again for keys that already
-      // are included in there. This also makes Angular accept any script
-      // directive, no matter its name. However, we still need to unwrap trusted
-      // types.
-      if (!isString(tpl) || !$templateCache.get(tpl)) {
-        tpl = $sce.getTrustedResourceUrl(tpl);
-      }
 
       var transformResponse = $http.defaults && $http.defaults.transformResponse;
 
@@ -42218,8 +42199,8 @@ var ngIfDirective = ['$animate', function($animate) {
  * @param {Object} angularEvent Synthetic event object.
  * @param {String} src URL of content to load.
  */
-var ngIncludeDirective = ['$templateRequest', '$anchorScroll', '$animate',
-                  function($templateRequest,   $anchorScroll,   $animate) {
+var ngIncludeDirective = ['$templateRequest', '$anchorScroll', '$animate', '$sce',
+                  function($templateRequest,   $anchorScroll,   $animate,   $sce) {
   return {
     restrict: 'ECA',
     priority: 400,
@@ -42255,7 +42236,7 @@ var ngIncludeDirective = ['$templateRequest', '$anchorScroll', '$animate',
           }
         };
 
-        scope.$watch(srcExp, function ngIncludeWatchAction(src) {
+        scope.$watch($sce.parseAsResourceUrl(srcExp), function ngIncludeWatchAction(src) {
           var afterAnimation = function() {
             if (isDefined(autoScrollExp) && (!autoScrollExp || scope.$eval(autoScrollExp))) {
               $anchorScroll();
@@ -46343,7 +46324,7 @@ angular.module('exceptionless', [])
     }]);
 
 /**
- * @license AngularJS v1.3.17
+ * @license AngularJS v1.3.16
  * (c) 2010-2014 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -58834,7 +58815,7 @@ angular.module('cfp.loadingBar', [])
 });
 
 /**
- * @license AngularJS v1.3.17
+ * @license AngularJS v1.3.16
  * (c) 2010-2014 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -60049,7 +60030,7 @@ angular.module('angularPayments', []);angular.module('angularPayments')
 }]);
 
 /**
- * @license AngularJS v1.3.17
+ * @license AngularJS v1.3.16
  * (c) 2010-2014 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -73292,7 +73273,7 @@ angular.module('debounce', [])
 }());
 
 /**
- * Satellizer 0.11.2
+ * Satellizer 0.11.1
  * (c) 2015 Sahat Yalkabov
  * License: MIT
  */
@@ -73340,10 +73321,10 @@ angular.module('debounce', [])
           name: 'facebook',
           url: '/auth/facebook',
           authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
-          redirectUri: (window.location.origin || window.location.protocol + '//' + window.location.host) + '/',
+          redirectUri: window.location.origin + '/' || window.location.protocol + '//' + window.location.host + '/',
           scope: ['email'],
           scopeDelimiter: ',',
-          requiredUrlParams: ['nonce','display', 'scope'],
+          requiredUrlParams: ['display', 'scope'],
           display: 'popup',
           type: '2.0',
           popupOptions: { width: 580, height: 400 }
@@ -73779,22 +73760,17 @@ angular.module('debounce', [])
 
             var url = defaults.authorizationEndpoint + '?' + oauth2.buildQueryString();
 
-            var openPopup;
-            if (config.platform === 'mobile') {
-              openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri)
-            } else {
-              openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri).pollPopup();
-            }
-
-            return openPopup.then(function(oauthData) {
-              if (defaults.responseType === 'token') {
-                return oauthData;
-              }
-              if (oauthData.state && oauthData.state !== storage.get(stateName)) {
-                return $q.reject('OAuth 2.0 state parameter mismatch.');
-              }
-              return oauth2.exchangeForToken(oauthData, userData);
-            });
+            return popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri)
+              .pollPopup()
+              .then(function(oauthData) {
+                if (defaults.responseType === 'token') {
+                  return oauthData;
+                }
+                if (oauthData.state && oauthData.state !== storage.get(stateName)) {
+                  return $q.reject('OAuth 2.0 state parameter mismatch.');
+                }
+                return oauth2.exchangeForToken(oauthData, userData);
+              });
 
           };
 
@@ -73822,10 +73798,9 @@ angular.module('debounce', [])
             var urlParams = ['defaultUrlParams', 'requiredUrlParams', 'optionalUrlParams'];
 
             angular.forEach(urlParams, function(params) {
-
               angular.forEach(defaults[params], function(paramName) {
                 var camelizedName = utils.camelCase(paramName);
-                var paramValue = angular.isFunction(defaults[paramName]) ? defaults[paramName]() : defaults[camelizedName];
+                var paramValue = defaults[camelizedName];
 
                 if (paramName === 'state') {
                   var stateName = defaults.name + '_state';
@@ -73928,7 +73903,6 @@ angular.module('debounce', [])
             popup.popupWindow.focus();
           }
 
-
           if (config.platform === 'mobile') {
             return popup.eventListener(redirectUri);
           }
@@ -74000,7 +73974,8 @@ angular.module('debounce', [])
                 popup.popupWindow.close();
                 $interval.cancel(polling);
               }
-            } catch (error) {}
+            } catch (error) {
+            }
 
             if (!popup.popupWindow) {
               $interval.cancel(polling);
@@ -74010,7 +73985,6 @@ angular.module('debounce', [])
               deferred.reject({ data: 'Authorization Failed' });
             }
           }, 35);
-
           return deferred.promise;
         };
 
@@ -74143,7 +74117,6 @@ angular.module('debounce', [])
     }]);
 
 })(window, window.angular);
-
 /* jquery.signalR.core.js */
 /*global window:false */
 /*!
@@ -92905,7 +92878,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         restrict: 'E',
         replace: true,
         templateUrl: 'components/intercom/intercom-directive.tpl.html',
-        controller: ['$interval', '$scope', 'authService', 'filterService', 'INTERCOM_APPID', '$intercom', 'objectIDService', 'organizationService', 'projectService', 'userService', 'VERSION', function ($interval, $scope, authService, filterService, INTERCOM_APPID, $intercom, objectIDService, organizationService, projectService, userService, VERSION) {
+        controller: ['$interval', '$scope', 'authService', 'filterService', 'INTERCOM_APPID', '$intercom', 'objectIDService', 'organizationService', 'projectService', 'userService', function ($interval, $scope, authService, filterService, INTERCOM_APPID, $intercom, objectIDService, organizationService, projectService, userService) {
           if (!authService.isAuthenticated()) {
             return;
           }
@@ -92957,10 +92930,9 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               remote_created_at: objectIDService.create(vm.user.id).timestamp
             };
 
-            var versionParts = VERSION.split('.');
-            var build = 0;
+            var versionParts = '@@version'.split('.');
             if (versionParts.length === 3)
-              build = parseInt(versionParts[2]);
+              data.app_build = parseInt(versionParts[2]);
 
             var currentOrganization = getCurrentOrganization();
             if (currentOrganization) {
@@ -92972,8 +92944,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 monthly_spend: currentOrganization.billing_price,
                 total_errors: currentOrganization.total_event_count
               };
-
-              data.app_build = build;
 
               if (currentOrganization.subscribe_date) {
                 data.company.subscribe_at = moment(currentOrganization.subscribe_date).unix();
