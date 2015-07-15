@@ -60699,7 +60699,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.4.2
+ * @license AngularJS v1.4.3
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -91325,13 +91325,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return true;
         }
 
-        if(response.status === 401) {
+        if (response.status === 401) {
           stateService.save(['auth.']);
           $state.go('auth.login');
           return true;
         }
 
-        if(response.status === 409) {
+        if (response.status === 409) {
           return true;
         }
 
@@ -94827,13 +94827,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
           queryParams: {
             'access_token': authService.getToken()
-          },
-
-          // handle connection error
-          errorHandler: function (error) {
-            $ExceptionlessClient.createUnhandledException(error, source)
-              .addTags('SignalR')
-              .submit();
           },
           stateChanged: function(state) {
             if (state.newState === $.signalR.connectionState.disconnected && authService.isAuthenticated()) {
