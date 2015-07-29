@@ -77593,7 +77593,7 @@ angular.module('debounce', [])
 }());
 
 /**
- * Satellizer 0.11.3
+ * Satellizer 0.11.1
  * (c) 2015 Sahat Yalkabov
  * License: MIT
  */
@@ -77641,10 +77641,10 @@ angular.module('debounce', [])
           name: 'facebook',
           url: '/auth/facebook',
           authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
-          redirectUri: (window.location.origin || window.location.protocol + '//' + window.location.host) + '/',
+          redirectUri: window.location.origin + '/' || window.location.protocol + '//' + window.location.host + '/',
           scope: ['email'],
           scopeDelimiter: ',',
-          requiredUrlParams: ['nonce','display', 'scope'],
+          requiredUrlParams: ['display', 'scope'],
           display: 'popup',
           type: '2.0',
           popupOptions: { width: 580, height: 400 }
@@ -77686,7 +77686,6 @@ angular.module('debounce', [])
           name: 'twitter',
           url: '/auth/twitter',
           authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
-          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
           type: '1.0',
           popupOptions: { width: 495, height: 645 }
         },
@@ -78081,22 +78080,17 @@ angular.module('debounce', [])
 
             var url = defaults.authorizationEndpoint + '?' + oauth2.buildQueryString();
 
-            var openPopup;
-            if (config.platform === 'mobile') {
-              openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri).eventListener(defaults.redirectUri);
-            } else {
-              openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri).pollPopup();
-            }
-
-            return openPopup.then(function(oauthData) {
-              if (defaults.responseType === 'token') {
-                return oauthData;
-              }
-              if (oauthData.state && oauthData.state !== storage.get(stateName)) {
-                return $q.reject('OAuth 2.0 state parameter mismatch.');
-              }
-              return oauth2.exchangeForToken(oauthData, userData);
-            });
+            return popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri)
+              .pollPopup()
+              .then(function(oauthData) {
+                if (defaults.responseType === 'token') {
+                  return oauthData;
+                }
+                if (oauthData.state && oauthData.state !== storage.get(stateName)) {
+                  return $q.reject('OAuth 2.0 state parameter mismatch.');
+                }
+                return oauth2.exchangeForToken(oauthData, userData);
+              });
 
           };
 
@@ -78124,10 +78118,9 @@ angular.module('debounce', [])
             var urlParams = ['defaultUrlParams', 'requiredUrlParams', 'optionalUrlParams'];
 
             angular.forEach(urlParams, function(params) {
-
               angular.forEach(defaults[params], function(paramName) {
                 var camelizedName = utils.camelCase(paramName);
-                var paramValue = angular.isFunction(defaults[paramName]) ? defaults[paramName]() : defaults[camelizedName];
+                var paramValue = defaults[camelizedName];
 
                 if (paramName === 'state') {
                   var stateName = defaults.name + '_state';
@@ -78175,26 +78168,15 @@ angular.module('debounce', [])
 
           oauth1.open = function(options, userData) {
             angular.extend(defaults, options);
-            var popupWindow;
             var serverUrl = config.baseUrl ? utils.joinUrl(config.baseUrl, defaults.url) : defaults.url;
-
-            if (config.platform !== 'mobile') {
-              popupWindow = popup.open('', defaults.name, defaults.popupOptions, defaults.redirectUri);
-            }
-
-            return $http.post(serverUrl, defaults)
+            var popupWindow = popup.open('', defaults.name, defaults.popupOptions, defaults.redirectUri);
+            return $http.post(serverUrl)
               .then(function(response) {
-                if (config.platform === 'mobile') {
-                  popupWindow = popup.open([defaults.authorizationEndpoint, oauth1.buildQueryString(response.data)].join('?'), defaults.name, defaults.popupOptions, defaults.redirectUri);
-                } else {
-                  popupWindow.popupWindow.location = [defaults.authorizationEndpoint, oauth1.buildQueryString(response.data)].join('?');
-                }
-
-                var popupListener = config.platform === 'mobile' ? popupWindow.eventListener(defaults.redirectUri) : popupWindow.pollPopup();
-
-                return popupListener.then(function(response) {
-                  return oauth1.exchangeForToken(response, userData);
-                });
+                popupWindow.popupWindow.location.href = [defaults.authorizationEndpoint, oauth1.buildQueryString(response.data)].join('?');
+                return popupWindow.pollPopup()
+                  .then(function(response) {
+                    return oauth1.exchangeForToken(response, userData);
+                  });
               });
 
           };
@@ -78239,6 +78221,10 @@ angular.module('debounce', [])
 
           if (popup.popupWindow && popup.popupWindow.focus) {
             popup.popupWindow.focus();
+          }
+
+          if (config.platform === 'mobile') {
+            return popup.eventListener(redirectUri);
           }
 
           return popup;
@@ -78308,7 +78294,8 @@ angular.module('debounce', [])
                 popup.popupWindow.close();
                 $interval.cancel(polling);
               }
-            } catch (error) {}
+            } catch (error) {
+            }
 
             if (!popup.popupWindow) {
               $interval.cancel(polling);
@@ -78318,7 +78305,6 @@ angular.module('debounce', [])
               deferred.reject({ data: 'Authorization Failed' });
             }
           }, 35);
-
           return deferred.promise;
         };
 
@@ -78451,7 +78437,6 @@ angular.module('debounce', [])
     }]);
 
 })(window, window.angular);
-
 /* jquery.signalR.core.js */
 /*global window:false */
 /*!
