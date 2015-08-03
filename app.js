@@ -101411,23 +101411,19 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     $authProvider.signupRedirect = false;
 
     $authProvider.facebook({
-      clientId: FACEBOOK_APPID,
-      redirectUri: BASE_URL
+      clientId: FACEBOOK_APPID
     });
 
     $authProvider.google({
-      clientId: GOOGLE_APPID,
-      redirectUri: BASE_URL
+      clientId: GOOGLE_APPID
     });
 
     $authProvider.github({
-      clientId: GITHUB_APPID,
-      redirectUri: BASE_URL
+      clientId: GITHUB_APPID
     });
 
     $authProvider.live({
       clientId: LIVE_APPID,
-      redirectUri: BASE_URL,
       scope: ['wl.emails']
     });
 
