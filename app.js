@@ -1652,6 +1652,24 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   var _filter = Function.call.bind(Array.prototype.filter);
   var _every = Function.call.bind(Array.prototype.every);
 
+  var createDataProperty = function createDataProperty(object, name, value) {
+    if (supportsDescriptors) {
+      Object.defineProperty(object, name, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: value
+      });
+    } else {
+      object[name] = value;
+    }
+  };
+  var createDataPropertyOrThrow = function createDataPropertyOrThrow(object, name, value) {
+    createDataProperty(object, name, value);
+    if (!ES.SameValue(object[name], value)) {
+      throw new TypeError('property is nonconfigurable');
+    }
+  };
   var defineProperty = function (object, name, value, force) {
     if (!force && name in object) { return; }
     if (supportsDescriptors) {
@@ -1716,7 +1734,15 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   }());
 
   /*jshint evil: true */
-  var getGlobal = new Function('return this;');
+  var getGlobal = function () {
+	// the only reliable means to get the global object is
+	// `Function('return this')()`
+	// However, this causes CSP violations in Chrome apps.
+    if (typeof self !== 'undefined') { return self; }
+    if (typeof window !== 'undefined') { return window; }
+    if (typeof global !== 'undefined') { return global; }
+	throw new Error('unable to locate global object');
+  };
   /*jshint evil: false */
 
   var globals = getGlobal();
@@ -1742,32 +1768,6 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
 
   var Symbol = globals.Symbol || {};
   var symbolSpecies = Symbol.species || '@@species';
-  var defaultSpeciesGetter = function () { return this; };
-  var addDefaultSpecies = function (C) {
-    if (supportsDescriptors && !_hasOwnProperty(C, symbolSpecies)) {
-      Value.getter(C, symbolSpecies, defaultSpeciesGetter);
-    }
-  };
-  var Type = {
-    object: function (x) { return x !== null && typeof x === 'object'; },
-    string: function (x) { return _toString(x) === '[object String]'; },
-    regex: function (x) { return _toString(x) === '[object RegExp]'; },
-    symbol: function (x) {
-      return typeof globals.Symbol === 'function' && typeof x === 'symbol';
-    }
-  };
-
-  var numberIsNaN = Number.isNaN || function isNaN(value) {
-    // NaN !== NaN, but they are identical.
-    // NaNs are the only non-reflexive value, i.e., if x !== x,
-    // then x is NaN.
-    // isNaN is broken: it converts its argument to number, so
-    // isNaN('foo') => true
-    return value !== value;
-  };
-  var numberIsFinite = Number.isFinite || function isFinite(value) {
-    return typeof value === 'number' && globalIsFinite(value);
-  };
 
   var Value = {
     getter: function (object, name, getter) {
@@ -1813,6 +1813,33 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     }
   };
 
+  var defaultSpeciesGetter = function () { return this; };
+  var addDefaultSpecies = function (C) {
+    if (supportsDescriptors && !_hasOwnProperty(C, symbolSpecies)) {
+      Value.getter(C, symbolSpecies, defaultSpeciesGetter);
+    }
+  };
+  var Type = {
+    object: function (x) { return x !== null && typeof x === 'object'; },
+    string: function (x) { return _toString(x) === '[object String]'; },
+    regex: function (x) { return _toString(x) === '[object RegExp]'; },
+    symbol: function (x) {
+      return typeof globals.Symbol === 'function' && typeof x === 'symbol';
+    }
+  };
+
+  var numberIsNaN = Number.isNaN || function isNaN(value) {
+    // NaN !== NaN, but they are identical.
+    // NaNs are the only non-reflexive value, i.e., if x !== x,
+    // then x is NaN.
+    // isNaN is broken: it converts its argument to number, so
+    // isNaN('foo') => true
+    return value !== value;
+  };
+  var numberIsFinite = Number.isFinite || function isFinite(value) {
+    return typeof value === 'number' && globalIsFinite(value);
+  };
+
   var overrideNative = function overrideNative(object, property, replacement) {
     var original = object[property];
     defineProperty(object, property, replacement, true);
@@ -1833,9 +1860,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   }
   var addIterator = function (prototype, impl) {
     var implementation = impl || function iterator() { return this; };
-    var o = {};
-    o[$iterator$] = implementation;
-    defineProperties(prototype, o);
+    defineProperty(prototype, $iterator$, implementation);
     if (!prototype[$iterator$] && Type.symbol($iterator$)) {
       // implementations are buggy when $iterator$ is a Symbol
       prototype[$iterator$] = implementation;
@@ -2351,7 +2376,14 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     },
 
     of: function of() {
-      return _call(Array.from, this, arguments);
+      var len = arguments.length;
+      var C = this;
+      var A = Array.isArray(C) || !ES.IsCallable(C) ? new Array(len) : ES.Construct(C, [len]);
+      for (var k = 0; k < len; ++k) {
+        createDataPropertyOrThrow(A, k, arguments[k]);
+      }
+      A.length = len;
+      return A;
     }
   };
   defineProperties(Array, ArrayShims);
@@ -2456,7 +2488,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   addIterator(ObjectIterator.prototype);
 
   // note: this is positioned here because it depends on ArrayIterator
-  var arrayOfSupportsSubclassing = (function () {
+  var arrayOfSupportsSubclassing = Array.of === ArrayShims.of || (function () {
     // Detects a bug in Webkit nightly r181886
     var Foo = function Foo(len) { this.length = len; };
     Foo.prototype = [];
@@ -3705,7 +3737,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     p.constructor = {};
     var p2 = Promise.resolve(p);
     return (p === p2); // This *should* be false!
-  })(globals.Promise);
+  }(globals.Promise));
   if (!promiseSupportsSubclassing || !promiseIgnoresNonFunctionThenCallbacks ||
       !promiseRequiresObjectContext || promiseResolveBroken) {
     /*globals Promise: true */
@@ -4210,7 +4242,6 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
         return SetShim;
       }())
     };
-    defineProperties(globals, collectionShims);
 
     if (globals.Map || globals.Set) {
       // Safari 8, for example, doesn't accept an iterable.
@@ -4382,25 +4413,28 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
           Set: collectionShims.Set
         }, true);
       }
-    }
-    if (globals.Set.prototype.keys !== globals.Set.prototype.values) {
-      // Fixed in WebKit with https://bugs.webkit.org/show_bug.cgi?id=144190
-      defineProperty(globals.Set.prototype, 'keys', globals.Set.prototype.values, true);
-    }
-    // Shim incomplete iterator implementations.
-    addIterator(Object.getPrototypeOf((new globals.Map()).keys()));
-    addIterator(Object.getPrototypeOf((new globals.Set()).keys()));
 
-    if (functionsHaveNames && globals.Set.prototype.has.name !== 'has') {
-      // Microsoft Edge v0.11.10074.0 is missing a name on Set#has
-      var anonymousSetHas = globals.Set.prototype.has;
-      overrideNative(globals.Set.prototype, 'has', function has(key) {
-        return _call(anonymousSetHas, this, key);
-      });
+      if (globals.Set.prototype.keys !== globals.Set.prototype.values) {
+        // Fixed in WebKit with https://bugs.webkit.org/show_bug.cgi?id=144190
+        defineProperty(globals.Set.prototype, 'keys', globals.Set.prototype.values, true);
+      }
+
+      // Shim incomplete iterator implementations.
+      addIterator(Object.getPrototypeOf((new globals.Map()).keys()));
+      addIterator(Object.getPrototypeOf((new globals.Set()).keys()));
+
+      if (functionsHaveNames && globals.Set.prototype.has.name !== 'has') {
+        // Microsoft Edge v0.11.10074.0 is missing a name on Set#has
+        var anonymousSetHas = globals.Set.prototype.has;
+        overrideNative(globals.Set.prototype, 'has', function has(key) {
+          return _call(anonymousSetHas, this, key);
+        });
+      }
     }
+    defineProperties(globals, collectionShims);
+    addDefaultSpecies(globals.Map);
+    addDefaultSpecies(globals.Set);
   }
-  addDefaultSpecies(Map);
-  addDefaultSpecies(Set);
 
   // Reflect
   if (!globals.Reflect) {
@@ -10537,7 +10571,7 @@ return exports;
 
 }));
 /**
-* @version: 2.0.5
+* @version: 2.0.6
 * @author: Dan Grossman http://www.dangrossman.info/
 * @copyright: Copyright (c) 2012-2015 Dan Grossman. All rights reserved.
 * @license: Licensed under the MIT license. See http://www.opensource.org/licenses/mit-license.php
@@ -10553,12 +10587,13 @@ return exports;
 
   } else if (typeof exports !== 'undefined') {
     var momentjs = require('moment');
-    var jQuery;
-    try {
-      jQuery = require('jquery');
-    } catch (err) {
-      jQuery = window.jQuery;
-      if (!jQuery) throw new Error('jQuery dependnecy not found');
+    var jQuery = window.jQuery;
+    if (jQuery === undefined) {
+      try {
+        jQuery = require('jquery');
+      } catch (err) {
+        if (!jQuery) throw new Error('jQuery dependency not found');
+      }
     }
 
     factory(root, exports, momentjs, jQuery);
@@ -10724,6 +10759,14 @@ return exports;
 
         if (typeof options.maxDate === 'object')
             this.maxDate = moment(options.maxDate);
+
+        // sanity check for bad options
+        if (this.minDate && this.startDate.isBefore(this.minDate))
+            this.startDate = this.minDate.clone();
+
+        // sanity check for bad options
+        if (this.maxDate && this.endDate.isAfter(this.maxDate))
+            this.endDate = this.maxDate.clone();
 
         if (typeof options.applyClass === 'string')
             this.applyClass = options.applyClass;
@@ -11017,6 +11060,13 @@ return exports;
                     this.container.find('.right .calendar-time select').removeAttr('disabled').removeClass('disabled');
                 }
             }
+            if (this.endDate) {
+                this.container.find('input[name="daterangepicker_end"]').removeClass('active');
+                this.container.find('input[name="daterangepicker_start"]').addClass('active');
+            } else {
+                this.container.find('input[name="daterangepicker_end"]').addClass('active');
+                this.container.find('input[name="daterangepicker_start"]').removeClass('active');
+            }
             this.updateMonthsInView();
             this.updateCalendars();
             this.updateFormInputs();
@@ -11176,7 +11226,7 @@ return exports;
             var maxDate = this.maxDate;
             var selected = side == 'left' ? this.startDate : this.endDate;
 
-            html = '<table class="table-condensed">';
+            var html = '<table class="table-condensed">';
             html += '<thead>';
             html += '<tr>';
 
@@ -11296,7 +11346,7 @@ return exports;
                         classes.push('in-range');
 
                     var cname = '', disabled = false;
-                    for (var i in classes) {
+                    for (var i = 0; i < classes.length; i++) {
                         cname += classes[i] + ' ';
                         if (classes[i] == 'disabled')
                             disabled = true;
@@ -11661,6 +11711,7 @@ return exports;
             //ignore dates that can't be selected
             if (!$(e.target).hasClass('available')) return;
 
+            //have the text inputs above calendars reflect the date being hovered over
             var title = $(e.target).attr('data-title');
             var row = title.substr(1, 1);
             var col = title.substr(3, 1);
@@ -11671,6 +11722,25 @@ return exports;
                 this.container.find('input[name=daterangepicker_start]').val(date.format(this.locale.format));
             } else {
                 this.container.find('input[name=daterangepicker_end]').val(date.format(this.locale.format));
+            }
+
+            //highlight the dates between the start date and the date being hovered as a potential end date
+            var leftCalendar = this.leftCalendar;
+            var rightCalendar = this.rightCalendar;
+            var startDate = this.startDate;
+            if (!this.endDate) {
+                this.container.find('.calendar td').each(function(index, el) {
+                    var title = $(el).attr('data-title');
+                    var row = title.substr(1, 1);
+                    var col = title.substr(3, 1);
+                    var cal = $(el).parents('.calendar');
+                    var dt = cal.hasClass('left') ? leftCalendar.calendar[row][col] : rightCalendar.calendar[row][col];
+                    if (dt.isAfter(startDate) && dt.isBefore(date)) {
+                        $(el).addClass('in-range');
+                    } else {
+                        $(el).removeClass('in-range');
+                    }
+                });
             }
 
         },
@@ -11907,10 +11977,10 @@ return exports;
 
 }));
 
-// Generated by CoffeeScript 1.8.0
+// Generated by CoffeeScript 1.9.3
 (function() {
   var deprecate, hasModule, isArray, makeTwix,
-    __slice = [].slice;
+    slice = [].slice;
 
   hasModule = (typeof module !== "undefined" && module !== null) && (module.exports != null);
 
@@ -11919,7 +11989,7 @@ return exports;
     alreadyDone = false;
     return function() {
       var args;
-      args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
       if (!alreadyDone) {
         if (typeof console !== "undefined" && console !== null) {
           if (typeof console.warn === "function") {
@@ -11937,14 +12007,13 @@ return exports;
   };
 
   makeTwix = function(moment) {
-    var Twix, localesLoaded;
+    var Twix;
     if (moment == null) {
       throw "Can't find moment";
     }
-    localesLoaded = false;
     Twix = (function() {
       function Twix(start, end, parseFormat, options) {
-        var _ref;
+        var ref;
         if (options == null) {
           options = {};
         }
@@ -11959,16 +12028,15 @@ return exports;
         }
         this.start = moment(start, parseFormat, options.parseStrict);
         this.end = moment(end, parseFormat, options.parseStrict);
-        this.allDay = (_ref = options.allDay) != null ? _ref : false;
-        this._trueStart = this.allDay ? this.start.clone().startOf("day") : this.start;
-        this._trueEnd = this.allDay ? this.end.startOf('d').clone().add(1, "day") : this.end;
+        this.allDay = (ref = options.allDay) != null ? ref : false;
+        this._mutated();
       }
 
       Twix._extend = function() {
-        var attr, first, other, others, _i, _len;
-        first = arguments[0], others = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-        for (_i = 0, _len = others.length; _i < _len; _i++) {
-          other = others[_i];
+        var attr, first, j, len, other, others;
+        first = arguments[0], others = 2 <= arguments.length ? slice.call(arguments, 1) : [];
+        for (j = 0, len = others.length; j < len; j++) {
+          other = others[j];
           for (attr in other) {
             if (typeof other[attr] !== "undefined") {
               first[attr] = other[attr];
@@ -11978,110 +12046,12 @@ return exports;
         return first;
       };
 
-      Twix.defaults = {
-        twentyFourHour: false,
-        allDaySimple: {
-          fn: function(options) {
-            return function() {
-              return options.allDay;
-            };
-          },
-          slot: 0,
-          pre: " "
-        },
-        dayOfWeek: {
-          fn: function(options) {
-            return function(date) {
-              return date.format(options.weekdayFormat);
-            };
-          },
-          slot: 1,
-          pre: " "
-        },
-        allDayMonth: {
-          fn: function(options) {
-            return function(date) {
-              return date.format("" + options.monthFormat + " " + options.dayFormat);
-            };
-          },
-          slot: 2,
-          pre: " "
-        },
-        month: {
-          fn: function(options) {
-            return function(date) {
-              return date.format(options.monthFormat);
-            };
-          },
-          slot: 2,
-          pre: " "
-        },
-        date: {
-          fn: function(options) {
-            return function(date) {
-              return date.format(options.dayFormat);
-            };
-          },
-          slot: 3,
-          pre: " "
-        },
-        year: {
-          fn: function(options) {
-            return function(date) {
-              return date.format(options.yearFormat);
-            };
-          },
-          slot: 4,
-          pre: ", "
-        },
-        time: {
-          fn: function(options) {
-            return function(date) {
-              var str;
-              str = date.minutes() === 0 && options.implicitMinutes && !options.twentyFourHour ? date.format(options.hourFormat) : date.format("" + options.hourFormat + ":" + options.minuteFormat);
-              if (!options.groupMeridiems && !options.twentyFourHour) {
-                if (options.spaceBeforeMeridiem) {
-                  str += " ";
-                }
-                str += date.format(options.meridiemFormat);
-              }
-              return str;
-            };
-          },
-          slot: 5,
-          pre: ", "
-        },
-        meridiem: {
-          fn: function(options) {
-            return (function(_this) {
-              return function(t) {
-                return t.format(options.meridiemFormat);
-              };
-            })(this);
-          },
-          slot: 6,
-          pre: function(options) {
-            if (options.spaceBeforeMeridiem) {
-              return " ";
-            } else {
-              return "";
-            }
-          }
-        }
-      };
-
-      Twix.registerLocale = function(name, options) {
-        return moment.locale(name, {
-          twix: Twix._extend({}, Twix.defaults, options)
-        });
-      };
-
       Twix.prototype.isSame = function(period) {
         return this.start.isSame(this.end, period);
       };
 
       Twix.prototype.length = function(period) {
-        return this._trueEnd.diff(this._trueStart, period);
+        return this._displayEnd.diff(this._trueStart, period);
       };
 
       Twix.prototype.count = function(period) {
@@ -12092,8 +12062,8 @@ return exports;
       };
 
       Twix.prototype.countInner = function(period) {
-        var end, start, _ref;
-        _ref = this._inner(period), start = _ref[0], end = _ref[1];
+        var end, ref, start;
+        ref = this._inner(period), start = ref[0], end = ref[1];
         if (start >= end) {
           return 0;
         }
@@ -12101,11 +12071,11 @@ return exports;
       };
 
       Twix.prototype.iterate = function(intervalAmount, period, minHours) {
-        var end, hasNext, start, _ref;
+        var end, hasNext, ref, start;
         if (intervalAmount == null) {
           intervalAmount = 1;
         }
-        _ref = this._prepIterateInputs(intervalAmount, period, minHours), intervalAmount = _ref[0], period = _ref[1], minHours = _ref[2];
+        ref = this._prepIterateInputs(intervalAmount, period, minHours), intervalAmount = ref[0], period = ref[1], minHours = ref[2];
         start = this._trueStart.clone().startOf(period);
         end = this.end.clone().startOf(period);
         if (this.allDay) {
@@ -12120,12 +12090,12 @@ return exports;
       };
 
       Twix.prototype.iterateInner = function(intervalAmount, period) {
-        var end, hasNext, start, _ref, _ref1;
+        var end, hasNext, ref, ref1, start;
         if (intervalAmount == null) {
           intervalAmount = 1;
         }
-        _ref = this._prepIterateInputs(intervalAmount, period), intervalAmount = _ref[0], period = _ref[1];
-        _ref1 = this._inner(period, intervalAmount), start = _ref1[0], end = _ref1[1];
+        ref = this._prepIterateInputs(intervalAmount, period), intervalAmount = ref[0], period = ref[1];
+        ref1 = this._inner(period, intervalAmount), start = ref1[0], end = ref1[1];
         hasNext = function() {
           return start < end;
         };
@@ -12151,19 +12121,11 @@ return exports;
       };
 
       Twix.prototype.isPast = function() {
-        if (this.allDay) {
-          return this.end.clone().endOf("day") < moment();
-        } else {
-          return this.end < moment();
-        }
+        return this._lastMilli < moment();
       };
 
       Twix.prototype.isFuture = function() {
-        if (this.allDay) {
-          return this.start.clone().startOf("day") > moment();
-        } else {
-          return this.start > moment();
-        }
+        return this._trueStart > moment();
       };
 
       Twix.prototype.isCurrent = function() {
@@ -12174,75 +12136,65 @@ return exports;
         if (!moment.isMoment(mom)) {
           mom = moment(mom);
         }
-        return this._trueStart <= mom && this._trueEnd >= mom;
+        return this._trueStart <= mom && this._lastMilli >= mom;
       };
 
       Twix.prototype.isEmpty = function() {
-        return this._trueStart.isSame(this._trueEnd);
+        return this._trueStart.isSame(this._displayEnd);
       };
 
       Twix.prototype.overlaps = function(other) {
-        return this._trueEnd.isAfter(other._trueStart) && this._trueStart.isBefore(other._trueEnd);
+        return this._displayEnd.isAfter(other._trueStart) && this._trueStart.isBefore(other._displayEnd);
       };
 
       Twix.prototype.engulfs = function(other) {
-        return this._trueStart <= other._trueStart && this._trueEnd >= other._trueEnd;
+        return this._trueStart <= other._trueStart && this._displayEnd >= other._displayEnd;
       };
 
       Twix.prototype.union = function(other) {
         var allDay, newEnd, newStart;
         allDay = this.allDay && other.allDay;
-        if (allDay) {
-          newStart = this.start < other.start ? this.start : other.start;
-          newEnd = this.end > other.end ? this.end : other.end;
-        } else {
-          newStart = this._trueStart < other._trueStart ? this._trueStart : other._trueStart;
-          newEnd = this._trueEnd > other._trueEnd ? this._trueEnd : other._trueEnd;
-        }
+        newStart = this._trueStart < other._trueStart ? this._trueStart : other._trueStart;
+        newEnd = this._lastMilli > other._lastMilli ? (allDay ? this._transferrableEnd : this._displayEnd) : (allDay ? other._transferrableEnd : other._displayEnd);
         return new Twix(newStart, newEnd, allDay);
       };
 
       Twix.prototype.intersection = function(other) {
         var allDay, newEnd, newStart;
         allDay = this.allDay && other.allDay;
-        if (allDay) {
-          newStart = this.start > other.start ? this.start : other.start;
-          newEnd = this.end < other.end ? this.end : other.end;
-        } else {
-          newStart = this._trueStart > other._trueStart ? this._trueStart : other._trueStart;
-          newEnd = this._trueEnd < other._trueEnd ? this._trueEnd : other._trueEnd;
-        }
+        newStart = this._trueStart > other._trueStart ? this._trueStart : other._trueStart;
+        newEnd = this._lastMilli < other._lastMilli ? (allDay ? this._transferrableEnd : this._displayEnd) : (allDay ? other._transferrableEnd : other._displayEnd);
         return new Twix(newStart, newEnd, allDay);
       };
 
       Twix.prototype.xor = function() {
-        var allDay, arr, endTime, i, item, last, o, open, other, others, results, start, t, _i, _j, _len, _len1, _ref;
-        others = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+        var allDay, arr, endTime, i, item, j, k, last, len, len1, o, open, other, others, ref, results, start, t;
+        others = 1 <= arguments.length ? slice.call(arguments, 0) : [];
         open = 0;
         start = null;
         results = [];
         allDay = ((function() {
-          var _i, _len, _results;
-          _results = [];
-          for (_i = 0, _len = others.length; _i < _len; _i++) {
-            o = others[_i];
+          var j, len, results1;
+          results1 = [];
+          for (j = 0, len = others.length; j < len; j++) {
+            o = others[j];
             if (o.allDay) {
-              _results.push(o);
+              results1.push(o);
             }
           }
-          return _results;
+          return results1;
         })()).length === others.length;
         arr = [];
-        _ref = [this].concat(others);
-        for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
-          item = _ref[i];
+        ref = [this].concat(others);
+        for (i = j = 0, len = ref.length; j < len; i = ++j) {
+          item = ref[i];
           arr.push({
             time: item._trueStart,
             i: i,
             type: 0
           });
           arr.push({
-            time: item._trueEnd,
+            time: item._displayEnd,
             i: i,
             type: 1
           });
@@ -12250,8 +12202,8 @@ return exports;
         arr = arr.sort(function(a, b) {
           return a.time - b.time;
         });
-        for (_j = 0, _len1 = arr.length; _j < _len1; _j++) {
-          other = arr[_j];
+        for (k = 0, len1 = arr.length; k < len1; k++) {
+          other = arr[k];
           if (other.type === 1) {
             open -= 1;
           }
@@ -12263,6 +12215,7 @@ return exports;
               last = results[results.length - 1];
               if (last && last.end.isSame(start)) {
                 last.end = other.time;
+                last._mutated();
               } else {
                 endTime = allDay ? other.time.clone().subtract(1, 'd') : other.time;
                 t = new Twix(start, endTime, allDay);
@@ -12281,26 +12234,26 @@ return exports;
       };
 
       Twix.prototype.difference = function() {
-        var others, t, _i, _len, _ref, _results;
-        others = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        _ref = this.xor.apply(this, others).map((function(_this) {
+        var j, len, others, ref, results1, t;
+        others = 1 <= arguments.length ? slice.call(arguments, 0) : [];
+        ref = this.xor.apply(this, others).map((function(_this) {
           return function(i) {
             return _this.intersection(i);
           };
         })(this));
-        _results = [];
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          t = _ref[_i];
+        results1 = [];
+        for (j = 0, len = ref.length; j < len; j++) {
+          t = ref[j];
           if (!t.isEmpty() && t.isValid()) {
-            _results.push(t);
+            results1.push(t);
           }
         }
-        return _results;
+        return results1;
       };
 
       Twix.prototype.split = function() {
         var args, dur, end, final, i, mom, start, time, times, vals;
-        args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+        args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
         end = start = this._trueStart.clone();
         if (moment.isDuration(args[0])) {
           dur = args[0];
@@ -12313,24 +12266,24 @@ return exports;
         }
         if (times) {
           times = (function() {
-            var _i, _len, _results;
-            _results = [];
-            for (_i = 0, _len = times.length; _i < _len; _i++) {
-              time = times[_i];
-              _results.push(moment(time));
+            var j, len, results1;
+            results1 = [];
+            for (j = 0, len = times.length; j < len; j++) {
+              time = times[j];
+              results1.push(moment(time));
             }
-            return _results;
+            return results1;
           })();
           times = ((function() {
-            var _i, _len, _results;
-            _results = [];
-            for (_i = 0, _len = times.length; _i < _len; _i++) {
-              mom = times[_i];
+            var j, len, results1;
+            results1 = [];
+            for (j = 0, len = times.length; j < len; j++) {
+              mom = times[j];
               if (mom.isValid() && mom >= start) {
-                _results.push(mom);
+                results1.push(mom);
               }
             }
-            return _results;
+            return results1;
           })()).sort();
         }
         if ((dur && dur.asMilliseconds() === 0) || (times && times.length === 0)) {
@@ -12338,7 +12291,7 @@ return exports;
         }
         vals = [];
         i = 0;
-        final = this._trueEnd;
+        final = this._displayEnd;
         while (start < final && ((times == null) || times[i])) {
           end = dur ? start.clone().add(dur) : times[i].clone();
           end = moment.min(final, end);
@@ -12348,14 +12301,14 @@ return exports;
           start = end;
           i += 1;
         }
-        if (!end.isSame(this._trueEnd) && times) {
-          vals.push(moment.twix(end, this._trueEnd));
+        if (!end.isSame(this._displayEnd) && times) {
+          vals.push(moment.twix(end, this._displayEnd));
         }
         return vals;
       };
 
       Twix.prototype.isValid = function() {
-        return this._trueStart <= this._trueEnd;
+        return this._trueStart <= this._displayEnd;
       };
 
       Twix.prototype.equals = function(other) {
@@ -12363,8 +12316,8 @@ return exports;
       };
 
       Twix.prototype.toString = function() {
-        var _ref;
-        return "{start: " + (this.start.format()) + ", end: " + (this.end.format()) + ", allDay: " + ((_ref = this.allDay) != null ? _ref : {
+        var ref;
+        return "{start: " + (this.start.format()) + ", end: " + (this.end.format()) + ", allDay: " + ((ref = this.allDay) != null ? ref : {
           "true": "false"
         }) + "}";
       };
@@ -12384,17 +12337,16 @@ return exports;
       };
 
       Twix.prototype.format = function(inopts) {
-        var common_bucket, end_bucket, fold, format, fs, global_first, goesIntoTheMorning, needDate, options, process, start_bucket, together, _i, _len;
-        this._lazyLocale();
+        var common_bucket, end_bucket, fold, format, fs, global_first, goesIntoTheMorning, j, len, momentHourFormat, needDate, needsMeridiem, options, process, start_bucket, together;
         if (this.isEmpty()) {
           return "";
         }
+        momentHourFormat = this.start.localeData()._longDateFormat["LT"][0];
         options = {
           groupMeridiems: true,
           spaceBeforeMeridiem: true,
           showDate: true,
           showDayOfWeek: false,
-          twentyFourHour: this.localeData.twentyFourHour,
           implicitMinutes: true,
           implicitYear: true,
           yearFormat: "YYYY",
@@ -12402,7 +12354,7 @@ return exports;
           weekdayFormat: "ddd",
           dayFormat: "D",
           meridiemFormat: "A",
-          hourFormat: "h",
+          hourFormat: momentHourFormat,
           minuteFormat: "mm",
           allDay: "all day",
           explicitAllDay: false,
@@ -12411,76 +12363,103 @@ return exports;
         };
         Twix._extend(options, inopts || {});
         fs = [];
-        if (options.twentyFourHour) {
-          options.hourFormat = options.hourFormat.replace("h", "H");
+        if (inopts && (inopts.twentyFourHour != null)) {
+          options.hourFormat = inopts.twentyFourHour ? options.hourFormat.replace("h", "H") : options.hourFormat.replace("H", "h");
         }
+        needsMeridiem = options.hourFormat && options.hourFormat[0] === "h";
         goesIntoTheMorning = options.lastNightEndsAt > 0 && !this.allDay && this.end.clone().startOf("day").valueOf() === this.start.clone().add(1, "day").startOf("day").valueOf() && this.start.hours() > 12 && this.end.hours() < options.lastNightEndsAt;
         needDate = options.showDate || (!this.isSame("day") && !goesIntoTheMorning);
         if (this.allDay && this.isSame("day") && (!options.showDate || options.explicitAllDay)) {
           fs.push({
             name: "all day simple",
-            fn: this._formatFn('allDaySimple', options),
-            pre: this._formatPre('allDaySimple', options),
-            slot: this._formatSlot('allDaySimple')
+            fn: function() {
+              return options.allDay;
+            },
+            pre: " ",
+            slot: 0
           });
         }
         if (needDate && (!options.implicitYear || this.start.year() !== moment().year() || !this.isSame("year"))) {
           fs.push({
             name: "year",
-            fn: this._formatFn('year', options),
-            pre: this._formatPre('year', options),
-            slot: this._formatSlot('year')
+            fn: function(date) {
+              return date.format(options.yearFormat);
+            },
+            pre: ", ",
+            slot: 4
           });
         }
         if (!this.allDay && needDate) {
           fs.push({
             name: "all day month",
-            fn: this._formatFn('allDayMonth', options),
+            fn: function(date) {
+              return date.format(options.monthFormat + " " + options.dayFormat);
+            },
             ignoreEnd: function() {
               return goesIntoTheMorning;
             },
-            pre: this._formatPre('allDayMonth', options),
-            slot: this._formatSlot('allDayMonth')
+            pre: " ",
+            slot: 2
           });
         }
         if (this.allDay && needDate) {
           fs.push({
             name: "month",
-            fn: this._formatFn('month', options),
-            pre: this._formatPre('month', options),
-            slot: this._formatSlot('month')
+            fn: function(date) {
+              return date.format(options.monthFormat);
+            },
+            pre: " ",
+            slot: 2
           });
         }
         if (this.allDay && needDate) {
           fs.push({
             name: "date",
-            fn: this._formatFn('date', options),
-            pre: this._formatPre('date', options),
-            slot: this._formatSlot('date')
+            fn: function(date) {
+              return date.format(options.dayFormat);
+            },
+            pre: " ",
+            slot: 3
           });
         }
         if (needDate && options.showDayOfWeek) {
           fs.push({
             name: "day of week",
-            fn: this._formatFn('dayOfWeek', options),
-            pre: this._formatPre('dayOfWeek', options),
-            slot: this._formatSlot('dayOfWeek')
+            fn: function(date) {
+              return date.format(options.weekdayFormat);
+            },
+            pre: " ",
+            slot: 1
           });
         }
-        if (options.groupMeridiems && !options.twentyFourHour && !this.allDay) {
+        if (options.groupMeridiems && needsMeridiem && !this.allDay) {
           fs.push({
             name: "meridiem",
-            fn: this._formatFn('meridiem', options),
-            pre: this._formatPre('meridiem', options),
-            slot: this._formatSlot('meridiem')
+            fn: (function(_this) {
+              return function(t) {
+                return t.format(options.meridiemFormat);
+              };
+            })(this),
+            slot: 6,
+            pre: options.spaceBeforeMeridiem ? " " : ""
           });
         }
         if (!this.allDay) {
           fs.push({
             name: "time",
-            fn: this._formatFn('time', options),
-            pre: this._formatPre('time', options),
-            slot: this._formatSlot('time')
+            fn: function(date) {
+              var str;
+              str = date.minutes() === 0 && options.implicitMinutes && needsMeridiem ? date.format(options.hourFormat) : date.format(options.hourFormat + ":" + options.minuteFormat);
+              if (!options.groupMeridiems && needsMeridiem) {
+                if (options.spaceBeforeMeridiem) {
+                  str += " ";
+                }
+                str += date.format(options.meridiemFormat);
+              }
+              return str;
+            },
+            slot: 5,
+            pre: ", "
           });
         }
         start_bucket = [];
@@ -12523,21 +12502,21 @@ return exports;
             }
           };
         })(this);
-        for (_i = 0, _len = fs.length; _i < _len; _i++) {
-          format = fs[_i];
+        for (j = 0, len = fs.length; j < len; j++) {
+          format = fs[j];
           process(format);
         }
         global_first = true;
         fold = (function(_this) {
           return function(array, skip_pre) {
-            var local_first, section, str, _j, _len1, _ref;
+            var k, len1, local_first, ref, section, str;
             local_first = true;
             str = "";
-            _ref = array.sort(function(a, b) {
+            ref = array.sort(function(a, b) {
               return a.format.slot - b.format.slot;
             });
-            for (_j = 0, _len1 = _ref.length; _j < _len1; _j++) {
-              section = _ref[_j];
+            for (k = 0, len1 = ref.length; k < len1; k++) {
+              section = ref[k];
               if (!global_first) {
                 if (local_first && skip_pre) {
                   str += " ";
@@ -12577,16 +12556,16 @@ return exports;
       };
 
       Twix.prototype._prepIterateInputs = function() {
-        var inputs, intervalAmount, minHours, period, _ref, _ref1;
-        inputs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+        var inputs, intervalAmount, minHours, period, ref, ref1;
+        inputs = 1 <= arguments.length ? slice.call(arguments, 0) : [];
         if (typeof inputs[0] === "number") {
           return inputs;
         }
         if (typeof inputs[0] === "string") {
           period = inputs.shift();
-          intervalAmount = (_ref = inputs.pop()) != null ? _ref : 1;
+          intervalAmount = (ref = inputs.pop()) != null ? ref : 1;
           if (inputs.length) {
-            minHours = (_ref1 = inputs[0]) != null ? _ref1 : false;
+            minHours = (ref1 = inputs[0]) != null ? ref1 : false;
           }
         }
         if (moment.isDuration(inputs[0])) {
@@ -12605,7 +12584,7 @@ return exports;
           intervalAmount = 1;
         }
         start = this._trueStart.clone();
-        end = this._trueEnd.clone();
+        end = this._displayEnd.clone();
         if (start > start.clone().startOf(period)) {
           start.startOf(period).add(intervalAmount, period);
         }
@@ -12619,41 +12598,11 @@ return exports;
         return [start, end];
       };
 
-      Twix.prototype._lazyLocale = function() {
-        var e, localeData, locales, _ref;
-        localeData = this.start.localeData();
-        if ((localeData != null) && this.end.locale()._abbr !== localeData._abbr) {
-          this.end.locale(localeData._abbr);
-        }
-        if ((this.localeData != null) && this.localeData._abbr === localeData._abbr) {
-          return;
-        }
-        if (hasModule && !(localesLoaded || localeData._abbr === "en")) {
-          try {
-            locales = require("./locale");
-            locales(moment, Twix);
-          } catch (_error) {
-            e = _error;
-          }
-          localesLoaded = true;
-        }
-        return this.localeData = (_ref = localeData != null ? localeData._twix : void 0) != null ? _ref : Twix.defaults;
-      };
-
-      Twix.prototype._formatFn = function(name, options) {
-        return this.localeData[name].fn(options);
-      };
-
-      Twix.prototype._formatSlot = function(name) {
-        return this.localeData[name].slot;
-      };
-
-      Twix.prototype._formatPre = function(name, options) {
-        if (typeof this.localeData[name].pre === "function") {
-          return this.localeData[name].pre(options);
-        } else {
-          return this.localeData[name].pre;
-        }
+      Twix.prototype._mutated = function() {
+        this._trueStart = this.allDay ? this.start.clone().startOf("day") : this.start;
+        this._lastMilli = this.allDay ? this.end.clone().endOf("day") : this.end;
+        this._transferrableEnd = this.allDay ? this.end.clone().startOf("day") : this.end;
+        return this._displayEnd = this.allDay ? this._transferrableEnd.clone().add(1, "day") : this.end;
       };
 
       Twix.prototype.sameDay = deprecate("sameDay", "isSame('day')", function() {
@@ -12691,7 +12640,7 @@ return exports;
       _twix: Twix.defaults
     });
     Twix.formatTemplate = function(leftSide, rightSide) {
-      return "" + leftSide + " - " + rightSide;
+      return leftSide + " - " + rightSide;
     };
     moment.twix = function() {
       return (function(func, args, ctor) {
@@ -12705,7 +12654,7 @@ return exports;
         ctor.prototype = func.prototype;
         var child = new ctor, result = func.apply(child, args);
         return Object(result) === result ? result : child;
-      })(Twix, [this].concat(__slice.call(arguments)), function(){});
+      })(Twix, [this].concat(slice.call(arguments)), function(){});
     };
     moment.fn.forDuration = function(duration, allDay) {
       return new Twix(this, this.clone().add(duration), allDay);
@@ -12723,7 +12672,7 @@ return exports;
   };
 
   if (hasModule) {
-    module.exports = makeTwix(require("moment"));
+    return module.exports = makeTwix(require("moment"));
   }
 
   if (typeof define === "function") {
@@ -52111,11 +52060,11 @@ angular.module('ngAnimate', [])
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 0.13.1-SNAPSHOT - 2015-07-23
+ * Version: 0.13.2 - 2015-08-02
  * License: MIT
  */
 angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.bindHtml","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.dropdown","ui.bootstrap.modal","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.transition","ui.bootstrap.typeahead"]);
-angular.module("ui.bootstrap.tpls", ["template/accordion/accordion-group.html","template/accordion/accordion.html","template/alert/alert.html","template/carousel/carousel.html","template/carousel/slide.html","template/datepicker/datepicker.html","template/datepicker/day.html","template/datepicker/month.html","template/datepicker/popup.html","template/datepicker/year.html","template/modal/backdrop.html","template/modal/window.html","template/pagination/pager.html","template/pagination/pagination.html","template/tooltip/tooltip-html-popup.html","template/tooltip/tooltip-html-unsafe-popup.html","template/tooltip/tooltip-popup.html","template/tooltip/tooltip-template-popup.html","template/popover/popover-template.html","template/popover/popover.html","template/progressbar/bar.html","template/progressbar/progress.html","template/progressbar/progressbar.html","template/rating/rating.html","template/tabs/tab.html","template/tabs/tabset.html","template/timepicker/timepicker.html","template/typeahead/typeahead-match.html","template/typeahead/typeahead-popup.html"]);
+angular.module("ui.bootstrap.tpls", ["template/accordion/accordion-group.html","template/accordion/accordion.html","template/alert/alert.html","template/carousel/carousel.html","template/carousel/slide.html","template/datepicker/datepicker.html","template/datepicker/day.html","template/datepicker/month.html","template/datepicker/popup.html","template/datepicker/year.html","template/modal/backdrop.html","template/modal/window.html","template/pagination/pager.html","template/pagination/pagination.html","template/tooltip/tooltip-html-popup.html","template/tooltip/tooltip-html-unsafe-popup.html","template/tooltip/tooltip-popup.html","template/tooltip/tooltip-template-popup.html","template/popover/popover-html.html","template/popover/popover-template.html","template/popover/popover.html","template/progressbar/bar.html","template/progressbar/progress.html","template/progressbar/progressbar.html","template/rating/rating.html","template/tabs/tab.html","template/tabs/tabset.html","template/timepicker/timepicker.html","template/typeahead/typeahead-match.html","template/typeahead/typeahead-popup.html"]);
 angular.module('ui.bootstrap.collapse', [])
 
   .directive('collapse', ['$animate', function ($animate) {
@@ -52300,8 +52249,8 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
     link: function(scope, element, attr, controller) {
       scope.$watch(function() { return controller[attr.accordionTransclude]; }, function(heading) {
         if ( heading ) {
-          element.html('');
-          element.append(heading);
+          element.find('span').html('');
+          element.find('span').append(heading);
         }
       });
     }
@@ -52383,6 +52332,10 @@ angular.module('ui.bootstrap.buttons', [])
 
       //ui->model
       element.bind(buttonsCtrl.toggleEvent, function () {
+        if ('disabled' in attrs) {
+          return;
+        }
+
         var isActive = element.hasClass(buttonsCtrl.activeClass);
 
         if (!isActive || angular.isDefined(attrs.uncheckable)) {
@@ -52423,6 +52376,10 @@ angular.module('ui.bootstrap.buttons', [])
 
       //ui->model
       element.bind(buttonsCtrl.toggleEvent, function () {
+        if ('disabled' in attrs) {
+          return;
+        }
+
         scope.$apply(function () {
           ngModelCtrl.$setViewValue(element.hasClass(buttonsCtrl.activeClass) ? getFalseValue() : getTrueValue());
           ngModelCtrl.$render();
@@ -52441,7 +52398,8 @@ angular.module('ui.bootstrap.buttons', [])
 *
 */
 angular.module('ui.bootstrap.carousel', [])
-.controller('CarouselController', ['$scope', '$element', '$interval', '$animate', function ($scope, $element, $interval, $animate) {
+.constant('ANIMATE_CSS', angular.version.minor >= 4)
+.controller('CarouselController', ['$scope', '$element', '$interval', '$animate', 'ANIMATE_CSS', function ($scope, $element, $interval, $animate, ANIMATE_CSS) {
   var self = this,
     slides = self.slides = $scope.slides = [],
     NO_TRANSITION = 'uib-noTransition',
@@ -52474,9 +52432,18 @@ angular.module('ui.bootstrap.carousel', [])
       slide.$element) {
       slide.$element.data(SLIDE_DIRECTION, slide.direction);
       $scope.$currentTransition = true;
-      slide.$element.one('$animate:close', function closeFn() {
-        $scope.$currentTransition = null;
-      });
+      if (ANIMATE_CSS) {
+        $animate.on('addClass', slide.$element, function (element, phase) {
+          $scope.$currentTransition = null;
+          if (!$scope.$currentTransition) {
+            $animate.off('addClass', element);
+          }
+        });
+      } else {
+        slide.$element.one('$animate:close', function closeFn() {
+          $scope.$currentTransition = null;
+        });
+      }
     }
 
     self.currentSlide = slide;
@@ -52581,6 +52548,12 @@ angular.module('ui.bootstrap.carousel', [])
   };
 
   self.addSlide = function(slide, element) {
+    // add default direction for initial transition
+    // necessary for angular 1.4+
+    if (!slides.length && element) {
+      element.data(SLIDE_DIRECTION, 'next');
+    }
+
     slide.$element = element;
     slides.push(slide);
     //if this is the first slide or the slide is set to active, select it
@@ -52611,6 +52584,11 @@ angular.module('ui.bootstrap.carousel', [])
       }
     } else if (currentIndex > index) {
       currentIndex--;
+    }
+    
+    //clean the currentSlide when no more slide
+    if (slides.length === 0) {
+      self.currentSlide = null;
     }
   };
 
@@ -52745,10 +52723,18 @@ function CarouselDemoCtrl($scope) {
 })
 
 .animation('.item', [
-         '$animate',
-function ($animate) {
+         '$injector', '$animate', 'ANIMATE_CSS',
+function ($injector, $animate, ANIMATE_CSS) {
   var NO_TRANSITION = 'uib-noTransition',
-    SLIDE_DIRECTION = 'uib-slideDirection';
+    SLIDE_DIRECTION = 'uib-slideDirection',
+    $animateCss = ANIMATE_CSS ? $injector.get('$animateCss') : null;
+
+  function removeClass(element, className, callback) {
+    element.removeClass(className);
+    if (callback) {
+      callback();
+    }
+  }
 
   return {
     beforeAddClass: function (element, className, done) {
@@ -52758,13 +52744,22 @@ function ($animate) {
         var stopped = false;
         var direction = element.data(SLIDE_DIRECTION);
         var directionClass = direction == 'next' ? 'left' : 'right';
+        var removeClassFn = removeClass.bind(this, element,
+          directionClass + ' ' + direction, done);
         element.addClass(direction);
-        $animate.addClass(element, directionClass).then(function () {
-          if (!stopped) {
-            element.removeClass(directionClass + ' ' + direction);
-          }
-          done();
-        });
+
+        if ($animateCss) {
+          $animateCss(element, {addClass: directionClass})
+            .start()
+            .done(removeClassFn);
+        } else {
+          $animate.addClass(element, directionClass).then(function () {
+            if (!stopped) {
+              removeClassFn();
+            }
+            done();
+          });
+        }
 
         return function () {
           stopped = true;
@@ -52774,17 +52769,25 @@ function ($animate) {
     },
     beforeRemoveClass: function (element, className, done) {
       // Due to transclusion, noTransition property is on parent's scope
-      if (className == 'active' && element.parent() &&
+      if (className === 'active' && element.parent() &&
           !element.parent().data(NO_TRANSITION)) {
         var stopped = false;
         var direction = element.data(SLIDE_DIRECTION);
         var directionClass = direction == 'next' ? 'left' : 'right';
-        $animate.addClass(element, directionClass).then(function () {
-          if (!stopped) {
-            element.removeClass(directionClass);
-          }
-          done();
-        });
+        var removeClassFn = removeClass.bind(this, element, directionClass, done);
+
+        if ($animateCss) {
+          $animateCss(element, {addClass: directionClass})
+            .start()
+            .done(removeClassFn);
+        } else {
+          $animate.addClass(element, directionClass).then(function () {
+            if (!stopped) {
+              removeClassFn();
+            }
+            done();
+          });
+        }
         return function () {
           stopped = true;
         };
@@ -52800,7 +52803,7 @@ function ($animate) {
 
 angular.module('ui.bootstrap.dateparser', [])
 
-.service('dateParser', ['$locale', 'orderByFilter', function($locale, orderByFilter) {
+.service('dateParser', ['$log', '$locale', 'orderByFilter', function($log, $locale, orderByFilter) {
   // Pulled from https://github.com/mbostock/d3/blob/master/src/format/requote.js
   var SPECIAL_CHARACTERS_REGEXP = /[\\\^\$\*\+\?\|\[\]\(\)\.\{\}]/g;
 
@@ -52925,7 +52928,7 @@ angular.module('ui.bootstrap.dateparser', [])
 
     if ( results && results.length ) {
       var fields, dt;
-      if (baseDate) {
+      if (angular.isDate(baseDate) && !isNaN(baseDate.getTime())) {
         fields = {
           year: baseDate.getFullYear(),
           month: baseDate.getMonth(),
@@ -52936,6 +52939,9 @@ angular.module('ui.bootstrap.dateparser', [])
           milliseconds: baseDate.getMilliseconds()
         };
       } else {
+        if (baseDate) {
+          $log.warn('dateparser:', 'baseDate is not a valid date');
+        }
         fields = { year: 1900, month: 0, date: 1, hours: 0, minutes: 0, seconds: 0, milliseconds: 0 };
       }
 
@@ -53214,7 +53220,6 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
       } else {
         $log.error('Datepicker directive: "ng-model" value must be a Date object, a number of milliseconds since 01.01.1970 or a string representing an RFC2822 or ISO 8601 date.');
       }
-      ngModelCtrl.$setValidity('date', isValid);
     }
     this.refreshView();
   };
@@ -53679,7 +53684,7 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
 
       if ( attrs.datepickerOptions ) {
         var options = scope.$parent.$eval(attrs.datepickerOptions);
-        if(options.initDate) {
+        if(options && options.initDate) {
           scope.initDate = options.initDate;
           datepickerEl.attr( 'init-date', 'initDate' );
           delete options.initDate;
@@ -53732,7 +53737,7 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
         } else if (angular.isDate(viewValue) && !isNaN(viewValue)) {
           return viewValue;
         } else if (angular.isString(viewValue)) {
-          var date = dateParser.parse(viewValue, dateFormat, scope.date) || new Date(viewValue);
+          var date = dateParser.parse(viewValue, dateFormat, scope.date);
           if (isNaN(date)) {
             return undefined;
           } else {
@@ -53745,6 +53750,11 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
 
       function validator(modelValue, viewValue) {
         var value = modelValue || viewValue;
+
+        if (!attrs.ngRequired && !value) {
+          return true;
+        }
+
         if (angular.isNumber(value)) {
           value = new Date(value);
         }
@@ -53753,7 +53763,7 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
         } else if (angular.isDate(value) && !isNaN(value)) {
           return true;
         } else if (angular.isString(value)) {
-          var date = dateParser.parse(value, dateFormat) || new Date(value);
+          var date = dateParser.parse(value, dateFormat);
           return !isNaN(date);
         } else {
           return false;
@@ -53782,7 +53792,7 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
         if (angular.isDefined(dt)) {
           scope.date = dt;
         }
-        var date = scope.date ? dateFilter(scope.date, dateFormat) : '';
+        var date = scope.date ? dateFilter(scope.date, dateFormat) : null; // Setting to NULL is necessary for form validators to function
         element.val(date);
         ngModel.$setViewValue(date);
 
@@ -53794,11 +53804,11 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
 
       // Detect changes in the view from the text box
       ngModel.$viewChangeListeners.push(function () {
-        scope.date = dateParser.parse(ngModel.$viewValue, dateFormat, scope.date) || new Date(ngModel.$viewValue);
+        scope.date = dateParser.parse(ngModel.$viewValue, dateFormat, scope.date);
       });
 
       var documentClickBind = function(event) {
-        if (scope.isOpen && event.target !== element[0]) {
+        if (scope.isOpen && !element[0].contains(event.target)) {
           scope.$apply(function() {
             scope.isOpen = false;
           });
@@ -53835,10 +53845,9 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
           scope.position = appendToBody ? $position.offset(element) : $position.position(element);
           scope.position.top = scope.position.top + element.prop('offsetHeight');
 
-          $document.bind('click', documentClickBind);
-
           $timeout(function() {
             scope.$broadcast('datepicker.focus');
+            $document.bind('click', documentClickBind);
           }, 0, false);
         } else {
           $document.unbind('click', documentClickBind);
@@ -54119,7 +54128,9 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
       self.selectedOption = null;
     }
 
-    setIsOpen($scope, isOpen);
+    if (angular.isFunction(setIsOpen)) {
+      setIsOpen($scope, isOpen);
+    }
   });
 
   $scope.$on('$locationChangeSuccess', function() {
@@ -54435,6 +54446,13 @@ angular.module('ui.bootstrap.modal', [])
         NOW_CLOSING_EVENT: 'modal.stack.now-closing'
       };
 
+      //Modal focus behavior
+      var focusableElementList;
+      var focusIndex = 0;
+      var tababbleSelector = 'a[href], area[href], input:not([disabled]), ' +
+        'button:not([disabled]),select:not([disabled]), textarea:not([disabled]), ' +
+        'iframe, object, embed, *[tabindex], *[contenteditable=true]';
+
       function backdropIndex() {
         var topBackdropIndex = -1;
         var opened = openedWindows.keys();
@@ -54446,7 +54464,7 @@ angular.module('ui.bootstrap.modal', [])
         return topBackdropIndex;
       }
 
-      $rootScope.$watch(backdropIndex, function(newBackdropIndex){
+      $rootScope.$watch(backdropIndex, function(newBackdropIndex) {
         if (backdropScope) {
           backdropScope.index = newBackdropIndex;
         }
@@ -54462,8 +54480,8 @@ angular.module('ui.bootstrap.modal', [])
 
         removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, function() {
           body.toggleClass(OPENED_MODAL_CLASS, openedWindows.length() > 0);
-          checkRemoveBackdrop();
         });
+        checkRemoveBackdrop();
 
         //move focus to specified element if available, or else to body
         if (elementToReceiveFocus && elementToReceiveFocus.focus) {
@@ -54511,7 +54529,7 @@ angular.module('ui.bootstrap.modal', [])
           }
           afterAnimating.done = true;
 
-          domEl.remove();
+          $animate.leave(domEl);
           scope.$destroy();
           if (done) {
             done();
@@ -54520,15 +54538,35 @@ angular.module('ui.bootstrap.modal', [])
       }
 
       $document.bind('keydown', function (evt) {
-        var modal;
+        var modal = openedWindows.top();
+        if (modal && modal.value.keyboard) {
+          switch (evt.which){
+            case 27: {
+              evt.preventDefault();
+              $rootScope.$apply(function () {
+                $modalStack.dismiss(modal.key, 'escape key press');
+              });
+              break;
+            }
+            case 9: {
+              $modalStack.loadFocusElementList(modal);
+              var focusChanged = false;
+              if (evt.shiftKey) {
+                if ($modalStack.isFocusInFirstItem(evt)) {
+                  focusChanged = $modalStack.focusLastFocusableElement();
+                }
+              } else {
+                if ($modalStack.isFocusInLastItem(evt)) {
+                  focusChanged = $modalStack.focusFirstFocusableElement();
+                }
+              }
 
-        if (evt.which === 27) {
-          modal = openedWindows.top();
-          if (modal && modal.value.keyboard) {
-            evt.preventDefault();
-            $rootScope.$apply(function () {
-              $modalStack.dismiss(modal.key, 'escape key press');
-            });
+              if (focusChanged) {
+                evt.preventDefault();
+                evt.stopPropagation();
+              }
+              break;
+            }
           }
         }
       });
@@ -54577,6 +54615,7 @@ angular.module('ui.bootstrap.modal', [])
         openedWindows.top().value.modalOpener = modalOpener;
         body.append(modalDomEl);
         body.addClass(OPENED_MODAL_CLASS);
+        $modalStack.clearFocusListCache();
       };
 
       function broadcastClosing(modalWindow, resultOrReason, closing) {
@@ -54618,6 +54657,51 @@ angular.module('ui.bootstrap.modal', [])
         var modalWindow = openedWindows.get(modalInstance);
         if (modalWindow) {
           modalWindow.value.renderDeferred.resolve();
+        }
+      };
+
+      $modalStack.focusFirstFocusableElement = function() {
+        if (focusableElementList.length > 0) {
+          focusableElementList[0].focus();
+          return true;
+        }
+        return false;
+      };
+      $modalStack.focusLastFocusableElement = function() {
+        if (focusableElementList.length > 0) {
+          focusableElementList[focusableElementList.length - 1].focus();
+          return true;
+        }
+        return false;
+      };
+
+      $modalStack.isFocusInFirstItem = function(evt) {
+        if (focusableElementList.length > 0) {
+          return (evt.target || evt.srcElement) == focusableElementList[0];
+        }
+        return false;
+      };
+
+      $modalStack.isFocusInLastItem = function(evt) {
+        if (focusableElementList.length > 0) {
+          return (evt.target || evt.srcElement) == focusableElementList[focusableElementList.length - 1];
+        }
+        return false;
+      };
+
+      $modalStack.clearFocusListCache = function() {
+        focusableElementList = [];
+        focusIndex = 0;
+      };
+
+      $modalStack.loadFocusElementList = function(modalWindow) {
+        if (focusableElementList === undefined || !focusableElementList.length0) {
+          if (modalWindow) {
+            var modalDomE1 = modalWindow.value.modalDomEl;
+            if (modalDomE1 && modalDomE1.length) {
+              focusableElementList = modalDomE1[0].querySelectorAll(tababbleSelector);
+            }
+          }
         }
       };
 
@@ -54704,10 +54788,10 @@ angular.module('ui.bootstrap.modal', [])
                 ctrlInstance = $controller(modalOptions.controller, ctrlLocals);
                 if (modalOptions.controllerAs) {
                   if (modalOptions.bindToController) {
-                    angular.extend(modalScope, ctrlInstance);
-                  } else {
-                    modalScope[modalOptions.controllerAs] = ctrlInstance;
+                    angular.extend(ctrlInstance, modalScope);
                   }
+
+                  modalScope[modalOptions.controllerAs] = ctrlInstance;
                 }
               }
 
@@ -55102,6 +55186,10 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
               tooltip.css( ttPosition );
             };
 
+            var positionTooltipAsync = function () {
+              $timeout(positionTooltip, 0, false);
+            };
+
             // Set up the correct scope to allow transclusion later
             ttScope.origScope = scope;
 
@@ -55212,12 +55300,9 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
                 }
               });
 
-              tooltipLinkedScope.$watch(function () {
-                $timeout(positionTooltip, 0, false);
-              });
-
               if (options.useContentExp) {
                 tooltipLinkedScope.$watch('contentExp()', function (val) {
+                  positionTooltipAsync();
                   if (!val && ttScope.isOpen ) {
                     hide();
                   }
@@ -55253,6 +55338,7 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
             if (!options.useContentExp) {
               attrs.$observe( type, function ( val ) {
                 ttScope.content = val;
+                positionTooltipAsync();
 
                 if (!val && ttScope.isOpen ) {
                   hide();
@@ -55268,6 +55354,16 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
 
             attrs.$observe( prefix+'Title', function ( val ) {
               ttScope.title = val;
+              positionTooltipAsync();
+            });
+
+            attrs.$observe( prefix + 'Placement', function () {
+              if (ttScope.isOpen) {
+                $timeout(function () {
+                  prepPlacement();
+                  show()();
+                }, 0, false);
+              }
             });
 
             function prepPopupClass() {
@@ -55496,7 +55592,7 @@ function ( $tooltip ,  tooltipHtmlUnsafeSuppressDeprecated ,  $log) {
 /**
  * The following features are still outstanding: popup delay, animation as a
  * function, placement as a function, inside, support for more triggers than
- * just mouse enter/leave, html popovers, and selector delegatation.
+ * just mouse enter/leave, and selector delegatation.
  */
 angular.module( 'ui.bootstrap.popover', [ 'ui.bootstrap.tooltip' ] )
 
@@ -55514,6 +55610,21 @@ angular.module( 'ui.bootstrap.popover', [ 'ui.bootstrap.tooltip' ] )
   return $tooltip( 'popoverTemplate', 'popover', 'click', {
     useContentExp: true
   } );
+}])
+
+.directive( 'popoverHtmlPopup', function () {
+  return {
+    restrict: 'EA',
+    replace: true,
+    scope: { contentExp: '&', title: '@', placement: '@', popupClass: '@', animation: '&', isOpen: '&' },
+    templateUrl: 'template/popover/popover-html.html'
+  };
+})
+
+.directive( 'popoverHtml', [ '$tooltip', function ( $tooltip ) {
+  return $tooltip( 'popoverHtml', 'popover', 'click', {
+    useContentExp: true
+  });
 }])
 
 .directive( 'popoverPopup', function () {
@@ -55558,6 +55669,15 @@ angular.module('ui.bootstrap.progressbar', [])
 
         bar.recalculatePercentage = function() {
             bar.percent = +(100 * bar.value / bar.max).toFixed(2);
+			
+            var totalPercentage = 0;
+            self.bars.forEach(function (bar) {
+                totalPercentage += bar.percent;
+            });
+
+            if (totalPercentage > 100) {
+                bar.percent -= totalPercentage - 100;
+            }
         };
 
         bar.$on('$destroy', function() {
@@ -55632,7 +55752,8 @@ angular.module('ui.bootstrap.rating', [])
 .constant('ratingConfig', {
   max: 5,
   stateOn: null,
-  stateOff: null
+  stateOff: null,
+  titles : ['one', 'two', 'three', 'four', 'five']
 })
 
 .controller('RatingController', ['$scope', '$attrs', 'ratingConfig', function($scope, $attrs, ratingConfig) {
@@ -55651,7 +55772,10 @@ angular.module('ui.bootstrap.rating', [])
 
     this.stateOn = angular.isDefined($attrs.stateOn) ? $scope.$parent.$eval($attrs.stateOn) : ratingConfig.stateOn;
     this.stateOff = angular.isDefined($attrs.stateOff) ? $scope.$parent.$eval($attrs.stateOff) : ratingConfig.stateOff;
-
+    var tmpTitles = angular.isDefined($attrs.titles)  ? $scope.$parent.$eval($attrs.titles) : ratingConfig.titles ;    
+    this.titles = angular.isArray(tmpTitles) && tmpTitles.length > 0 ?
+      tmpTitles : ratingConfig.titles;
+    
     var ratingStates = angular.isDefined($attrs.ratingStates) ? $scope.$parent.$eval($attrs.ratingStates) :
                         new Array( angular.isDefined($attrs.max) ? $scope.$parent.$eval($attrs.max) : ratingConfig.max );
     $scope.range = this.buildTemplateObjects(ratingStates);
@@ -55659,11 +55783,19 @@ angular.module('ui.bootstrap.rating', [])
 
   this.buildTemplateObjects = function(states) {
     for (var i = 0, n = states.length; i < n; i++) {
-      states[i] = angular.extend({ index: i }, { stateOn: this.stateOn, stateOff: this.stateOff }, states[i]);
+      states[i] = angular.extend({ index: i }, { stateOn: this.stateOn, stateOff: this.stateOff, title: this.getTitle(i) }, states[i]);
     }
     return states;
   };
-
+  
+  this.getTitle = function(index) {
+    if (index >= this.titles.length) {
+      return index + 1;
+    } else {
+      return this.titles[index];
+    }
+  };
+  
   $scope.rate = function(value) {
     if ( !$scope.readonly && value >= 0 && value <= $scope.range.length ) {
       ngModelCtrl.$setViewValue(ngModelCtrl.$viewValue === value ? 0 : value);
@@ -55714,6 +55846,7 @@ angular.module('ui.bootstrap.rating', [])
     }
   };
 });
+
 
 /**
  * @ngdoc overview
@@ -55915,47 +56048,45 @@ angular.module('ui.bootstrap.tabs', [])
     controller: function() {
       //Empty controller so other directives can require being 'under' a tab
     },
-    compile: function(elm, attrs, transclude) {
-      return function postLink(scope, elm, attrs, tabsetCtrl) {
-        scope.$watch('active', function(active) {
-          if (active) {
-            tabsetCtrl.select(scope);
-          }
-        });
-
-        scope.disabled = false;
-        if ( attrs.disable ) {
-          scope.$parent.$watch($parse(attrs.disable), function(value) {
-            scope.disabled = !! value;
-          });
+    link: function(scope, elm, attrs, tabsetCtrl, transclude) {
+      scope.$watch('active', function(active) {
+        if (active) {
+          tabsetCtrl.select(scope);
         }
+      });
 
-        // Deprecation support of "disabled" parameter
-        // fix(tab): IE9 disabled attr renders grey text on enabled tab #2677
-        // This code is duplicated from the lines above to make it easy to remove once
-        // the feature has been completely deprecated
-        if ( attrs.disabled ) {
-          $log.warn('Use of "disabled" attribute has been deprecated, please use "disable"');
-          scope.$parent.$watch($parse(attrs.disabled), function(value) {
-            scope.disabled = !! value;
-          });
-        }
-
-        scope.select = function() {
-          if ( !scope.disabled ) {
-            scope.active = true;
-          }
-        };
-
-        tabsetCtrl.addTab(scope);
-        scope.$on('$destroy', function() {
-          tabsetCtrl.removeTab(scope);
+      scope.disabled = false;
+      if ( attrs.disable ) {
+        scope.$parent.$watch($parse(attrs.disable), function(value) {
+          scope.disabled = !! value;
         });
+      }
 
-        //We need to transclude later, once the content container is ready.
-        //when this link happens, we're inside a tab heading.
-        scope.$transcludeFn = transclude;
+      // Deprecation support of "disabled" parameter
+      // fix(tab): IE9 disabled attr renders grey text on enabled tab #2677
+      // This code is duplicated from the lines above to make it easy to remove once
+      // the feature has been completely deprecated
+      if ( attrs.disabled ) {
+        $log.warn('Use of "disabled" attribute has been deprecated, please use "disable"');
+        scope.$parent.$watch($parse(attrs.disabled), function(value) {
+          scope.disabled = !! value;
+        });
+      }
+
+      scope.select = function() {
+        if ( !scope.disabled ) {
+          scope.active = true;
+        }
       };
+
+      tabsetCtrl.addTab(scope);
+      scope.$on('$destroy', function() {
+        tabsetCtrl.removeTab(scope);
+      });
+
+      //We need to transclude later, once the content container is ready.
+      //when this link happens, we're inside a tab heading.
+      scope.$transcludeFn = transclude;
     }
   };
 }])
@@ -56462,11 +56593,17 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
       //should it select highlighted popup value when losing focus?
       var isSelectOnBlur = angular.isDefined(attrs.typeaheadSelectOnBlur) ? originalScope.$eval(attrs.typeaheadSelectOnBlur) : false;
 
+      //binding to a variable that indicates if there were no results after the query is completed
+      var isNoResultsSetter = $parse(attrs.typeaheadNoResults).assign || angular.noop;
+
       var inputFormatter = attrs.typeaheadInputFormatter ? $parse(attrs.typeaheadInputFormatter) : undefined;
 
       var appendToBody =  attrs.typeaheadAppendToBody ? originalScope.$eval(attrs.typeaheadAppendToBody) : false;
 
       var focusFirst = originalScope.$eval(attrs.typeaheadFocusFirst) !== false;
+
+      //If input matches an item of the list exactly, select it automatically
+      var selectOnExact = attrs.typeaheadSelectOnExact ? originalScope.$eval(attrs.typeaheadSelectOnExact) : false;
 
       //INTERNAL VARIABLES
 
@@ -56534,10 +56671,20 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
         }
       });
 
+      var inputIsExactMatch = function(inputValue, index) {
+
+        if (scope.matches.length > index && inputValue) {
+          return inputValue.toUpperCase() === scope.matches[index].label.toUpperCase();
+        }
+
+        return false;
+      };
+
       var getMatchesAsync = function(inputValue) {
 
         var locals = {$viewValue: inputValue};
         isLoadingSetter(originalScope, true);
+        isNoResultsSetter(originalScope, false);
         $q.when(parserResult.source(originalScope, locals)).then(function(matches) {
 
           //it might happen that several async queries were in progress if a user were typing fast
@@ -56547,6 +56694,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
             if (matches && matches.length > 0) {
 
               scope.activeIdx = focusFirst ? 0 : -1;
+              isNoResultsSetter(originalScope, false);
               scope.matches.length = 0;
 
               //transform labels
@@ -56566,8 +56714,14 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
               recalculatePosition();
 
               element.attr('aria-expanded', true);
+
+              //Select the single remaining option if user input matches
+              if (selectOnExact && scope.matches.length === 1 && inputIsExactMatch(inputValue, 0)) {
+                scope.select(0);
+              }
             } else {
               resetMatches();
+              isNoResultsSetter(originalScope, true);
             }
           }
           if (onCurrentRequest) {
@@ -56576,6 +56730,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
         }, function(){
           resetMatches();
           isLoadingSetter(originalScope, false);
+          isNoResultsSetter(originalScope, true);
         });
       };
 
@@ -56737,13 +56892,8 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
           return;
         }
 
-        // if there's nothing selected (i.e. focusFirst) and enter is hit, don't do anything
-        if (scope.activeIdx === -1 && evt.which === 13) {
-          return;
-        }
-
-        // if there's nothing selected (i.e. focusFirst) and tab is hit, clear the results
-        if (scope.activeIdx === -1 && evt.which === 9) {
+        // if there's nothing selected (i.e. focusFirst) and enter or tab is hit, clear the results
+        if (scope.activeIdx === -1 && (evt.which === 9 || evt.which === 13)) {
           resetMatches();
           scope.$digest();
           return;
@@ -56787,7 +56937,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
       var dismissClickHandler = function (evt) {
         // Issue #3973
         // Firefox treats right click as a click on document
-        if (element[0] !== evt.target && evt.which !== 3) {
+        if (element[0] !== evt.target && evt.which !== 3 && scope.matches.length !== 0) {
           resetMatches();
           if (!$rootScope.$$phase) {
             scope.$digest();
@@ -57120,6 +57270,22 @@ angular.module("template/tooltip/tooltip-template-popup.html", []).run(["$templa
     "");
 }]);
 
+angular.module("template/popover/popover-html.html", []).run(["$templateCache", function($templateCache) {
+  $templateCache.put("template/popover/popover-html.html",
+    "<div class=\"popover\"\n" +
+    "  tooltip-animation-class=\"fade\"\n" +
+    "  tooltip-classes\n" +
+    "  ng-class=\"{ in: isOpen() }\">\n" +
+    "  <div class=\"arrow\"></div>\n" +
+    "\n" +
+    "  <div class=\"popover-inner\">\n" +
+    "      <h3 class=\"popover-title\" ng-bind=\"title\" ng-if=\"title\"></h3>\n" +
+    "      <div class=\"popover-content\" ng-bind-html=\"contentExp()\"></div>\n" +
+    "  </div>\n" +
+    "</div>\n" +
+    "");
+}]);
+
 angular.module("template/popover/popover-template.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("template/popover/popover-template.html",
     "<div class=\"popover\"\n" +
@@ -57176,10 +57342,11 @@ angular.module("template/progressbar/progressbar.html", []).run(["$templateCache
 angular.module("template/rating/rating.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("template/rating/rating.html",
     "<span ng-mouseleave=\"reset()\" ng-keydown=\"onKeydown($event)\" tabindex=\"0\" role=\"slider\" aria-valuemin=\"0\" aria-valuemax=\"{{range.length}}\" aria-valuenow=\"{{value}}\">\n" +
-    "    <i ng-repeat=\"r in range track by $index\" ng-mouseenter=\"enter($index + 1)\" ng-click=\"rate($index + 1)\" class=\"glyphicon\" ng-class=\"$index < value && (r.stateOn || 'glyphicon-star') || (r.stateOff || 'glyphicon-star-empty')\">\n" +
+    "    <i ng-repeat=\"r in range track by $index\" ng-mouseenter=\"enter($index + 1)\" ng-click=\"rate($index + 1)\" class=\"glyphicon\" ng-class=\"$index < value && (r.stateOn || 'glyphicon-star') || (r.stateOff || 'glyphicon-star-empty')\" ng-attr-title=\"{{r.title}}\" >\n" +
     "        <span class=\"sr-only\">({{ $index < value ? '*' : ' ' }})</span>\n" +
     "    </i>\n" +
-    "</span>");
+    "</span>\n" +
+    "");
 }]);
 
 angular.module("template/tabs/tab.html", []).run(["$templateCache", function($templateCache) {
@@ -77593,7 +77760,7 @@ angular.module('debounce', [])
 }());
 
 /**
- * Satellizer 0.11.1
+ * Satellizer 0.11.3
  * (c) 2015 Sahat Yalkabov
  * License: MIT
  */
@@ -77641,10 +77808,10 @@ angular.module('debounce', [])
           name: 'facebook',
           url: '/auth/facebook',
           authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
-          redirectUri: window.location.origin + '/' || window.location.protocol + '//' + window.location.host + '/',
+          redirectUri: (window.location.origin || window.location.protocol + '//' + window.location.host) + '/',
           scope: ['email'],
           scopeDelimiter: ',',
-          requiredUrlParams: ['display', 'scope'],
+          requiredUrlParams: ['nonce','display', 'scope'],
           display: 'popup',
           type: '2.0',
           popupOptions: { width: 580, height: 400 }
@@ -77686,6 +77853,7 @@ angular.module('debounce', [])
           name: 'twitter',
           url: '/auth/twitter',
           authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
+          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
           type: '1.0',
           popupOptions: { width: 495, height: 645 }
         },
@@ -78080,17 +78248,22 @@ angular.module('debounce', [])
 
             var url = defaults.authorizationEndpoint + '?' + oauth2.buildQueryString();
 
-            return popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri)
-              .pollPopup()
-              .then(function(oauthData) {
-                if (defaults.responseType === 'token') {
-                  return oauthData;
-                }
-                if (oauthData.state && oauthData.state !== storage.get(stateName)) {
-                  return $q.reject('OAuth 2.0 state parameter mismatch.');
-                }
-                return oauth2.exchangeForToken(oauthData, userData);
-              });
+            var openPopup;
+            if (config.platform === 'mobile') {
+              openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri).eventListener(defaults.redirectUri);
+            } else {
+              openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri).pollPopup();
+            }
+
+            return openPopup.then(function(oauthData) {
+              if (defaults.responseType === 'token') {
+                return oauthData;
+              }
+              if (oauthData.state && oauthData.state !== storage.get(stateName)) {
+                return $q.reject('OAuth 2.0 state parameter mismatch.');
+              }
+              return oauth2.exchangeForToken(oauthData, userData);
+            });
 
           };
 
@@ -78118,9 +78291,10 @@ angular.module('debounce', [])
             var urlParams = ['defaultUrlParams', 'requiredUrlParams', 'optionalUrlParams'];
 
             angular.forEach(urlParams, function(params) {
+
               angular.forEach(defaults[params], function(paramName) {
                 var camelizedName = utils.camelCase(paramName);
-                var paramValue = defaults[camelizedName];
+                var paramValue = angular.isFunction(defaults[paramName]) ? defaults[paramName]() : defaults[camelizedName];
 
                 if (paramName === 'state') {
                   var stateName = defaults.name + '_state';
@@ -78168,15 +78342,26 @@ angular.module('debounce', [])
 
           oauth1.open = function(options, userData) {
             angular.extend(defaults, options);
+            var popupWindow;
             var serverUrl = config.baseUrl ? utils.joinUrl(config.baseUrl, defaults.url) : defaults.url;
-            var popupWindow = popup.open('', defaults.name, defaults.popupOptions, defaults.redirectUri);
-            return $http.post(serverUrl)
+
+            if (config.platform !== 'mobile') {
+              popupWindow = popup.open('', defaults.name, defaults.popupOptions, defaults.redirectUri);
+            }
+
+            return $http.post(serverUrl, defaults)
               .then(function(response) {
-                popupWindow.popupWindow.location.href = [defaults.authorizationEndpoint, oauth1.buildQueryString(response.data)].join('?');
-                return popupWindow.pollPopup()
-                  .then(function(response) {
-                    return oauth1.exchangeForToken(response, userData);
-                  });
+                if (config.platform === 'mobile') {
+                  popupWindow = popup.open([defaults.authorizationEndpoint, oauth1.buildQueryString(response.data)].join('?'), defaults.name, defaults.popupOptions, defaults.redirectUri);
+                } else {
+                  popupWindow.popupWindow.location = [defaults.authorizationEndpoint, oauth1.buildQueryString(response.data)].join('?');
+                }
+
+                var popupListener = config.platform === 'mobile' ? popupWindow.eventListener(defaults.redirectUri) : popupWindow.pollPopup();
+
+                return popupListener.then(function(response) {
+                  return oauth1.exchangeForToken(response, userData);
+                });
               });
 
           };
@@ -78221,10 +78406,6 @@ angular.module('debounce', [])
 
           if (popup.popupWindow && popup.popupWindow.focus) {
             popup.popupWindow.focus();
-          }
-
-          if (config.platform === 'mobile') {
-            return popup.eventListener(redirectUri);
           }
 
           return popup;
@@ -78294,8 +78475,7 @@ angular.module('debounce', [])
                 popup.popupWindow.close();
                 $interval.cancel(polling);
               }
-            } catch (error) {
-            }
+            } catch (error) {}
 
             if (!popup.popupWindow) {
               $interval.cancel(polling);
@@ -78305,6 +78485,7 @@ angular.module('debounce', [])
               deferred.reject({ data: 'Authorization Failed' });
             }
           }, 35);
+
           return deferred.promise;
         };
 
@@ -78437,6 +78618,7 @@ angular.module('debounce', [])
     }]);
 
 })(window, window.angular);
+
 /* jquery.signalR.core.js */
 /*global window:false */
 /*!
@@ -101229,19 +101411,23 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     $authProvider.signupRedirect = false;
 
     $authProvider.facebook({
-      clientId: FACEBOOK_APPID
+      clientId: FACEBOOK_APPID,
+      redirectUri: BASE_URL
     });
 
     $authProvider.google({
-      clientId: GOOGLE_APPID
+      clientId: GOOGLE_APPID,
+      redirectUri: BASE_URL
     });
 
     $authProvider.github({
-      clientId: GITHUB_APPID
+      clientId: GITHUB_APPID,
+      redirectUri: BASE_URL
     });
 
     $authProvider.live({
       clientId: LIVE_APPID,
+      redirectUri: BASE_URL,
       scope: ['wl.emails']
     });
 
