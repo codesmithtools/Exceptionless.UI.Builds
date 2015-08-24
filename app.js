@@ -98525,11 +98525,11 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           if (options.data)
             data = Handlebars.createFrame(options.data);
           if (context) {
-            for (var field in context) {
-              var info = reflect(context[field]);
-              info.name = field;
+            Object.keys(context || {}).sort().forEach(function(key) {
+              var info = reflect(context[key]);
+              info.name = key;
               ret = ret + fn(info, { data: data });
-            }
+            });
           }
           return ret;
         });
@@ -105275,7 +105275,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/tabs/extended-data.tpl.html',
-    "<h3 class=\"visible-print\">Extended Data</h3> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} (<timeago date=\"vm.event.date\"></timeago>)</td> </tr> </table> <extended-data-item title=\"item.title\" data=\"item.data\" promote-tab=\"vm.promoteTab(tabName)\" ng-repeat=\"item in tab.data\"></extended-data-item>"
+    "<h3 class=\"visible-print\">Extended Data</h3> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} (<timeago date=\"vm.event.date\"></timeago>)</td> </tr> </table> <extended-data-item title=\"item.title\" data=\"item.data\" promote-tab=\"vm.promoteTab(tabName)\" ng-repeat=\"item in tab.data | orderBy: 'title'\"></extended-data-item>"
   );
 
 
