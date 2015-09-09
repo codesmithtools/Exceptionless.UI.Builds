@@ -65910,7 +65910,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.4.4
+ * @license AngularJS v1.4.5
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
