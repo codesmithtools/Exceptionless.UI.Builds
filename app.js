@@ -882,19 +882,20 @@ var dontEnums = [
 ];
 var dontEnumsLength = dontEnums.length;
 
-var isArguments = function isArguments(value) {
-    var str = toStr(value);
-    var isArgs = str === '[object Arguments]';
-    if (!isArgs) {
-        isArgs = !isArray(value) &&
-          value !== null &&
-          typeof value === 'object' &&
-          typeof value.length === 'number' &&
-          value.length >= 0 &&
-          isCallable(value.callee);
-    }
-    return isArgs;
+// taken directly from https://github.com/ljharb/is-arguments/blob/master/index.js
+// can be replaced with require('is-arguments') if we ever use a build process instead
+var isStandardArguments = function isArguments(value) {
+    return toStr(value) === '[object Arguments]';
 };
+var isLegacyArguments = function isArguments(value) {
+    return value !== null &&
+        typeof value === 'object' &&
+        typeof value.length === 'number' &&
+        value.length >= 0 &&
+        !isArray(value) &&
+        isCallable(value.callee);
+};
+var isArguments = isStandardArguments(arguments) ? isStandardArguments : isLegacyArguments;
 
 defineProperties($Object, {
     keys: function keys(object) {
@@ -940,6 +941,10 @@ var keysWorksWithArguments = $Object.keys && (function () {
     // Safari 5.0 bug
     return $Object.keys(arguments).length === 2;
 }(1, 2));
+var keysHasArgumentsLengthBug = $Object.keys && (function () {
+    var argKeys = $Object.keys(arguments);
+	return arguments.length !== 1 || argKeys.length !== 1 || argKeys[0] !== 1;
+}(1));
 var originalKeys = $Object.keys;
 defineProperties($Object, {
     keys: function keys(object) {
@@ -949,7 +954,7 @@ defineProperties($Object, {
             return originalKeys(object);
         }
     }
-}, !keysWorksWithArguments);
+}, !keysWorksWithArguments || keysHasArgumentsLengthBug);
 
 //
 // Date
@@ -1066,7 +1071,7 @@ if (!dateToJSONIsSupported) {
 var supportsExtendedYears = Date.parse('+033658-09-27T01:46:40.000Z') === 1e15;
 var acceptsInvalidDates = !isNaN(Date.parse('2012-04-04T24:00:00.500Z')) || !isNaN(Date.parse('2012-11-31T23:59:59.000Z')) || !isNaN(Date.parse('2012-12-31T23:59:60.000Z'));
 var doesNotParseY2KNewYear = isNaN(Date.parse('2000-01-01T00:00:00.000Z'));
-if (!Date.parse || doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExtendedYears) {
+if (doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExtendedYears) {
     // XXX global assignment won't work in embeddings that use
     // an alternate object for the context.
     /* global Date: true */
@@ -1094,8 +1099,10 @@ if (!Date.parse || doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExt
             } else {
                 date = NativeDate.apply(this, arguments);
             }
-            // Prevent mixups with unfixed Date object
-            defineProperties(date, { constructor: DateShim }, true);
+            if (!isPrimitive(date)) {
+              // Prevent mixups with unfixed Date object
+              defineProperties(date, { constructor: DateShim }, true);
+            }
             return date;
         };
 
@@ -1592,8 +1599,8 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   * https://github.com/paulmillr/es6-shim
   * @license es6-shim Copyright 2013-2015 by Paul Miller (http://paulmillr.com)
   *   and contributors,  MIT License
-  * es6-shim: v0.32.3
-  * see https://github.com/paulmillr/es6-shim/blob/0.32.3/LICENSE
+  * es6-shim: v0.33.3
+  * see https://github.com/paulmillr/es6-shim/blob/0.33.3/LICENSE
   * Details and documentation:
   * https://github.com/paulmillr/es6-shim/
   */
@@ -1733,7 +1740,6 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     return String.prototype.startsWith && 'abc'.startsWith('a', Infinity) === false;
   }());
 
-  /*jshint evil: true */
   var getGlobal = function () {
 	// the only reliable means to get the global object is
 	// `Function('return this')()`
@@ -1743,7 +1749,6 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     if (typeof global !== 'undefined') { return global; }
 	throw new Error('unable to locate global object');
   };
-  /*jshint evil: false */
 
   var globals = getGlobal();
   var globalIsFinite = globals.isFinite;
@@ -1813,6 +1818,20 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     }
   };
 
+  var wrapConstructor = function wrapConstructor(original, replacement, keysToSkip) {
+    Value.preserveToString(replacement, original);
+    if (Object.setPrototypeOf) {
+      // sets up proper prototype chain where possible
+      Object.setPrototypeOf(original, replacement);
+    }
+    _forEach(Object.getOwnPropertyNames(original), function (key) {
+      if (key in noop || keysToSkip[key]) { return; }
+      Value.proxy(original, key, replacement);
+    });
+    replacement.prototype = original.prototype;
+    Value.redefine(original.prototype, 'constructor', replacement);
+  };
+
   var defaultSpeciesGetter = function () { return this; };
   var addDefaultSpecies = function (C) {
     if (supportsDescriptors && !_hasOwnProperty(C, symbolSpecies)) {
@@ -1820,6 +1839,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     }
   };
   var Type = {
+    primitive: function (x) { return x === null || (typeof x !== 'function' && typeof x !== 'object'); },
     object: function (x) { return x !== null && typeof x === 'object'; },
     string: function (x) { return _toString(x) === '[object String]'; },
     regex: function (x) { return _toString(x) === '[object RegExp]'; },
@@ -2340,7 +2360,8 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
         var iterator = ES.GetIterator(items);
         var next, nextValue;
 
-        for (i = 0; ; ++i) {
+        i = 0;
+        while (true) {
           next = ES.IteratorStep(iterator);
           if (next === false) {
             break;
@@ -2355,6 +2376,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
             ES.IteratorClose(iterator, true);
             throw e;
           }
+          i += 1;
         }
         length = i;
       } else {
@@ -2433,10 +2455,11 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   addIterator(ArrayIterator.prototype);
 
   var ObjectIterator = function (object, kind) {
-    this.object = object;
-    // Don't generate keys yet.
-    this.array = null;
-    this.kind = kind;
+    defineProperties(this, {
+      object: object,
+      array: getAllKeys(object),
+      kind: kind
+    });
   };
 
   var getAllKeys = function getAllKeys(object) {
@@ -2450,20 +2473,16 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   };
 
   defineProperties(ObjectIterator.prototype, {
-    next: function () {
-      var key, array = this.array;
+    next: function next() {
+      var key;
+      var array = this.array;
 
       if (!(this instanceof ObjectIterator)) {
         throw new TypeError('Not an ObjectIterator');
       }
 
-      // Keys not generated
-      if (array === null) {
-        array = this.array = getAllKeys(this.object);
-      }
-
       // Find next key in the object
-      while (ES.ToLength(array.length) > 0) {
+      while (array.length > 0) {
         key = _shift(array);
 
         // The candidate key isn't defined on object.
@@ -2708,6 +2727,49 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     overrideNative(Array.prototype, 'reduceRight', function reduceRight(callbackFn) {
       return _apply(originalReduceRight, this.length >= 0 ? this : [], arguments);
     }, true);
+  }
+
+  if (Number('0o10') !== 8 || Number('0b10') !== 2) {
+    var OrigNumber = Number;
+    var isBinary = Function.bind.call(Function.call, RegExp.prototype.test, /^0b/i);
+    var isOctal = Function.bind.call(Function.call, RegExp.prototype.test, /^0o/i);
+    var toPrimitive = function (O) { // need to replace this with `es-to-primitive/es6`
+      var result;
+      if (typeof O.valueOf === 'function') {
+        result = O.valueOf();
+        if (Type.primitive(result)) {
+          return result;
+        }
+      }
+      if (typeof O.toString === 'function') {
+        result = O.toString();
+        if (Type.primitive(result)) {
+          return result;
+        }
+      }
+      throw new TypeError('No default value');
+    };
+    var NumberShim = function Number(value) {
+      var primValue = Type.primitive(value) ? value : toPrimitive(value, 'number');
+      if (typeof primValue === 'string') {
+        if (isBinary(primValue)) {
+          primValue = parseInt(_strSlice(primValue, 2), 2);
+        } else if (isOctal(primValue)) {
+          primValue = parseInt(_strSlice(primValue, 2), 8);
+        }
+      }
+      if (this instanceof Number) {
+        return new OrigNumber(primValue);
+      }
+      /* jshint newcap: false */
+      return OrigNumber(primValue);
+      /* jshint newcap: true */
+    };
+    wrapConstructor(OrigNumber, NumberShim, {});
+    /*globals Number: true */
+    Number = NumberShim;
+    Value.redefine(globals, 'Number', NumberShim);
+    /*globals Number: false */
   }
 
   var maxSafeInteger = Math.pow(2, 53) - 1;
@@ -3030,18 +3092,9 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       }
       return new OrigRegExp(pattern, flags);
     };
-    Value.preserveToString(RegExpShim, OrigRegExp);
-    if (Object.setPrototypeOf) {
-      // sets up proper prototype chain where possible
-      Object.setPrototypeOf(OrigRegExp, RegExpShim);
-    }
-    _forEach(Object.getOwnPropertyNames(OrigRegExp), function (key) {
-      if (key === '$input') { return; } // Chrome < v39 & Opera < 26 have a nonstandard "$input" property
-      if (key in noop) { return; }
-      Value.proxy(OrigRegExp, key, RegExpShim);
+    wrapConstructor(OrigRegExp, RegExpShim, {
+      $input: true // Chrome < v39 & Opera < 26 have a nonstandard "$input" property
     });
-    RegExpShim.prototype = OrigRegExp.prototype;
-    Value.redefine(OrigRegExp.prototype, 'constructor', RegExpShim);
     /*globals RegExp: true */
     RegExp = RegExpShim;
     Value.redefine(globals, 'RegExp', RegExpShim);
@@ -3314,6 +3367,9 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   // Simplest possible implementation; use a 3rd-party library if you
   // want the best possible speed and/or long stack traces.
   var PromiseShim = (function () {
+    var setTimeout = globals.setTimeout;
+    // some environments don't have setTimeout - no way to shim here.
+    if (typeof setTimeout !== 'function') { return; }
 
     ES.IsPromise = function (promise) {
       if (!ES.TypeIsObject(promise)) {
@@ -3346,7 +3402,6 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     };
 
     // find an appropriate setImmediate-alike
-    var setTimeout = globals.setTimeout;
     var makeZeroTimeout;
     /*global window */
     if (typeof window !== 'undefined' && ES.IsCallable(window.postMessage)) {
@@ -3545,7 +3600,8 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     var performPromiseAll = function (iteratorRecord, C, resultCapability) {
       var it = iteratorRecord.iterator;
       var values = [], remaining = { count: 1 }, next, nextValue;
-      for (var index = 0; ; index++) {
+      var index = 0;
+      while (true) {
         try {
           next = ES.IteratorStep(it);
           if (next === false) {
@@ -3564,6 +3620,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
         );
         remaining.count++;
         nextPromise.then(resolveElement, resultCapability.reject);
+        index += 1;
       }
       if ((--remaining.count) === 0) {
         var resolve = resultCapability.resolve;
@@ -3683,25 +3740,21 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
         var fulfillReaction = { capabilities: resultCapability, handler: onFulfilled };
         var rejectReaction = { capabilities: resultCapability, handler: onRejected };
         var _promise = promise._promise, value;
-        switch (_promise.state) {
-          case PROMISE_PENDING:
-            _push(_promise.fulfillReactions, fulfillReaction);
-            _push(_promise.rejectReactions, rejectReaction);
-            break;
-          case PROMISE_FULFILLED:
-            value = _promise.result;
-            enqueue(function () {
-              promiseReactionJob(fulfillReaction, value);
-            });
-            break;
-          case PROMISE_REJECTED:
-            value = _promise.result;
-            enqueue(function () {
-              promiseReactionJob(rejectReaction, value);
-            });
-            break;
-          default:
-            throw new TypeError('unexpected');
+        if (_promise.state === PROMISE_PENDING) {
+          _push(_promise.fulfillReactions, fulfillReaction);
+          _push(_promise.rejectReactions, rejectReaction);
+        } else if (_promise.state === PROMISE_FULFILLED) {
+          value = _promise.result;
+          enqueue(function () {
+            promiseReactionJob(fulfillReaction, value);
+          });
+        } else if (_promise.state === PROMISE_REJECTED) {
+          value = _promise.result;
+          enqueue(function () {
+            promiseReactionJob(rejectReaction, value);
+          });
+        } else {
+          throw new TypeError('unexpected Promise state');
         }
         return resultCapability.promise;
       }
@@ -3717,35 +3770,37 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     delete globals.Promise.prototype.chain;
   }
 
-  // export the Promise constructor.
-  defineProperties(globals, { Promise: PromiseShim });
-  // In Chrome 33 (and thereabouts) Promise is defined, but the
-  // implementation is buggy in a number of ways.  Let's check subclassing
-  // support to see if we have a buggy implementation.
-  var promiseSupportsSubclassing = supportsSubclassing(globals.Promise, function (S) {
-    return S.resolve(42).then(function () {}) instanceof S;
-  });
-  var promiseIgnoresNonFunctionThenCallbacks = !throwsError(function () { globals.Promise.reject(42).then(null, 5).then(null, noop); });
-  var promiseRequiresObjectContext = throwsError(function () { globals.Promise.call(3, noop); });
-  // Promise.resolve() was errata'ed late in the ES6 process.
-  // See: https://bugzilla.mozilla.org/show_bug.cgi?id=1170742
-  //      https://code.google.com/p/v8/issues/detail?id=4161
-  // It serves as a proxy for a number of other bugs in early Promise
-  // implementations.
-  var promiseResolveBroken = (function (Promise) {
-    var p = Promise.resolve(5);
-    p.constructor = {};
-    var p2 = Promise.resolve(p);
-    return (p === p2); // This *should* be false!
-  }(globals.Promise));
-  if (!promiseSupportsSubclassing || !promiseIgnoresNonFunctionThenCallbacks ||
-      !promiseRequiresObjectContext || promiseResolveBroken) {
-    /*globals Promise: true */
-    Promise = PromiseShim;
-    /*globals Promise: false */
-    overrideNative(globals, 'Promise', PromiseShim);
+  if (typeof PromiseShim === 'function') {
+    // export the Promise constructor.
+    defineProperties(globals, { Promise: PromiseShim });
+    // In Chrome 33 (and thereabouts) Promise is defined, but the
+    // implementation is buggy in a number of ways.  Let's check subclassing
+    // support to see if we have a buggy implementation.
+    var promiseSupportsSubclassing = supportsSubclassing(globals.Promise, function (S) {
+      return S.resolve(42).then(function () {}) instanceof S;
+    });
+    var promiseIgnoresNonFunctionThenCallbacks = !throwsError(function () { globals.Promise.reject(42).then(null, 5).then(null, noop); });
+    var promiseRequiresObjectContext = throwsError(function () { globals.Promise.call(3, noop); });
+    // Promise.resolve() was errata'ed late in the ES6 process.
+    // See: https://bugzilla.mozilla.org/show_bug.cgi?id=1170742
+    //      https://code.google.com/p/v8/issues/detail?id=4161
+    // It serves as a proxy for a number of other bugs in early Promise
+    // implementations.
+    var promiseResolveBroken = (function (Promise) {
+      var p = Promise.resolve(5);
+      p.constructor = {};
+      var p2 = Promise.resolve(p);
+      return (p === p2); // This *should* be false!
+    }(globals.Promise));
+    if (!promiseSupportsSubclassing || !promiseIgnoresNonFunctionThenCallbacks ||
+        !promiseRequiresObjectContext || promiseResolveBroken) {
+      /*globals Promise: true */
+      Promise = PromiseShim;
+      /*globals Promise: false */
+      overrideNative(globals, 'Promise', PromiseShim);
+    }
+    addDefaultSpecies(Promise);
   }
-  addDefaultSpecies(Promise);
 
   // Map and Set require a true ES5 environment
   // Their fast path also requires that the environment preserve
@@ -4731,6 +4786,14 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       return true;
     })) {
       overrideNative(globals.Reflect, 'defineProperty', ReflectShims.defineProperty);
+    }
+  }
+  if (globals.Reflect.construct) {
+    if (!valueOrFalseIfThrows(function () {
+      var F = function F() {};
+      return globals.Reflect.construct(function () {}, [], F) instanceof F;
+    })) {
+      overrideNative(globals.Reflect, 'construct', ReflectShims.construct);
     }
   }
 
@@ -10585,7 +10648,7 @@ return exports;
 
 }));
 /**
-* @version: 2.0.8
+* @version: 2.0.11
 * @author: Dan Grossman http://www.dangrossman.info/
 * @copyright: Copyright (c) 2012-2015 Dan Grossman. All rights reserved.
 * @license: Licensed under the MIT license. See http://www.opensource.org/licenses/mit-license.php
@@ -10639,6 +10702,7 @@ return exports;
         this.timePickerIncrement = 1;
         this.timePickerSeconds = false;
         this.linkedCalendars = true;
+        this.autoUpdateInput = true;
         this.ranges = {};
 
         this.opens = 'right';
@@ -10831,8 +10895,14 @@ return exports;
         if (typeof options.autoApply === 'boolean')
             this.autoApply = options.autoApply;
 
+        if (typeof options.autoUpdateInput === 'boolean')
+            this.autoUpdateInput = options.autoUpdateInput;
+
         if (typeof options.linkedCalendars === 'boolean')
             this.linkedCalendars = options.linkedCalendars;
+
+        if (typeof options.isInvalidDate === 'function')
+            this.isInvalidDate = options.isInvalidDate;
 
         // update day names order to firstDay
         if (this.locale.firstDay != 0) {
@@ -10918,7 +10988,6 @@ return exports;
             }
             list += '<li>' + this.locale.customRangeLabel + '</li>';
             list += '</ul>';
-            this.container.find('.ranges ul').remove();
             this.container.find('.ranges').prepend(list);
         }
 
@@ -10957,7 +11026,15 @@ return exports;
             this.container.addClass('show-calendar');
         }
 
-        this.container.removeClass('opensleft opensright').addClass('opens' + this.opens);
+        this.container.addClass('opens' + this.opens);
+
+        //swap the position of the predefined ranges if opens right
+        if (typeof options.ranges !== 'undefined' && this.opens == 'right') {
+            var ranges = this.container.find('.ranges');
+            var html = ranges.clone();
+            ranges.remove();
+            this.container.find('.calendar.left').parent().prepend(html);
+        }
 
         //apply CSS classes and labels to buttons
         this.container.find('.applyBtn, .cancelBtn').addClass(this.buttonClasses);
@@ -10982,8 +11059,8 @@ return exports;
             .on('change.daterangepicker', 'select.monthselect', $.proxy(this.monthOrYearChanged, this))
             .on('change.daterangepicker', 'select.hourselect,select.minuteselect,select.secondselect,select.ampmselect', $.proxy(this.timeChanged, this))
             .on('click.daterangepicker', '.daterangepicker_input input', $.proxy(this.showCalendars, this))
-            .on('keyup.daterangepicker', '.daterangepicker_input input', $.proxy(this.formInputsChanged, this))
-            .on('change.daterangepicker', '.daterangepicker_input input', $.proxy(this.updateFormInputs, this));
+            //.on('keyup.daterangepicker', '.daterangepicker_input input', $.proxy(this.formInputsChanged, this))
+            .on('change.daterangepicker', '.daterangepicker_input input', $.proxy(this.formInputsChanged, this));
 
         this.container.find('.ranges')
             .on('click.daterangepicker', 'button.applyBtn', $.proxy(this.clickApply, this))
@@ -10996,7 +11073,7 @@ return exports;
             this.element.on({
                 'click.daterangepicker': $.proxy(this.show, this),
                 'focus.daterangepicker': $.proxy(this.show, this),
-                'keyup.daterangepicker': $.proxy(this.controlChanged, this),
+                'keyup.daterangepicker': $.proxy(this.elementChanged, this),
                 'keydown.daterangepicker': $.proxy(this.keydown, this)
             });
         } else {
@@ -11007,10 +11084,10 @@ return exports;
         // if attached to a text input, set the initial value
         //
 
-        if (this.element.is('input') && !this.singleDatePicker) {
+        if (this.element.is('input') && !this.singleDatePicker && this.autoUpdateInput) {
             this.element.val(this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format));
             this.element.trigger('change');
-        } else if (this.element.is('input')) {
+        } else if (this.element.is('input') && this.autoUpdateInput) {
             this.element.val(this.startDate.format(this.locale.format));
             this.element.trigger('change');
         }
@@ -11040,6 +11117,9 @@ return exports;
             if (this.maxDate && this.startDate.isAfter(this.maxDate))
                 this.startDate = this.maxDate;
 
+            if (!this.isShowing)
+                this.updateElement();
+
             this.updateMonthsInView();
         },
 
@@ -11065,7 +11145,14 @@ return exports;
             if (this.dateLimit && this.startDate.clone().add(this.dateLimit).isBefore(this.endDate))
                 this.endDate = this.startDate.clone().add(this.dateLimit);
 
+            if (!this.isShowing)
+                this.updateElement();
+
             this.updateMonthsInView();
+        },
+
+        isInvalidDate: function() {
+            return false;
         },
 
         updateView: function() {
@@ -11092,12 +11179,23 @@ return exports;
 
         updateMonthsInView: function() {
             if (this.endDate) {
+
+                //if both dates are visible already, do nothing
+                if (this.leftCalendar.month && this.rightCalendar.month &&
+                    (this.startDate.format('YYYY-MM') == this.leftCalendar.month.format('YYYY-MM') || this.startDate.format('YYYY-MM') == this.rightCalendar.month.format('YYYY-MM'))
+                    &&
+                    (this.endDate.format('YYYY-MM') == this.leftCalendar.month.format('YYYY-MM') || this.endDate.format('YYYY-MM') == this.rightCalendar.month.format('YYYY-MM'))
+                    ) {
+                    return;
+                }
+
                 this.leftCalendar.month = this.startDate.clone().date(2);
                 if (!this.linkedCalendars && (this.endDate.month() != this.startDate.month() || this.endDate.year() != this.startDate.year())) {
                     this.rightCalendar.month = this.endDate.clone().date(2);
                 } else {
                     this.rightCalendar.month = this.startDate.clone().date(2).add(1, 'month');
                 }
+                
             } else {
                 if (this.leftCalendar.month.format('YYYY-MM') != this.startDate.format('YYYY-MM') && this.rightCalendar.month.format('YYYY-MM') != this.startDate.format('YYYY-MM')) {
                     this.leftCalendar.month = this.startDate.clone().date(2);
@@ -11208,7 +11306,7 @@ return exports;
                 startDay = daysInLastMonth - 6;
 
             // Possible patch for issue #626 https://github.com/dangrossman/bootstrap-daterangepicker/issues/626
-            var curDate = moment([lastYear, lastMonth, startDay, 12, minute, second]); // .utcOffset(this.timeZone);
+            var curDate = moment([lastYear, lastMonth, startDay, 12, minute, second]).utcOffset(this.timeZone); // .utcOffset(this.timeZone);
 
             var col, row;
             for (var i = 0, col = 0, row = 0; i < 42; i++, col++, curDate = moment(curDate).add(24, 'hour')) {
@@ -11355,6 +11453,10 @@ return exports;
                     if (maxDate && calendar[row][col].isAfter(maxDate, 'day'))
                         classes.push('off', 'disabled');
 
+                    //don't allow selection of date if a custom function decides it's invalid
+                    if (this.isInvalidDate(calendar[row][col]))
+                        classes.push('off', 'disabled');
+
                     //highlight the currently selected start date
                     if (calendar[row][col].format('YYYY-MM-DD') == this.startDate.format('YYYY-MM-DD'))
                         classes.push('active', 'start-date');
@@ -11391,7 +11493,7 @@ return exports;
 
         renderTimePicker: function(side) {
 
-            var selected, minDate, maxDate = this.maxDate;
+            var html, selected, minDate, maxDate = this.maxDate;
 
             if (this.dateLimit && (!this.maxDate || this.startDate.clone().add(this.dateLimit).isAfter(this.maxDate)))
                 maxDate = this.startDate.clone().add(this.dateLimit);
@@ -11522,6 +11624,11 @@ return exports;
         },
 
         updateFormInputs: function() {
+
+            //ignore mouse movements while an above-calendar text input has focus
+            if (this.container.find('input[name=daterangepicker_start]').is(":focus") || this.container.find('input[name=daterangepicker_end]').is(":focus"))
+                return;
+
             this.container.find('input[name=daterangepicker_start]').val(this.startDate.format(this.locale.format));
             if (this.endDate)
                 this.container.find('input[name=daterangepicker_end]').val(this.endDate.format(this.locale.format));
@@ -11531,6 +11638,7 @@ return exports;
             } else {
                 this.container.find('button.applyBtn').attr('disabled', 'disabled');
             }
+
         },
 
         move: function() {
@@ -11630,13 +11738,7 @@ return exports;
                 this.callback(this.startDate, this.endDate, this.chosenLabel);
 
             //if picker is attached to a text input, update it
-            if (this.element.is('input') && !this.singleDatePicker) {
-                this.element.val(this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format));
-                this.element.trigger('change');
-            } else if (this.element.is('input')) {
-                this.element.val(this.startDate.format(this.locale.format));
-                this.element.trigger('change');
-            }
+            this.updateElement();
 
             $(document).off('.daterangepicker');
             this.container.hide();
@@ -11678,6 +11780,11 @@ return exports;
         },
 
         hoverRange: function(e) {
+
+            //ignore mouse movements while an above-calendar text input has focus
+            if (this.container.find('input[name=daterangepicker_start]').is(":focus") || this.container.find('input[name=daterangepicker_end]').is(":focus"))
+                return;
+
             var label = e.target.innerHTML;
             if (label == this.locale.customRangeLabel) {
                 this.updateView();
@@ -11686,6 +11793,7 @@ return exports;
                 this.container.find('input[name=daterangepicker_start]').val(dates[0].format(this.locale.format));
                 this.container.find('input[name=daterangepicker_end]').val(dates[1].format(this.locale.format));
             }
+            
         },
 
         clickRange: function(e) {
@@ -11734,6 +11842,10 @@ return exports;
 
         hoverDate: function(e) {
 
+            //ignore mouse movements while an above-calendar text input has focus
+            if (this.container.find('input[name=daterangepicker_start]').is(":focus") || this.container.find('input[name=daterangepicker_end]').is(":focus"))
+                return;
+
             //ignore dates that can't be selected
             if (!$(e.target).hasClass('available')) return;
 
@@ -11756,7 +11868,7 @@ return exports;
             var startDate = this.startDate;
             if (!this.endDate) {
                 this.container.find('.calendar td').each(function(index, el) {
-                    
+
                     //skip week numbers, only look at dates
                     if ($(el).hasClass('week')) return;
 
@@ -11941,8 +12053,8 @@ return exports;
 
         formInputsChanged: function(e) {
             var isRight = $(e.target).closest('.calendar').hasClass('right');
-            var start = moment(this.container.find('input[name="daterangepicker_start"]').val(), this.locale.format);
-            var end = moment(this.container.find('input[name="daterangepicker_end"]').val(), this.locale.format);
+            var start = moment(this.container.find('input[name="daterangepicker_start"]').val(), this.locale.format).utcOffset(this.timeZone);
+            var end = moment(this.container.find('input[name="daterangepicker_end"]').val(), this.locale.format).utcOffset(this.timeZone);
 
             if (start.isValid() && end.isValid()) {
 
@@ -11967,7 +12079,7 @@ return exports;
             }
         },
 
-        controlChanged: function() {
+        elementChanged: function() {
             if (!this.element.is('input')) return;
             if (!this.element.val().length) return;
 
@@ -11997,6 +12109,16 @@ return exports;
             }
         },
 
+        updateElement: function() {
+            if (this.element.is('input') && !this.singleDatePicker && this.autoUpdateInput) {
+                this.element.val(this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format));
+                this.element.trigger('change');
+            } else if (this.element.is('input') && this.autoUpdateInput) {
+                this.element.val(this.startDate.format(this.locale.format));
+                this.element.trigger('change');
+            }
+        },
+
         remove: function() {
             this.container.remove();
             this.element.off('.daterangepicker');
@@ -12016,31 +12138,12 @@ return exports;
     };
 
 }));
-
 // Generated by CoffeeScript 1.9.3
 (function() {
-  var deprecate, hasModule, isArray, makeTwix,
+  var hasModule, isArray, makeTwix,
     slice = [].slice;
 
   hasModule = (typeof module !== "undefined" && module !== null) && (module.exports != null);
-
-  deprecate = function(name, instead, fn) {
-    var alreadyDone;
-    alreadyDone = false;
-    return function() {
-      var args;
-      args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
-      if (!alreadyDone) {
-        if (typeof console !== "undefined" && console !== null) {
-          if (typeof console.warn === "function") {
-            console.warn("#" + name + " is deprecated. Use #" + instead + " instead.");
-          }
-        }
-      }
-      alreadyDone = true;
-      return fn.apply(this, args);
-    };
-  };
 
   isArray = function(input) {
     return Object.prototype.toString.call(input) === '[object Array]';
@@ -12049,7 +12152,7 @@ return exports;
   makeTwix = function(moment) {
     var Twix;
     if (moment == null) {
-      throw "Can't find moment";
+      throw new Error("Can't find moment");
     }
     Twix = (function() {
       function Twix(start, end, parseFormat, options) {
@@ -12057,11 +12160,11 @@ return exports;
         if (options == null) {
           options = {};
         }
-        if (typeof parseFormat !== "string") {
+        if (typeof parseFormat !== 'string') {
           options = parseFormat != null ? parseFormat : {};
           parseFormat = null;
         }
-        if (typeof options === "boolean") {
+        if (typeof options === 'boolean') {
           options = {
             allDay: options
           };
@@ -12078,7 +12181,7 @@ return exports;
         for (j = 0, len = others.length; j < len; j++) {
           other = others[j];
           for (attr in other) {
-            if (typeof other[attr] !== "undefined") {
+            if (typeof other[attr] !== 'undefined') {
               first[attr] = other[attr];
             }
           }
@@ -12112,14 +12215,11 @@ return exports;
 
       Twix.prototype.iterate = function(intervalAmount, period, minHours) {
         var end, hasNext, ref, start;
-        if (intervalAmount == null) {
-          intervalAmount = 1;
-        }
         ref = this._prepIterateInputs(intervalAmount, period, minHours), intervalAmount = ref[0], period = ref[1], minHours = ref[2];
         start = this._trueStart.clone().startOf(period);
         end = this.end.clone().startOf(period);
         if (this.allDay) {
-          end = end.add(1, "day");
+          end = end.add(1, 'd');
         }
         hasNext = (function(_this) {
           return function() {
@@ -12131,9 +12231,6 @@ return exports;
 
       Twix.prototype.iterateInner = function(intervalAmount, period) {
         var end, hasNext, ref, ref1, start;
-        if (intervalAmount == null) {
-          intervalAmount = 1;
-        }
         ref = this._prepIterateInputs(intervalAmount, period), intervalAmount = ref[0], period = ref[1];
         ref1 = this._inner(period, intervalAmount), start = ref1[0], end = ref1[1];
         hasNext = function() {
@@ -12144,10 +12241,10 @@ return exports;
 
       Twix.prototype.humanizeLength = function() {
         if (this.allDay) {
-          if (this.isSame("day")) {
-            return "all day";
+          if (this.isSame('d')) {
+            return 'all day';
           } else {
-            return this.start.from(this.end.clone().add(1, "day"), true);
+            return this.start.from(this.end.clone().add(1, 'd'), true);
           }
         } else {
           return this.start.from(this.end, true);
@@ -12297,7 +12394,7 @@ return exports;
         end = start = this._trueStart.clone();
         if (moment.isDuration(args[0])) {
           dur = args[0];
-        } else if ((!moment.isMoment(args[0]) && !isArray(args[0]) && typeof args[0] === "object") || (typeof args[0] === "number" && typeof args[1] === "string")) {
+        } else if ((!moment.isMoment(args[0]) && !isArray(args[0]) && typeof args[0] === 'object') || (typeof args[0] === 'number' && typeof args[1] === 'string')) {
           dur = moment.duration(args[0], args[1]);
         } else if (isArray(args[0])) {
           times = args[0];
@@ -12356,16 +12453,13 @@ return exports;
       };
 
       Twix.prototype.toString = function() {
-        var ref;
-        return "{start: " + (this.start.format()) + ", end: " + (this.end.format()) + ", allDay: " + ((ref = this.allDay) != null ? ref : {
-          "true": "false"
-        }) + "}";
+        return "{start: " + (this.start.format()) + ", end: " + (this.end.format()) + ", allDay: " + (this.allDay ? 'true' : 'false') + "}";
       };
 
       Twix.prototype.simpleFormat = function(momentOpts, inopts) {
         var options, s;
         options = {
-          allDay: "(all day)",
+          allDay: '(all day)',
           template: Twix.formatTemplate
         };
         Twix._extend(options, inopts || {});
@@ -12379,9 +12473,9 @@ return exports;
       Twix.prototype.format = function(inopts) {
         var common_bucket, end_bucket, fold, format, fs, global_first, goesIntoTheMorning, j, len, momentHourFormat, needDate, needsMeridiem, options, process, start_bucket, together;
         if (this.isEmpty()) {
-          return "";
+          return '';
         }
-        momentHourFormat = this.start.localeData()._longDateFormat["LT"][0];
+        momentHourFormat = this.start.localeData()._longDateFormat['LT'][0];
         options = {
           groupMeridiems: true,
           spaceBeforeMeridiem: true,
@@ -12389,14 +12483,14 @@ return exports;
           showDayOfWeek: false,
           implicitMinutes: true,
           implicitYear: true,
-          yearFormat: "YYYY",
-          monthFormat: "MMM",
-          weekdayFormat: "ddd",
-          dayFormat: "D",
-          meridiemFormat: "A",
+          yearFormat: 'YYYY',
+          monthFormat: 'MMM',
+          weekdayFormat: 'ddd',
+          dayFormat: 'D',
+          meridiemFormat: 'A',
           hourFormat: momentHourFormat,
-          minuteFormat: "mm",
-          allDay: "all day",
+          minuteFormat: 'mm',
+          allDay: 'all day',
           explicitAllDay: false,
           lastNightEndsAt: 0,
           template: Twix.formatTemplate
@@ -12404,102 +12498,100 @@ return exports;
         Twix._extend(options, inopts || {});
         fs = [];
         if (inopts && (inopts.twentyFourHour != null)) {
-          options.hourFormat = inopts.twentyFourHour ? options.hourFormat.replace("h", "H") : options.hourFormat.replace("H", "h");
+          options.hourFormat = inopts.twentyFourHour ? options.hourFormat.replace('h', 'H') : options.hourFormat.replace('H', 'h');
         }
-        needsMeridiem = options.hourFormat && options.hourFormat[0] === "h";
-        goesIntoTheMorning = options.lastNightEndsAt > 0 && !this.allDay && this.end.clone().startOf("day").valueOf() === this.start.clone().add(1, "day").startOf("day").valueOf() && this.start.hours() > 12 && this.end.hours() < options.lastNightEndsAt;
-        needDate = options.showDate || (!this.isSame("day") && !goesIntoTheMorning);
-        if (this.allDay && this.isSame("day") && (!options.showDate || options.explicitAllDay)) {
+        needsMeridiem = options.hourFormat && options.hourFormat[0] === 'h';
+        goesIntoTheMorning = options.lastNightEndsAt > 0 && !this.allDay && this.end.clone().startOf('d').valueOf() === this.start.clone().add(1, 'd').startOf('d').valueOf() && this.start.hours() > 12 && this.end.hours() < options.lastNightEndsAt;
+        needDate = options.showDate || (!this.isSame('d') && !goesIntoTheMorning);
+        if (this.allDay && this.isSame('d') && (!options.showDate || options.explicitAllDay)) {
           fs.push({
-            name: "all day simple",
+            name: 'all day simple',
             fn: function() {
               return options.allDay;
             },
-            pre: " ",
+            pre: ' ',
             slot: 0
           });
         }
-        if (needDate && (!options.implicitYear || this.start.year() !== moment().year() || !this.isSame("year"))) {
+        if (needDate && (!options.implicitYear || this.start.year() !== moment().year() || !this.isSame('y'))) {
           fs.push({
-            name: "year",
+            name: 'year',
             fn: function(date) {
               return date.format(options.yearFormat);
             },
-            pre: ", ",
+            pre: ', ',
             slot: 4
           });
         }
         if (!this.allDay && needDate) {
           fs.push({
-            name: "all day month",
+            name: 'all day month',
             fn: function(date) {
               return date.format(options.monthFormat + " " + options.dayFormat);
             },
             ignoreEnd: function() {
               return goesIntoTheMorning;
             },
-            pre: " ",
+            pre: ' ',
             slot: 2
           });
         }
         if (this.allDay && needDate) {
           fs.push({
-            name: "month",
+            name: 'month',
             fn: function(date) {
               return date.format(options.monthFormat);
             },
-            pre: " ",
+            pre: ' ',
             slot: 2
           });
         }
         if (this.allDay && needDate) {
           fs.push({
-            name: "date",
+            name: 'date',
             fn: function(date) {
               return date.format(options.dayFormat);
             },
-            pre: " ",
+            pre: ' ',
             slot: 3
           });
         }
         if (needDate && options.showDayOfWeek) {
           fs.push({
-            name: "day of week",
+            name: 'day of week',
             fn: function(date) {
               return date.format(options.weekdayFormat);
             },
-            pre: " ",
+            pre: ' ',
             slot: 1
           });
         }
         if (options.groupMeridiems && needsMeridiem && !this.allDay) {
           fs.push({
-            name: "meridiem",
-            fn: (function(_this) {
-              return function(t) {
-                return t.format(options.meridiemFormat);
-              };
-            })(this),
+            name: 'meridiem',
+            fn: function(t) {
+              return t.format(options.meridiemFormat);
+            },
             slot: 6,
-            pre: options.spaceBeforeMeridiem ? " " : ""
+            pre: options.spaceBeforeMeridiem ? ' ' : ''
           });
         }
         if (!this.allDay) {
           fs.push({
-            name: "time",
+            name: 'time',
             fn: function(date) {
               var str;
               str = date.minutes() === 0 && options.implicitMinutes && needsMeridiem ? date.format(options.hourFormat) : date.format(options.hourFormat + ":" + options.minuteFormat);
               if (!options.groupMeridiems && needsMeridiem) {
                 if (options.spaceBeforeMeridiem) {
-                  str += " ";
+                  str += ' ';
                 }
                 str += date.format(options.meridiemFormat);
               }
               return str;
             },
             slot: 5,
-            pre: ", "
+            pre: ', '
           });
         }
         start_bucket = [];
@@ -12525,7 +12617,7 @@ return exports;
                 common_bucket.push({
                   format: {
                     slot: format.slot,
-                    pre: ""
+                    pre: ''
                   },
                   value: function() {
                     return options.template(fold(start_bucket), fold(end_bucket, true).trim());
@@ -12547,50 +12639,43 @@ return exports;
           process(format);
         }
         global_first = true;
-        fold = (function(_this) {
-          return function(array, skip_pre) {
-            var k, len1, local_first, ref, section, str;
-            local_first = true;
-            str = "";
-            ref = array.sort(function(a, b) {
-              return a.format.slot - b.format.slot;
-            });
-            for (k = 0, len1 = ref.length; k < len1; k++) {
-              section = ref[k];
-              if (!global_first) {
-                if (local_first && skip_pre) {
-                  str += " ";
-                } else {
-                  str += section.format.pre;
-                }
+        fold = function(array, skip_pre) {
+          var k, len1, local_first, ref, section, str;
+          local_first = true;
+          str = '';
+          ref = array.sort(function(a, b) {
+            return a.format.slot - b.format.slot;
+          });
+          for (k = 0, len1 = ref.length; k < len1; k++) {
+            section = ref[k];
+            if (!global_first) {
+              if (local_first && skip_pre) {
+                str += ' ';
+              } else {
+                str += section.format.pre;
               }
-              str += section.value();
-              global_first = false;
-              local_first = false;
             }
-            return str;
-          };
-        })(this);
+            str += section.value();
+            global_first = false;
+            local_first = false;
+          }
+          return str;
+        };
         return fold(common_bucket);
       };
 
       Twix.prototype._iterateHelper = function(period, iter, hasNext, intervalAmount) {
-        if (intervalAmount == null) {
-          intervalAmount = 1;
-        }
         return {
-          next: (function(_this) {
-            return function() {
-              var val;
-              if (!hasNext()) {
-                return null;
-              } else {
-                val = iter.clone();
-                iter.add(intervalAmount, period);
-                return val;
-              }
-            };
-          })(this),
+          next: function() {
+            var val;
+            if (!hasNext()) {
+              return null;
+            } else {
+              val = iter.clone();
+              iter.add(intervalAmount, period);
+              return val;
+            }
+          },
           hasNext: hasNext
         };
       };
@@ -12598,10 +12683,10 @@ return exports;
       Twix.prototype._prepIterateInputs = function() {
         var inputs, intervalAmount, minHours, period, ref, ref1;
         inputs = 1 <= arguments.length ? slice.call(arguments, 0) : [];
-        if (typeof inputs[0] === "number") {
+        if (typeof inputs[0] === 'number') {
           return inputs;
         }
-        if (typeof inputs[0] === "string") {
+        if (typeof inputs[0] === 'string') {
           period = inputs.shift();
           intervalAmount = (ref = inputs.pop()) != null ? ref : 1;
           if (inputs.length) {
@@ -12618,7 +12703,7 @@ return exports;
       Twix.prototype._inner = function(period, intervalAmount) {
         var durationCount, durationPeriod, end, modulus, start;
         if (period == null) {
-          period = "ms";
+          period = 'ms';
         }
         if (intervalAmount == null) {
           intervalAmount = 1;
@@ -12639,39 +12724,11 @@ return exports;
       };
 
       Twix.prototype._mutated = function() {
-        this._trueStart = this.allDay ? this.start.clone().startOf("day") : this.start;
-        this._lastMilli = this.allDay ? this.end.clone().endOf("day") : this.end;
-        this._transferrableEnd = this.allDay ? this.end.clone().startOf("day") : this.end;
-        return this._displayEnd = this.allDay ? this._transferrableEnd.clone().add(1, "day") : this.end;
+        this._trueStart = this.allDay ? this.start.clone().startOf('d') : this.start;
+        this._lastMilli = this.allDay ? this.end.clone().endOf('d') : this.end;
+        this._transferrableEnd = this.allDay ? this.end.clone().startOf('d') : this.end;
+        return this._displayEnd = this.allDay ? this._transferrableEnd.clone().add(1, 'd') : this.end;
       };
-
-      Twix.prototype.sameDay = deprecate("sameDay", "isSame('day')", function() {
-        return this.isSame("day");
-      });
-
-      Twix.prototype.sameYear = deprecate("sameYear", "isSame('year')", function() {
-        return this.isSame("year");
-      });
-
-      Twix.prototype.countDays = deprecate("countDays", "countOuter('days')", function() {
-        return this.countOuter("days");
-      });
-
-      Twix.prototype.daysIn = deprecate("daysIn", "iterate('days' [,minHours])", function(minHours) {
-        return this.iterate('days', minHours);
-      });
-
-      Twix.prototype.past = deprecate("past", "isPast()", function() {
-        return this.isPast();
-      });
-
-      Twix.prototype.duration = deprecate("duration", "humanizeLength()", function() {
-        return this.humanizeLength();
-      });
-
-      Twix.prototype.merge = deprecate("merge", "union(other)", function(other) {
-        return this.union(other);
-      });
 
       return Twix;
 
@@ -12712,11 +12769,11 @@ return exports;
   };
 
   if (hasModule) {
-    return module.exports = makeTwix(require("moment"));
+    return module.exports = makeTwix(require('moment'));
   }
 
-  if (typeof define === "function") {
-    define("twix", ["moment"], function(moment) {
+  if (typeof define === 'function') {
+    define('twix', ['moment'], function(moment) {
       return makeTwix(moment);
     });
   }
@@ -15432,9 +15489,9 @@ return exports;
 }());
 /*!
 
- handlebars v3.0.3
+ handlebars v4.0.3
 
-Copyright (C) 2011-2014 by Yehuda Katz
+Copyright (C) 2011-2015 by Yehuda Katz
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -15514,52 +15571,52 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 
-	var _runtime = __webpack_require__(1);
-
-	var _runtime2 = _interopRequireWildcard(_runtime);
+	var _handlebarsRuntime = __webpack_require__(1);
 
 	// Compiler imports
 
-	var _AST = __webpack_require__(2);
+	var _handlebarsRuntime2 = _interopRequireDefault(_handlebarsRuntime);
 
-	var _AST2 = _interopRequireWildcard(_AST);
+	var _handlebarsCompilerAst = __webpack_require__(2);
 
-	var _Parser$parse = __webpack_require__(3);
+	var _handlebarsCompilerAst2 = _interopRequireDefault(_handlebarsCompilerAst);
 
-	var _Compiler$compile$precompile = __webpack_require__(4);
+	var _handlebarsCompilerBase = __webpack_require__(3);
 
-	var _JavaScriptCompiler = __webpack_require__(5);
+	var _handlebarsCompilerCompiler = __webpack_require__(4);
 
-	var _JavaScriptCompiler2 = _interopRequireWildcard(_JavaScriptCompiler);
+	var _handlebarsCompilerJavascriptCompiler = __webpack_require__(5);
 
-	var _Visitor = __webpack_require__(6);
+	var _handlebarsCompilerJavascriptCompiler2 = _interopRequireDefault(_handlebarsCompilerJavascriptCompiler);
 
-	var _Visitor2 = _interopRequireWildcard(_Visitor);
+	var _handlebarsCompilerVisitor = __webpack_require__(6);
 
-	var _noConflict = __webpack_require__(7);
+	var _handlebarsCompilerVisitor2 = _interopRequireDefault(_handlebarsCompilerVisitor);
 
-	var _noConflict2 = _interopRequireWildcard(_noConflict);
+	var _handlebarsNoConflict = __webpack_require__(7);
 
-	var _create = _runtime2['default'].create;
+	var _handlebarsNoConflict2 = _interopRequireDefault(_handlebarsNoConflict);
+
+	var _create = _handlebarsRuntime2['default'].create;
 	function create() {
 	  var hb = _create();
 
 	  hb.compile = function (input, options) {
-	    return _Compiler$compile$precompile.compile(input, options, hb);
+	    return _handlebarsCompilerCompiler.compile(input, options, hb);
 	  };
 	  hb.precompile = function (input, options) {
-	    return _Compiler$compile$precompile.precompile(input, options, hb);
+	    return _handlebarsCompilerCompiler.precompile(input, options, hb);
 	  };
 
-	  hb.AST = _AST2['default'];
-	  hb.Compiler = _Compiler$compile$precompile.Compiler;
-	  hb.JavaScriptCompiler = _JavaScriptCompiler2['default'];
-	  hb.Parser = _Parser$parse.parser;
-	  hb.parse = _Parser$parse.parse;
+	  hb.AST = _handlebarsCompilerAst2['default'];
+	  hb.Compiler = _handlebarsCompilerCompiler.Compiler;
+	  hb.JavaScriptCompiler = _handlebarsCompilerJavascriptCompiler2['default'];
+	  hb.Parser = _handlebarsCompilerBase.parser;
+	  hb.parse = _handlebarsCompilerBase.parse;
 
 	  return hb;
 	}
@@ -15567,9 +15624,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	var inst = create();
 	inst.create = create;
 
-	_noConflict2['default'](inst);
+	_handlebarsNoConflict2['default'](inst);
 
-	inst.Visitor = _Visitor2['default'];
+	inst.Visitor = _handlebarsCompilerVisitor2['default'];
 
 	inst['default'] = inst;
 
@@ -15582,44 +15639,47 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireWildcard = __webpack_require__(9)['default'];
+
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 
-	var _import = __webpack_require__(9);
-
-	var base = _interopRequireWildcard(_import);
+	var _handlebarsBase = __webpack_require__(10);
 
 	// Each of these augment the Handlebars object. No need to setup here.
 	// (This is done to easily share code between commonjs and browse envs)
 
-	var _SafeString = __webpack_require__(10);
+	var base = _interopRequireWildcard(_handlebarsBase);
 
-	var _SafeString2 = _interopRequireWildcard(_SafeString);
+	var _handlebarsSafeString = __webpack_require__(11);
 
-	var _Exception = __webpack_require__(11);
+	var _handlebarsSafeString2 = _interopRequireDefault(_handlebarsSafeString);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
+	var _handlebarsException = __webpack_require__(12);
 
-	var _import2 = __webpack_require__(12);
+	var _handlebarsException2 = _interopRequireDefault(_handlebarsException);
 
-	var Utils = _interopRequireWildcard(_import2);
+	var _handlebarsUtils = __webpack_require__(13);
 
-	var _import3 = __webpack_require__(13);
+	var Utils = _interopRequireWildcard(_handlebarsUtils);
 
-	var runtime = _interopRequireWildcard(_import3);
+	var _handlebarsRuntime = __webpack_require__(14);
 
-	var _noConflict = __webpack_require__(7);
+	var runtime = _interopRequireWildcard(_handlebarsRuntime);
 
-	var _noConflict2 = _interopRequireWildcard(_noConflict);
+	var _handlebarsNoConflict = __webpack_require__(7);
 
 	// For compatibility and usage outside of module systems, make the Handlebars object a namespace
+
+	var _handlebarsNoConflict2 = _interopRequireDefault(_handlebarsNoConflict);
+
 	function create() {
 	  var hb = new base.HandlebarsEnvironment();
 
 	  Utils.extend(hb, base);
-	  hb.SafeString = _SafeString2['default'];
-	  hb.Exception = _Exception2['default'];
+	  hb.SafeString = _handlebarsSafeString2['default'];
+	  hb.Exception = _handlebarsException2['default'];
 	  hb.Utils = Utils;
 	  hb.escapeExpression = Utils.escapeExpression;
 
@@ -15634,7 +15694,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var inst = create();
 	inst.create = create;
 
-	_noConflict2['default'](inst);
+	_handlebarsNoConflict2['default'](inst);
 
 	inst['default'] = inst;
 
@@ -15649,140 +15709,18 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	exports.__esModule = true;
 	var AST = {
-	  Program: function Program(statements, blockParams, strip, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'Program';
-	    this.body = statements;
-
-	    this.blockParams = blockParams;
-	    this.strip = strip;
-	  },
-
-	  MustacheStatement: function MustacheStatement(path, params, hash, escaped, strip, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'MustacheStatement';
-
-	    this.path = path;
-	    this.params = params || [];
-	    this.hash = hash;
-	    this.escaped = escaped;
-
-	    this.strip = strip;
-	  },
-
-	  BlockStatement: function BlockStatement(path, params, hash, program, inverse, openStrip, inverseStrip, closeStrip, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'BlockStatement';
-
-	    this.path = path;
-	    this.params = params || [];
-	    this.hash = hash;
-	    this.program = program;
-	    this.inverse = inverse;
-
-	    this.openStrip = openStrip;
-	    this.inverseStrip = inverseStrip;
-	    this.closeStrip = closeStrip;
-	  },
-
-	  PartialStatement: function PartialStatement(name, params, hash, strip, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'PartialStatement';
-
-	    this.name = name;
-	    this.params = params || [];
-	    this.hash = hash;
-
-	    this.indent = '';
-	    this.strip = strip;
-	  },
-
-	  ContentStatement: function ContentStatement(string, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'ContentStatement';
-	    this.original = this.value = string;
-	  },
-
-	  CommentStatement: function CommentStatement(comment, strip, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'CommentStatement';
-	    this.value = comment;
-
-	    this.strip = strip;
-	  },
-
-	  SubExpression: function SubExpression(path, params, hash, locInfo) {
-	    this.loc = locInfo;
-
-	    this.type = 'SubExpression';
-	    this.path = path;
-	    this.params = params || [];
-	    this.hash = hash;
-	  },
-
-	  PathExpression: function PathExpression(data, depth, parts, original, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'PathExpression';
-
-	    this.data = data;
-	    this.original = original;
-	    this.parts = parts;
-	    this.depth = depth;
-	  },
-
-	  StringLiteral: function StringLiteral(string, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'StringLiteral';
-	    this.original = this.value = string;
-	  },
-
-	  NumberLiteral: function NumberLiteral(number, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'NumberLiteral';
-	    this.original = this.value = Number(number);
-	  },
-
-	  BooleanLiteral: function BooleanLiteral(bool, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'BooleanLiteral';
-	    this.original = this.value = bool === 'true';
-	  },
-
-	  UndefinedLiteral: function UndefinedLiteral(locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'UndefinedLiteral';
-	    this.original = this.value = undefined;
-	  },
-
-	  NullLiteral: function NullLiteral(locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'NullLiteral';
-	    this.original = this.value = null;
-	  },
-
-	  Hash: function Hash(pairs, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'Hash';
-	    this.pairs = pairs;
-	  },
-	  HashPair: function HashPair(key, value, locInfo) {
-	    this.loc = locInfo;
-	    this.type = 'HashPair';
-	    this.key = key;
-	    this.value = value;
-	  },
-
 	  // Public API used to evaluate derived attributes regarding AST nodes
 	  helpers: {
 	    // a mustache is definitely a helper if:
 	    // * it is an eligible helper, and
 	    // * it has at least one parameter or hash segment
 	    helperExpression: function helperExpression(node) {
-	      return !!(node.type === 'SubExpression' || node.params.length || node.hash);
+	      return node.type === 'SubExpression' || (node.type === 'MustacheStatement' || node.type === 'BlockStatement') && !!(node.params && node.params.length || node.hash);
 	    },
 
 	    scopedId: function scopedId(path) {
-	      return /^\.|this\b/.test(path.original);
+	      return (/^\.|this\b/.test(path.original)
+	      );
 	    },
 
 	    // an ID is simple if it only has one part, and that part is not
@@ -15804,33 +15742,31 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
+
+	var _interopRequireWildcard = __webpack_require__(9)['default'];
 
 	exports.__esModule = true;
 	exports.parse = parse;
 
-	var _parser = __webpack_require__(14);
+	var _parser = __webpack_require__(15);
 
-	var _parser2 = _interopRequireWildcard(_parser);
+	var _parser2 = _interopRequireDefault(_parser);
 
-	var _AST = __webpack_require__(2);
+	var _whitespaceControl = __webpack_require__(16);
 
-	var _AST2 = _interopRequireWildcard(_AST);
+	var _whitespaceControl2 = _interopRequireDefault(_whitespaceControl);
 
-	var _WhitespaceControl = __webpack_require__(15);
+	var _helpers = __webpack_require__(17);
 
-	var _WhitespaceControl2 = _interopRequireWildcard(_WhitespaceControl);
+	var Helpers = _interopRequireWildcard(_helpers);
 
-	var _import = __webpack_require__(16);
-
-	var Helpers = _interopRequireWildcard(_import);
-
-	var _extend = __webpack_require__(12);
+	var _utils = __webpack_require__(13);
 
 	exports.parser = _parser2['default'];
 
 	var yy = {};
-	_extend.extend(yy, Helpers, _AST2['default']);
+	_utils.extend(yy, Helpers);
 
 	function parse(input, options) {
 	  // Just return if an already-compiled AST was passed in.
@@ -15845,7 +15781,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return new yy.SourceLocation(options && options.srcName, locInfo);
 	  };
 
-	  var strip = new _WhitespaceControl2['default']();
+	  var strip = new _whitespaceControl2['default'](options);
 	  return strip.accept(_parser2['default'].parse(input));
 	}
 
@@ -15853,24 +15789,26 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 4 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/* eslint-disable new-cap */
+
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 	exports.Compiler = Compiler;
 	exports.precompile = precompile;
 	exports.compile = compile;
 
-	var _Exception = __webpack_require__(11);
+	var _exception = __webpack_require__(12);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
+	var _exception2 = _interopRequireDefault(_exception);
 
-	var _isArray$indexOf = __webpack_require__(12);
+	var _utils = __webpack_require__(13);
 
-	var _AST = __webpack_require__(2);
+	var _ast = __webpack_require__(2);
 
-	var _AST2 = _interopRequireWildcard(_AST);
+	var _ast2 = _interopRequireDefault(_ast);
 
 	var slice = [].slice;
 
@@ -15925,17 +15863,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	    // These changes will propagate to the other compiler components
 	    var knownHelpers = options.knownHelpers;
 	    options.knownHelpers = {
-	      helperMissing: true,
-	      blockHelperMissing: true,
-	      each: true,
+	      'helperMissing': true,
+	      'blockHelperMissing': true,
+	      'each': true,
 	      'if': true,
-	      unless: true,
+	      'unless': true,
 	      'with': true,
-	      log: true,
-	      lookup: true
+	      'log': true,
+	      'lookup': true
 	    };
 	    if (knownHelpers) {
 	      for (var _name in knownHelpers) {
+	        /* istanbul ignore else */
 	        if (_name in knownHelpers) {
 	          options.knownHelpers[_name] = knownHelpers[_name];
 	        }
@@ -15960,6 +15899,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	  },
 
 	  accept: function accept(node) {
+	    /* istanbul ignore next: Sanity code */
+	    if (!this[node.type]) {
+	      throw new _exception2['default']('Unknown type: ' + node.type, node);
+	    }
+
 	    this.sourceNode.unshift(node);
 	    var ret = this[node.type](node);
 	    this.sourceNode.shift();
@@ -16019,14 +15963,32 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.opcode('append');
 	  },
 
+	  DecoratorBlock: function DecoratorBlock(decorator) {
+	    var program = decorator.program && this.compileProgram(decorator.program);
+	    var params = this.setupFullMustacheParams(decorator, program, undefined),
+	        path = decorator.path;
+
+	    this.useDecorators = true;
+	    this.opcode('registerDecorator', params.length, path.original);
+	  },
+
 	  PartialStatement: function PartialStatement(partial) {
 	    this.usePartial = true;
 
+	    var program = partial.program;
+	    if (program) {
+	      program = this.compileProgram(partial.program);
+	    }
+
 	    var params = partial.params;
 	    if (params.length > 1) {
-	      throw new _Exception2['default']('Unsupported number of partial arguments: ' + params.length, partial);
+	      throw new _exception2['default']('Unsupported number of partial arguments: ' + params.length, partial);
 	    } else if (!params.length) {
-	      params.push({ type: 'PathExpression', parts: [], depth: 0 });
+	      if (this.options.explicitPartialContext) {
+	        this.opcode('pushLiteral', 'undefined');
+	      } else {
+	        params.push({ type: 'PathExpression', parts: [], depth: 0 });
+	      }
 	    }
 
 	    var partialName = partial.name.original,
@@ -16035,7 +15997,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      this.accept(partial.name);
 	    }
 
-	    this.setupFullMustacheParams(partial, undefined, undefined, true);
+	    this.setupFullMustacheParams(partial, program, undefined, true);
 
 	    var indent = partial.indent || '';
 	    if (this.options.preventIndent && indent) {
@@ -16046,15 +16008,21 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.opcode('invokePartial', isDynamic, partialName, indent);
 	    this.opcode('append');
 	  },
+	  PartialBlockStatement: function PartialBlockStatement(partialBlock) {
+	    this.PartialStatement(partialBlock);
+	  },
 
 	  MustacheStatement: function MustacheStatement(mustache) {
-	    this.SubExpression(mustache); // eslint-disable-line new-cap
+	    this.SubExpression(mustache);
 
 	    if (mustache.escaped && !this.options.noEscape) {
 	      this.opcode('appendEscaped');
 	    } else {
 	      this.opcode('append');
 	    }
+	  },
+	  Decorator: function Decorator(decorator) {
+	    this.DecoratorBlock(decorator);
 	  },
 
 	  ContentStatement: function ContentStatement(content) {
@@ -16087,13 +16055,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.opcode('pushProgram', program);
 	    this.opcode('pushProgram', inverse);
 
+	    path.strict = true;
 	    this.accept(path);
 
 	    this.opcode('invokeAmbiguous', name, isBlock);
 	  },
 
 	  simpleSexpr: function simpleSexpr(sexpr) {
-	    this.accept(sexpr.path);
+	    var path = sexpr.path;
+	    path.strict = true;
+	    this.accept(path);
 	    this.opcode('resolvePossibleLambda');
 	  },
 
@@ -16105,12 +16076,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	    if (this.options.knownHelpers[name]) {
 	      this.opcode('invokeKnownHelper', params.length, name);
 	    } else if (this.options.knownHelpersOnly) {
-	      throw new _Exception2['default']('You specified knownHelpersOnly, but used the unknown helper ' + name, sexpr);
+	      throw new _exception2['default']('You specified knownHelpersOnly, but used the unknown helper ' + name, sexpr);
 	    } else {
+	      path.strict = true;
 	      path.falsy = true;
 
 	      this.accept(path);
-	      this.opcode('invokeHelper', params.length, path.original, _AST2['default'].helpers.simpleId(path));
+	      this.opcode('invokeHelper', params.length, path.original, _ast2['default'].helpers.simpleId(path));
 	    }
 	  },
 
@@ -16119,7 +16091,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.opcode('getContext', path.depth);
 
 	    var name = path.parts[0],
-	        scoped = _AST2['default'].helpers.scopedId(path),
+	        scoped = _ast2['default'].helpers.scopedId(path),
 	        blockParamId = !path.depth && !scoped && this.blockParamIndex(name);
 
 	    if (blockParamId) {
@@ -16129,9 +16101,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	      this.opcode('pushContext');
 	    } else if (path.data) {
 	      this.options.data = true;
-	      this.opcode('lookupData', path.depth, path.parts);
+	      this.opcode('lookupData', path.depth, path.parts, path.strict);
 	    } else {
-	      this.opcode('lookupOnContext', path.parts, path.falsy, scoped);
+	      this.opcode('lookupOnContext', path.parts, path.falsy, path.strict, scoped);
 	    }
 	  },
 
@@ -16185,13 +16157,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	  },
 
 	  classifySexpr: function classifySexpr(sexpr) {
-	    var isSimple = _AST2['default'].helpers.simpleId(sexpr.path);
+	    var isSimple = _ast2['default'].helpers.simpleId(sexpr.path);
 
 	    var isBlockParam = isSimple && !!this.blockParamIndex(sexpr.path.parts[0]);
 
 	    // a mustache is an eligible helper if:
 	    // * its id is simple (a single part, not `this` or `..`)
-	    var isHelper = !isBlockParam && _AST2['default'].helpers.helperExpression(sexpr);
+	    var isHelper = !isBlockParam && _ast2['default'].helpers.helperExpression(sexpr);
 
 	    // if a mustache is an eligible helper but not a definite
 	    // helper, it is ambiguous, and will be resolved in a later
@@ -16248,7 +16220,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    } else {
 	      if (this.trackIds) {
 	        var blockParamIndex = undefined;
-	        if (val.parts && !_AST2['default'].helpers.scopedId(val) && !val.depth) {
+	        if (val.parts && !_ast2['default'].helpers.scopedId(val) && !val.depth) {
 	          blockParamIndex = this.blockParamIndex(val.parts[0]);
 	        }
 	        if (blockParamIndex) {
@@ -16257,7 +16229,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        } else {
 	          value = val.original || value;
 	          if (value.replace) {
-	            value = value.replace(/^\.\//g, '').replace(/^\.$/g, '');
+	            value = value.replace(/^this(?:\.|$)/, '').replace(/^\.\//, '').replace(/^\.$/, '');
 	          }
 
 	          this.opcode('pushId', val.type, value);
@@ -16286,7 +16258,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  blockParamIndex: function blockParamIndex(name) {
 	    for (var depth = 0, len = this.options.blockParams.length; depth < len; depth++) {
 	      var blockParams = this.options.blockParams[depth],
-	          param = blockParams && _isArray$indexOf.indexOf(blockParams, name);
+	          param = blockParams && _utils.indexOf(blockParams, name);
 	      if (blockParams && param >= 0) {
 	        return [depth, param];
 	      }
@@ -16296,7 +16268,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function precompile(input, options, env) {
 	  if (input == null || typeof input !== 'string' && input.type !== 'Program') {
-	    throw new _Exception2['default']('You must pass a string or Handlebars AST to Handlebars.precompile. You passed ' + input);
+	    throw new _exception2['default']('You must pass a string or Handlebars AST to Handlebars.precompile. You passed ' + input);
 	  }
 
 	  options = options || {};
@@ -16312,11 +16284,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	  return new env.JavaScriptCompiler().compile(environment, options);
 	}
 
-	function compile(input, _x, env) {
-	  var options = arguments[1] === undefined ? {} : arguments[1];
+	function compile(input, options, env) {
+	  if (options === undefined) options = {};
 
 	  if (input == null || typeof input !== 'string' && input.type !== 'Program') {
-	    throw new _Exception2['default']('You must pass a string or Handlebars AST to Handlebars.compile. You passed ' + input);
+	    throw new _exception2['default']('You must pass a string or Handlebars AST to Handlebars.compile. You passed ' + input);
 	  }
 
 	  if (!('data' in options)) {
@@ -16362,7 +16334,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return true;
 	  }
 
-	  if (_isArray$indexOf.isArray(a) && _isArray$indexOf.isArray(b) && a.length === b.length) {
+	  if (_utils.isArray(a) && _utils.isArray(b) && a.length === b.length) {
 	    for (var i = 0; i < a.length; i++) {
 	      if (!argEquals(a[i], b[i])) {
 	        return false;
@@ -16377,7 +16349,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var literal = sexpr.path;
 	    // Casting to string here to make false and 0 literal values play nicely with the rest
 	    // of the system.
-	    sexpr.path = new _AST2['default'].PathExpression(false, 0, [literal.original + ''], literal.original + '', literal.loc);
+	    sexpr.path = {
+	      type: 'PathExpression',
+	      data: false,
+	      depth: 0,
+	      parts: [literal.original + ''],
+	      original: literal.original + '',
+	      loc: literal.loc
+	    };
 	  }
 	}
 
@@ -16387,21 +16366,21 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 
-	var _COMPILER_REVISION$REVISION_CHANGES = __webpack_require__(9);
+	var _base = __webpack_require__(10);
 
-	var _Exception = __webpack_require__(11);
+	var _exception = __webpack_require__(12);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
+	var _exception2 = _interopRequireDefault(_exception);
 
-	var _isArray = __webpack_require__(12);
+	var _utils = __webpack_require__(13);
 
-	var _CodeGen = __webpack_require__(17);
+	var _codeGen = __webpack_require__(18);
 
-	var _CodeGen2 = _interopRequireWildcard(_CodeGen);
+	var _codeGen2 = _interopRequireDefault(_codeGen);
 
 	function Literal(value) {
 	  this.value = value;
@@ -16416,22 +16395,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	    if (JavaScriptCompiler.isValidJavaScriptVariableName(name)) {
 	      return [parent, '.', name];
 	    } else {
-	      return [parent, '[\'', name, '\']'];
+	      return [parent, '[', JSON.stringify(name), ']'];
 	    }
 	  },
 	  depthedLookup: function depthedLookup(name) {
-	    return [this.aliasable('this.lookup'), '(depths, "', name, '")'];
+	    return [this.aliasable('container.lookup'), '(depths, "', name, '")'];
 	  },
 
 	  compilerInfo: function compilerInfo() {
-	    var revision = _COMPILER_REVISION$REVISION_CHANGES.COMPILER_REVISION,
-	        versions = _COMPILER_REVISION$REVISION_CHANGES.REVISION_CHANGES[revision];
+	    var revision = _base.COMPILER_REVISION,
+	        versions = _base.REVISION_CHANGES[revision];
 	    return [revision, versions];
 	  },
 
 	  appendToBuffer: function appendToBuffer(source, location, explicit) {
 	    // Force a source as this simplifies the merge logic.
-	    if (!_isArray.isArray(source)) {
+	    if (!_utils.isArray(source)) {
 	      source = [source];
 	    }
 	    source = this.source.wrap(source, location);
@@ -16464,6 +16443,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.name = this.environment.name;
 	    this.isChild = !!context;
 	    this.context = context || {
+	      decorators: [],
 	      programs: [],
 	      environments: []
 	    };
@@ -16481,7 +16461,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	    this.compileChildren(environment, options);
 
-	    this.useDepths = this.useDepths || environment.useDepths || this.options.compat;
+	    this.useDepths = this.useDepths || environment.useDepths || environment.useDecorators || this.options.compat;
 	    this.useBlockParams = this.useBlockParams || environment.useBlockParams;
 
 	    var opcodes = environment.opcodes,
@@ -16504,7 +16484,24 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	    /* istanbul ignore next */
 	    if (this.stackSlot || this.inlineStack.length || this.compileStack.length) {
-	      throw new _Exception2['default']('Compile completed with content left on stack');
+	      throw new _exception2['default']('Compile completed with content left on stack');
+	    }
+
+	    if (!this.decorators.isEmpty()) {
+	      this.useDecorators = true;
+
+	      this.decorators.prepend('var decorators = container.decorators;\n');
+	      this.decorators.push('return fn;');
+
+	      if (asObject) {
+	        this.decorators = Function.apply(this, ['fn', 'props', 'container', 'depth0', 'data', 'blockParams', 'depths', this.decorators.merge()]);
+	      } else {
+	        this.decorators.prepend('function(fn, props, container, depth0, data, blockParams, depths) {\n');
+	        this.decorators.push('}\n');
+	        this.decorators = this.decorators.merge();
+	      }
+	    } else {
+	      this.decorators = undefined;
 	    }
 
 	    var fn = this.createFunctionContext(asObject);
@@ -16513,10 +16510,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	        compiler: this.compilerInfo(),
 	        main: fn
 	      };
-	      var programs = this.context.programs;
+
+	      if (this.decorators) {
+	        ret.main_d = this.decorators; // eslint-disable-line camelcase
+	        ret.useDecorators = true;
+	      }
+
+	      var _context = this.context;
+	      var programs = _context.programs;
+	      var decorators = _context.decorators;
+
 	      for (i = 0, l = programs.length; i < l; i++) {
 	        if (programs[i]) {
 	          ret[i] = programs[i];
+	          if (decorators[i]) {
+	            ret[i + '_d'] = decorators[i];
+	            ret.useDecorators = true;
+	          }
 	        }
 	      }
 
@@ -16562,7 +16572,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    // track the last context pushed into place to allow skipping the
 	    // getContext opcode when it would be a noop
 	    this.lastContext = 0;
-	    this.source = new _CodeGen2['default'](this.options.srcName);
+	    this.source = new _codeGen2['default'](this.options.srcName);
+	    this.decorators = new _codeGen2['default'](this.options.srcName);
 	  },
 
 	  createFunctionContext: function createFunctionContext(asObject) {
@@ -16590,7 +16601,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      }
 	    }
 
-	    var params = ['depth0', 'helpers', 'partials', 'data'];
+	    var params = ['container', 'depth0', 'helpers', 'partials', 'data'];
 
 	    if (this.useBlockParams || this.useDepths) {
 	      params.push('blockParams');
@@ -16744,7 +16755,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      var local = this.popStack();
 	      this.pushSource(['if (', local, ' != null) { ', this.appendToBuffer(local, undefined, true), ' }']);
 	      if (this.environment.isSimple) {
-	        this.pushSource(['else { ', this.appendToBuffer('\'\'', undefined, true), ' }']);
+	        this.pushSource(['else { ', this.appendToBuffer("''", undefined, true), ' }']);
 	      }
 	    }
 	  },
@@ -16756,7 +16767,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  //
 	  // Escape `value` and append it to the buffer
 	  appendEscaped: function appendEscaped() {
-	    this.pushSource(this.appendToBuffer([this.aliasable('this.escapeExpression'), '(', this.popStack(), ')']));
+	    this.pushSource(this.appendToBuffer([this.aliasable('container.escapeExpression'), '(', this.popStack(), ')']));
 	  },
 
 	  // [getContext]
@@ -16787,7 +16798,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  //
 	  // Looks up the value of `name` on the current context and pushes
 	  // it onto the stack.
-	  lookupOnContext: function lookupOnContext(parts, falsy, scoped) {
+	  lookupOnContext: function lookupOnContext(parts, falsy, strict, scoped) {
 	    var i = 0;
 
 	    if (!scoped && this.options.compat && !this.lastContext) {
@@ -16798,7 +16809,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      this.pushContext();
 	    }
 
-	    this.resolvePath('context', parts, i, falsy);
+	    this.resolvePath('context', parts, i, falsy, strict);
 	  },
 
 	  // [lookupBlockParam]
@@ -16821,27 +16832,29 @@ return /******/ (function(modules) { // webpackBootstrap
 	  // On stack, after: data, ...
 	  //
 	  // Push the data lookup operator
-	  lookupData: function lookupData(depth, parts) {
+	  lookupData: function lookupData(depth, parts, strict) {
 	    if (!depth) {
 	      this.pushStackLiteral('data');
 	    } else {
-	      this.pushStackLiteral('this.data(data, ' + depth + ')');
+	      this.pushStackLiteral('container.data(data, ' + depth + ')');
 	    }
 
-	    this.resolvePath('data', parts, 0, true);
+	    this.resolvePath('data', parts, 0, true, strict);
 	  },
 
-	  resolvePath: function resolvePath(type, parts, i, falsy) {
+	  resolvePath: function resolvePath(type, parts, i, falsy, strict) {
+	    // istanbul ignore next
+
 	    var _this = this;
 
 	    if (this.options.strict || this.options.assumeObjects) {
-	      this.push(strictLookup(this.options.strict, this, parts, type));
+	      this.push(strictLookup(this.options.strict && strict, this, parts, type));
 	      return;
 	    }
 
 	    var len = parts.length;
 	    for (; i < len; i++) {
-	      /*eslint-disable no-loop-func */
+	      /* eslint-disable no-loop-func */
 	      this.replaceStack(function (current) {
 	        var lookup = _this.nameLookup(current, parts[i], type);
 	        // We want to ensure that zero and false are handled properly if the context (falsy flag)
@@ -16853,7 +16866,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	          return [' && ', lookup];
 	        }
 	      });
-	      /*eslint-enable no-loop-func */
+	      /* eslint-enable no-loop-func */
 	    }
 	  },
 
@@ -16865,7 +16878,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  // If the `value` is a lambda, replace it on the stack by
 	  // the return value of the lambda
 	  resolvePossibleLambda: function resolvePossibleLambda() {
-	    this.push([this.aliasable('this.lambda'), '(', this.popStack(), ', ', this.contextName(0), ')']);
+	    this.push([this.aliasable('container.lambda'), '(', this.popStack(), ', ', this.contextName(0), ')']);
 	  },
 
 	  // [pushStringParam]
@@ -16960,6 +16973,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	  },
 
+	  // [registerDecorator]
+	  //
+	  // On stack, before: hash, program, params..., ...
+	  // On stack, after: ...
+	  //
+	  // Pops off the decorator's parameters, invokes the decorator,
+	  // and inserts the decorator into the decorators list.
+	  registerDecorator: function registerDecorator(paramSize, name) {
+	    var foundDecorator = this.nameLookup('decorators', name, 'decorator'),
+	        options = this.setupHelperArgs(name, paramSize);
+
+	    this.decorators.push(['fn = ', this.decorators.functionCall(foundDecorator, '', ['fn', 'props', 'container', options]), ' || fn;']);
+	  },
+
 	  // [invokeHelper]
 	  //
 	  // On stack, before: hash, inverse, program, params..., ...
@@ -17035,7 +17062,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  // and pushes the result of the invocation back.
 	  invokePartial: function invokePartial(isDynamic, name, indent) {
 	    var params = [],
-	        options = this.setupParams(name, 1, params, false);
+	        options = this.setupParams(name, 1, params);
 
 	    if (isDynamic) {
 	      name = this.popStack();
@@ -17047,6 +17074,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	    options.helpers = 'helpers';
 	    options.partials = 'partials';
+	    options.decorators = 'container.decorators';
 
 	    if (!isDynamic) {
 	      params.unshift(this.nameLookup('partials', name, 'partial'));
@@ -17060,7 +17088,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    options = this.objectLiteral(options);
 	    params.push(options);
 
-	    this.push(this.source.functionCall('this.invokePartial', '', params));
+	    this.push(this.source.functionCall('container.invokePartial', '', params));
 	  },
 
 	  // [assignToHash]
@@ -17129,6 +17157,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        child.index = index;
 	        child.name = 'program' + index;
 	        this.context.programs[index] = compiler.compile(child, options, this.context, !this.precompile);
+	        this.context.decorators[index] = compiler.decorators;
 	        this.context.environments[index] = child;
 
 	        this.useDepths = this.useDepths || compiler.useDepths;
@@ -17162,7 +17191,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      programParams.push('depths');
 	    }
 
-	    return 'this.program(' + programParams.join(', ') + ')';
+	    return 'container.program(' + programParams.join(', ') + ')';
 	  },
 
 	  useRegister: function useRegister(name) {
@@ -17204,7 +17233,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	    /* istanbul ignore next */
 	    if (!this.isInline()) {
-	      throw new _Exception2['default']('replaceStack on non-inline');
+	      throw new _exception2['default']('replaceStack on non-inline');
 	    }
 
 	    // We want to merge the inline statement into the replacement statement via ','
@@ -17274,7 +17303,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      if (!inline) {
 	        /* istanbul ignore next */
 	        if (!this.stackSlot) {
-	          throw new _Exception2['default']('Invalid stack pop');
+	          throw new _exception2['default']('Invalid stack pop');
 	        }
 	        this.stackSlot--;
 	      }
@@ -17327,13 +17356,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	  setupHelper: function setupHelper(paramSize, name, blockHelper) {
 	    var params = [],
 	        paramsInit = this.setupHelperArgs(name, paramSize, params, blockHelper);
-	    var foundHelper = this.nameLookup('helpers', name, 'helper');
+	    var foundHelper = this.nameLookup('helpers', name, 'helper'),
+	        callContext = this.aliasable(this.contextName(0) + ' != null ? ' + this.contextName(0) + ' : {}');
 
 	    return {
 	      params: params,
 	      paramsInit: paramsInit,
 	      name: foundHelper,
-	      callParams: [this.contextName(0)].concat(params)
+	      callParams: [callContext].concat(params)
 	    };
 	  },
 
@@ -17342,7 +17372,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	        contexts = [],
 	        types = [],
 	        ids = [],
+	        objectArgs = !params,
 	        param = undefined;
+
+	    if (objectArgs) {
+	      params = [];
+	    }
 
 	    options.name = this.quotedString(helper);
 	    options.hash = this.popStack();
@@ -17361,8 +17396,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    // Avoid setting fn and inverse if neither are set. This allows
 	    // helpers to do a check for `if (options.fn)`
 	    if (program || inverse) {
-	      options.fn = program || 'this.noop';
-	      options.inverse = inverse || 'this.noop';
+	      options.fn = program || 'container.noop';
+	      options.inverse = inverse || 'container.noop';
 	    }
 
 	    // The parameters go on to the stack in order (making sure that they are evaluated in order)
@@ -17379,6 +17414,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	        types[i] = this.popStack();
 	        contexts[i] = this.popStack();
 	      }
+	    }
+
+	    if (objectArgs) {
+	      options.args = this.source.generateArray(params);
 	    }
 
 	    if (this.trackIds) {
@@ -17399,15 +17438,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	  },
 
 	  setupHelperArgs: function setupHelperArgs(helper, paramSize, params, useRegister) {
-	    var options = this.setupParams(helper, paramSize, params, true);
+	    var options = this.setupParams(helper, paramSize, params);
 	    options = this.objectLiteral(options);
 	    if (useRegister) {
 	      this.useRegister('options');
 	      params.push('options');
 	      return ['options=', options];
-	    } else {
+	    } else if (params) {
 	      params.push(options);
 	      return '';
+	    } else {
+	      return options;
 	    }
 	  }
 	};
@@ -17439,7 +17480,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 
 	  if (requireTerminal) {
-	    return [compiler.aliasable('this.strict'), '(', stack, ', ', compiler.quotedString(parts[i]), ')'];
+	    return [compiler.aliasable('container.strict'), '(', stack, ', ', compiler.quotedString(parts[i]), ')'];
 	  } else {
 	    return stack;
 	  }
@@ -17454,17 +17495,13 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 
-	var _Exception = __webpack_require__(11);
+	var _exception = __webpack_require__(12);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
-
-	var _AST = __webpack_require__(2);
-
-	var _AST2 = _interopRequireWildcard(_AST);
+	var _exception2 = _interopRequireDefault(_exception);
 
 	function Visitor() {
 	  this.parents = [];
@@ -17478,9 +17515,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	  acceptKey: function acceptKey(node, name) {
 	    var value = this.accept(node[name]);
 	    if (this.mutating) {
-	      // Hacky sanity check:
-	      if (value && (!value.type || !_AST2['default'][value.type])) {
-	        throw new _Exception2['default']('Unexpected node type "' + value.type + '" found when accepting ' + name + ' on ' + node.type);
+	      // Hacky sanity check: This may have a few false positives for type for the helper
+	      // methods but will generally do the right thing without a lot of overhead.
+	      if (value && !Visitor.prototype[value.type]) {
+	        throw new _exception2['default']('Unexpected node type "' + value.type + '" found when accepting ' + name + ' on ' + node.type);
 	      }
 	      node[name] = value;
 	    }
@@ -17492,7 +17530,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.acceptKey(node, name);
 
 	    if (!node[name]) {
-	      throw new _Exception2['default'](node.type + ' requires ' + name);
+	      throw new _exception2['default'](node.type + ' requires ' + name);
 	    }
 	  },
 
@@ -17515,6 +17553,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	      return;
 	    }
 
+	    /* istanbul ignore next: Sanity code */
+	    if (!this[object.type]) {
+	      throw new _exception2['default']('Unknown type: ' + object.type, object);
+	    }
+
 	    if (this.current) {
 	      this.parents.unshift(this.current);
 	    }
@@ -17535,43 +17578,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.acceptArray(program.body);
 	  },
 
-	  MustacheStatement: function MustacheStatement(mustache) {
-	    this.acceptRequired(mustache, 'path');
-	    this.acceptArray(mustache.params);
-	    this.acceptKey(mustache, 'hash');
+	  MustacheStatement: visitSubExpression,
+	  Decorator: visitSubExpression,
+
+	  BlockStatement: visitBlock,
+	  DecoratorBlock: visitBlock,
+
+	  PartialStatement: visitPartial,
+	  PartialBlockStatement: function PartialBlockStatement(partial) {
+	    visitPartial.call(this, partial);
+
+	    this.acceptKey(partial, 'program');
 	  },
 
-	  BlockStatement: function BlockStatement(block) {
-	    this.acceptRequired(block, 'path');
-	    this.acceptArray(block.params);
-	    this.acceptKey(block, 'hash');
+	  ContentStatement: function ContentStatement() /* content */{},
+	  CommentStatement: function CommentStatement() /* comment */{},
 
-	    this.acceptKey(block, 'program');
-	    this.acceptKey(block, 'inverse');
-	  },
+	  SubExpression: visitSubExpression,
 
-	  PartialStatement: function PartialStatement(partial) {
-	    this.acceptRequired(partial, 'name');
-	    this.acceptArray(partial.params);
-	    this.acceptKey(partial, 'hash');
-	  },
+	  PathExpression: function PathExpression() /* path */{},
 
-	  ContentStatement: function ContentStatement() {},
-	  CommentStatement: function CommentStatement() {},
-
-	  SubExpression: function SubExpression(sexpr) {
-	    this.acceptRequired(sexpr, 'path');
-	    this.acceptArray(sexpr.params);
-	    this.acceptKey(sexpr, 'hash');
-	  },
-
-	  PathExpression: function PathExpression() {},
-
-	  StringLiteral: function StringLiteral() {},
-	  NumberLiteral: function NumberLiteral() {},
-	  BooleanLiteral: function BooleanLiteral() {},
-	  UndefinedLiteral: function UndefinedLiteral() {},
-	  NullLiteral: function NullLiteral() {},
+	  StringLiteral: function StringLiteral() /* string */{},
+	  NumberLiteral: function NumberLiteral() /* number */{},
+	  BooleanLiteral: function BooleanLiteral() /* bool */{},
+	  UndefinedLiteral: function UndefinedLiteral() /* literal */{},
+	  NullLiteral: function NullLiteral() /* literal */{},
 
 	  Hash: function Hash(hash) {
 	    this.acceptArray(hash.pairs);
@@ -17581,18 +17612,34 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	};
 
+	function visitSubExpression(mustache) {
+	  this.acceptRequired(mustache, 'path');
+	  this.acceptArray(mustache.params);
+	  this.acceptKey(mustache, 'hash');
+	}
+	function visitBlock(block) {
+	  visitSubExpression.call(this, block);
+
+	  this.acceptKey(block, 'program');
+	  this.acceptKey(block, 'inverse');
+	}
+	function visitPartial(partial) {
+	  this.acceptRequired(partial, 'name');
+	  this.acceptArray(partial.params);
+	  this.acceptKey(partial, 'hash');
+	}
+
 	exports['default'] = Visitor;
 	module.exports = exports['default'];
-	/* content */ /* comment */ /* path */ /* string */ /* number */ /* bool */ /* literal */ /* literal */
 
 /***/ },
 /* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
+	/* WEBPACK VAR INJECTION */(function(global) {/* global window */
+	'use strict';
 
 	exports.__esModule = true;
-	/*global window */
 
 	exports['default'] = function (Handlebars) {
 	  /* istanbul ignore next */
@@ -17627,25 +17674,55 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
+	"use strict";
+
+	exports["default"] = function (obj) {
+	  if (obj && obj.__esModule) {
+	    return obj;
+	  } else {
+	    var newObj = {};
+
+	    if (obj != null) {
+	      for (var key in obj) {
+	        if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key];
+	      }
+	    }
+
+	    newObj["default"] = obj;
+	    return newObj;
+	  }
+	};
+
+	exports.__esModule = true;
+
+/***/ },
+/* 10 */
+/***/ function(module, exports, __webpack_require__) {
+
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 	exports.HandlebarsEnvironment = HandlebarsEnvironment;
-	exports.createFrame = createFrame;
 
-	var _import = __webpack_require__(12);
+	var _utils = __webpack_require__(13);
 
-	var Utils = _interopRequireWildcard(_import);
+	var _exception = __webpack_require__(12);
 
-	var _Exception = __webpack_require__(11);
+	var _exception2 = _interopRequireDefault(_exception);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
+	var _helpers = __webpack_require__(19);
 
-	var VERSION = '3.0.1';
+	var _decorators = __webpack_require__(20);
+
+	var _logger = __webpack_require__(21);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	var VERSION = '4.0.3';
 	exports.VERSION = VERSION;
-	var COMPILER_REVISION = 6;
+	var COMPILER_REVISION = 7;
 
 	exports.COMPILER_REVISION = COMPILER_REVISION;
 	var REVISION_CHANGES = {
@@ -17654,34 +17731,34 @@ return /******/ (function(modules) { // webpackBootstrap
 	  3: '== 1.0.0-rc.4',
 	  4: '== 1.x.x',
 	  5: '== 2.0.0-alpha.x',
-	  6: '>= 2.0.0-beta.1'
+	  6: '>= 2.0.0-beta.1',
+	  7: '>= 4.0.0'
 	};
 
 	exports.REVISION_CHANGES = REVISION_CHANGES;
-	var isArray = Utils.isArray,
-	    isFunction = Utils.isFunction,
-	    toString = Utils.toString,
-	    objectType = '[object Object]';
+	var objectType = '[object Object]';
 
-	function HandlebarsEnvironment(helpers, partials) {
+	function HandlebarsEnvironment(helpers, partials, decorators) {
 	  this.helpers = helpers || {};
 	  this.partials = partials || {};
+	  this.decorators = decorators || {};
 
-	  registerDefaultHelpers(this);
+	  _helpers.registerDefaultHelpers(this);
+	  _decorators.registerDefaultDecorators(this);
 	}
 
 	HandlebarsEnvironment.prototype = {
 	  constructor: HandlebarsEnvironment,
 
-	  logger: logger,
-	  log: log,
+	  logger: _logger2['default'],
+	  log: _logger2['default'].log,
 
 	  registerHelper: function registerHelper(name, fn) {
-	    if (toString.call(name) === objectType) {
+	    if (_utils.toString.call(name) === objectType) {
 	      if (fn) {
-	        throw new _Exception2['default']('Arg not supported with multiple helpers');
+	        throw new _exception2['default']('Arg not supported with multiple helpers');
 	      }
-	      Utils.extend(this.helpers, name);
+	      _utils.extend(this.helpers, name);
 	    } else {
 	      this.helpers[name] = fn;
 	    }
@@ -17691,224 +17768,48 @@ return /******/ (function(modules) { // webpackBootstrap
 	  },
 
 	  registerPartial: function registerPartial(name, partial) {
-	    if (toString.call(name) === objectType) {
-	      Utils.extend(this.partials, name);
+	    if (_utils.toString.call(name) === objectType) {
+	      _utils.extend(this.partials, name);
 	    } else {
 	      if (typeof partial === 'undefined') {
-	        throw new _Exception2['default']('Attempting to register a partial as undefined');
+	        throw new _exception2['default']('Attempting to register a partial as undefined');
 	      }
 	      this.partials[name] = partial;
 	    }
 	  },
 	  unregisterPartial: function unregisterPartial(name) {
 	    delete this.partials[name];
+	  },
+
+	  registerDecorator: function registerDecorator(name, fn) {
+	    if (_utils.toString.call(name) === objectType) {
+	      if (fn) {
+	        throw new _exception2['default']('Arg not supported with multiple decorators');
+	      }
+	      _utils.extend(this.decorators, name);
+	    } else {
+	      this.decorators[name] = fn;
+	    }
+	  },
+	  unregisterDecorator: function unregisterDecorator(name) {
+	    delete this.decorators[name];
 	  }
 	};
 
-	function registerDefaultHelpers(instance) {
-	  instance.registerHelper('helperMissing', function () {
-	    if (arguments.length === 1) {
-	      // A missing field in a {{foo}} constuct.
-	      return undefined;
-	    } else {
-	      // Someone is actually trying to call something, blow up.
-	      throw new _Exception2['default']('Missing helper: "' + arguments[arguments.length - 1].name + '"');
-	    }
-	  });
-
-	  instance.registerHelper('blockHelperMissing', function (context, options) {
-	    var inverse = options.inverse,
-	        fn = options.fn;
-
-	    if (context === true) {
-	      return fn(this);
-	    } else if (context === false || context == null) {
-	      return inverse(this);
-	    } else if (isArray(context)) {
-	      if (context.length > 0) {
-	        if (options.ids) {
-	          options.ids = [options.name];
-	        }
-
-	        return instance.helpers.each(context, options);
-	      } else {
-	        return inverse(this);
-	      }
-	    } else {
-	      if (options.data && options.ids) {
-	        var data = createFrame(options.data);
-	        data.contextPath = Utils.appendContextPath(options.data.contextPath, options.name);
-	        options = { data: data };
-	      }
-
-	      return fn(context, options);
-	    }
-	  });
-
-	  instance.registerHelper('each', function (context, options) {
-	    if (!options) {
-	      throw new _Exception2['default']('Must pass iterator to #each');
-	    }
-
-	    var fn = options.fn,
-	        inverse = options.inverse,
-	        i = 0,
-	        ret = '',
-	        data = undefined,
-	        contextPath = undefined;
-
-	    if (options.data && options.ids) {
-	      contextPath = Utils.appendContextPath(options.data.contextPath, options.ids[0]) + '.';
-	    }
-
-	    if (isFunction(context)) {
-	      context = context.call(this);
-	    }
-
-	    if (options.data) {
-	      data = createFrame(options.data);
-	    }
-
-	    function execIteration(field, index, last) {
-	      if (data) {
-	        data.key = field;
-	        data.index = index;
-	        data.first = index === 0;
-	        data.last = !!last;
-
-	        if (contextPath) {
-	          data.contextPath = contextPath + field;
-	        }
-	      }
-
-	      ret = ret + fn(context[field], {
-	        data: data,
-	        blockParams: Utils.blockParams([context[field], field], [contextPath + field, null])
-	      });
-	    }
-
-	    if (context && typeof context === 'object') {
-	      if (isArray(context)) {
-	        for (var j = context.length; i < j; i++) {
-	          execIteration(i, i, i === context.length - 1);
-	        }
-	      } else {
-	        var priorKey = undefined;
-
-	        for (var key in context) {
-	          if (context.hasOwnProperty(key)) {
-	            // We're running the iterations one step out of sync so we can detect
-	            // the last iteration without have to scan the object twice and create
-	            // an itermediate keys array.
-	            if (priorKey) {
-	              execIteration(priorKey, i - 1);
-	            }
-	            priorKey = key;
-	            i++;
-	          }
-	        }
-	        if (priorKey) {
-	          execIteration(priorKey, i - 1, true);
-	        }
-	      }
-	    }
-
-	    if (i === 0) {
-	      ret = inverse(this);
-	    }
-
-	    return ret;
-	  });
-
-	  instance.registerHelper('if', function (conditional, options) {
-	    if (isFunction(conditional)) {
-	      conditional = conditional.call(this);
-	    }
-
-	    // Default behavior is to render the positive path if the value is truthy and not empty.
-	    // The `includeZero` option may be set to treat the condtional as purely not empty based on the
-	    // behavior of isEmpty. Effectively this determines if 0 is handled by the positive path or negative.
-	    if (!options.hash.includeZero && !conditional || Utils.isEmpty(conditional)) {
-	      return options.inverse(this);
-	    } else {
-	      return options.fn(this);
-	    }
-	  });
-
-	  instance.registerHelper('unless', function (conditional, options) {
-	    return instance.helpers['if'].call(this, conditional, { fn: options.inverse, inverse: options.fn, hash: options.hash });
-	  });
-
-	  instance.registerHelper('with', function (context, options) {
-	    if (isFunction(context)) {
-	      context = context.call(this);
-	    }
-
-	    var fn = options.fn;
-
-	    if (!Utils.isEmpty(context)) {
-	      if (options.data && options.ids) {
-	        var data = createFrame(options.data);
-	        data.contextPath = Utils.appendContextPath(options.data.contextPath, options.ids[0]);
-	        options = { data: data };
-	      }
-
-	      return fn(context, options);
-	    } else {
-	      return options.inverse(this);
-	    }
-	  });
-
-	  instance.registerHelper('log', function (message, options) {
-	    var level = options.data && options.data.level != null ? parseInt(options.data.level, 10) : 1;
-	    instance.log(level, message);
-	  });
-
-	  instance.registerHelper('lookup', function (obj, field) {
-	    return obj && obj[field];
-	  });
-	}
-
-	var logger = {
-	  methodMap: { 0: 'debug', 1: 'info', 2: 'warn', 3: 'error' },
-
-	  // State enum
-	  DEBUG: 0,
-	  INFO: 1,
-	  WARN: 2,
-	  ERROR: 3,
-	  level: 1,
-
-	  // Can be overridden in the host environment
-	  log: function log(level, message) {
-	    if (typeof console !== 'undefined' && logger.level <= level) {
-	      var method = logger.methodMap[level];
-	      (console[method] || console.log).call(console, message); // eslint-disable-line no-console
-	    }
-	  }
-	};
-
-	exports.logger = logger;
-	var log = logger.log;
+	var log = _logger2['default'].log;
 
 	exports.log = log;
-
-	function createFrame(object) {
-	  var frame = Utils.extend({}, object);
-	  frame._parent = object;
-	  return frame;
-	}
-
-	/* [args, ]options */
+	exports.createFrame = _utils.createFrame;
+	exports.logger = _logger2['default'];
 
 /***/ },
-/* 10 */
+/* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
+	// Build out our basic SafeString type
 	'use strict';
 
 	exports.__esModule = true;
-	// Build out our basic SafeString type
 	function SafeString(string) {
 	  this.string = string;
 	}
@@ -17921,7 +17822,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 11 */
+/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -17948,6 +17849,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this[errorProps[idx]] = tmp[errorProps[idx]];
 	  }
 
+	  /* istanbul ignore else */
 	  if (Error.captureStackTrace) {
 	    Error.captureStackTrace(this, Exception);
 	  }
@@ -17964,18 +17866,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 12 */
+/* 13 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
 	exports.__esModule = true;
 	exports.extend = extend;
-
-	// Older IE versions do not directly support indexOf so we must implement our own, sadly.
 	exports.indexOf = indexOf;
 	exports.escapeExpression = escapeExpression;
 	exports.isEmpty = isEmpty;
+	exports.createFrame = createFrame;
 	exports.blockParams = blockParams;
 	exports.appendContextPath = appendContextPath;
 	var escape = {
@@ -17983,12 +17884,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	  '<': '&lt;',
 	  '>': '&gt;',
 	  '"': '&quot;',
-	  '\'': '&#x27;',
-	  '`': '&#x60;'
+	  "'": '&#x27;',
+	  '`': '&#x60;',
+	  '=': '&#x3D;'
 	};
 
-	var badChars = /[&<>"'`]/g,
-	    possible = /[&<>"'`]/;
+	var badChars = /[&<>"'`=]/g,
+	    possible = /[&<>"'`=]/;
 
 	function escapeChar(chr) {
 	  return escape[chr];
@@ -18008,10 +17910,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var toString = Object.prototype.toString;
 
-	exports.toString = toString;
 	// Sourced from lodash
 	// https://github.com/bestiejs/lodash/blob/master/LICENSE.txt
-	/*eslint-disable func-style, no-var */
+	/* eslint-disable func-style */
+	exports.toString = toString;
 	var isFunction = function isFunction(value) {
 	  return typeof value === 'function';
 	};
@@ -18022,14 +17924,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return typeof value === 'function' && toString.call(value) === '[object Function]';
 	  };
 	}
-	var isFunction;
 	exports.isFunction = isFunction;
-	/*eslint-enable func-style, no-var */
+
+	/* eslint-enable func-style */
 
 	/* istanbul ignore next */
 	var isArray = Array.isArray || function (value) {
 	  return value && typeof value === 'object' ? toString.call(value) === '[object Array]' : false;
-	};exports.isArray = isArray;
+	};
+
+	// Older IE versions do not directly support indexOf so we must implement our own, sadly.
+	exports.isArray = isArray;
 
 	function indexOf(array, value) {
 	  for (var i = 0, len = array.length; i < len; i++) {
@@ -18073,6 +17978,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	}
 
+	function createFrame(object) {
+	  var frame = extend({}, object);
+	  frame._parent = object;
+	  return frame;
+	}
+
 	function blockParams(params, ids) {
 	  params.path = ids;
 	  return params;
@@ -18083,46 +17994,45 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 /***/ },
-/* 13 */
+/* 14 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireWildcard = __webpack_require__(9)['default'];
+
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 	exports.checkRevision = checkRevision;
-
-	// TODO: Remove this line and break up compilePartial
-
 	exports.template = template;
 	exports.wrapProgram = wrapProgram;
 	exports.resolvePartial = resolvePartial;
 	exports.invokePartial = invokePartial;
 	exports.noop = noop;
 
-	var _import = __webpack_require__(12);
+	var _utils = __webpack_require__(13);
 
-	var Utils = _interopRequireWildcard(_import);
+	var Utils = _interopRequireWildcard(_utils);
 
-	var _Exception = __webpack_require__(11);
+	var _exception = __webpack_require__(12);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
+	var _exception2 = _interopRequireDefault(_exception);
 
-	var _COMPILER_REVISION$REVISION_CHANGES$createFrame = __webpack_require__(9);
+	var _base = __webpack_require__(10);
 
 	function checkRevision(compilerInfo) {
 	  var compilerRevision = compilerInfo && compilerInfo[0] || 1,
-	      currentRevision = _COMPILER_REVISION$REVISION_CHANGES$createFrame.COMPILER_REVISION;
+	      currentRevision = _base.COMPILER_REVISION;
 
 	  if (compilerRevision !== currentRevision) {
 	    if (compilerRevision < currentRevision) {
-	      var runtimeVersions = _COMPILER_REVISION$REVISION_CHANGES$createFrame.REVISION_CHANGES[currentRevision],
-	          compilerVersions = _COMPILER_REVISION$REVISION_CHANGES$createFrame.REVISION_CHANGES[compilerRevision];
-	      throw new _Exception2['default']('Template was precompiled with an older version of Handlebars than the current runtime. ' + 'Please update your precompiler to a newer version (' + runtimeVersions + ') or downgrade your runtime to an older version (' + compilerVersions + ').');
+	      var runtimeVersions = _base.REVISION_CHANGES[currentRevision],
+	          compilerVersions = _base.REVISION_CHANGES[compilerRevision];
+	      throw new _exception2['default']('Template was precompiled with an older version of Handlebars than the current runtime. ' + 'Please update your precompiler to a newer version (' + runtimeVersions + ') or downgrade your runtime to an older version (' + compilerVersions + ').');
 	    } else {
 	      // Use the embedded version info since the runtime doesn't know about this revision yet
-	      throw new _Exception2['default']('Template was precompiled with a newer version of Handlebars than the current runtime. ' + 'Please update your runtime to a newer version (' + compilerInfo[1] + ').');
+	      throw new _exception2['default']('Template was precompiled with a newer version of Handlebars than the current runtime. ' + 'Please update your runtime to a newer version (' + compilerInfo[1] + ').');
 	    }
 	  }
 	}
@@ -18130,11 +18040,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	function template(templateSpec, env) {
 	  /* istanbul ignore next */
 	  if (!env) {
-	    throw new _Exception2['default']('No environment passed to template');
+	    throw new _exception2['default']('No environment passed to template');
 	  }
 	  if (!templateSpec || !templateSpec.main) {
-	    throw new _Exception2['default']('Unknown template object: ' + typeof templateSpec);
+	    throw new _exception2['default']('Unknown template object: ' + typeof templateSpec);
 	  }
+
+	  templateSpec.main.decorator = templateSpec.main_d;
 
 	  // Note: Using env.VM references rather than local var references throughout this section to allow
 	  // for external users to override these as psuedo-supported APIs.
@@ -18143,6 +18055,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	  function invokePartialWrapper(partial, context, options) {
 	    if (options.hash) {
 	      context = Utils.extend({}, context, options.hash);
+	      if (options.ids) {
+	        options.ids[0] = true;
+	      }
 	    }
 
 	    partial = env.VM.resolvePartial.call(this, partial, context, options);
@@ -18166,7 +18081,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      }
 	      return result;
 	    } else {
-	      throw new _Exception2['default']('The partial ' + options.name + ' could not be compiled when running in runtime-only mode');
+	      throw new _exception2['default']('The partial ' + options.name + ' could not be compiled when running in runtime-only mode');
 	    }
 	  }
 
@@ -18174,7 +18089,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  var container = {
 	    strict: function strict(obj, name) {
 	      if (!(name in obj)) {
-	        throw new _Exception2['default']('"' + name + '" not defined in ' + obj);
+	        throw new _exception2['default']('"' + name + '" not defined in ' + obj);
 	      }
 	      return obj[name];
 	    },
@@ -18194,7 +18109,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    invokePartial: invokePartialWrapper,
 
 	    fn: function fn(i) {
-	      return templateSpec[i];
+	      var ret = templateSpec[i];
+	      ret.decorator = templateSpec[i + '_d'];
+	      return ret;
 	    },
 
 	    programs: [],
@@ -18230,7 +18147,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  };
 
 	  function ret(context) {
-	    var options = arguments[1] === undefined ? {} : arguments[1];
+	    var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
 	    var data = options.data;
 
@@ -18241,10 +18158,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var depths = undefined,
 	        blockParams = templateSpec.useBlockParams ? [] : undefined;
 	    if (templateSpec.useDepths) {
-	      depths = options.depths ? [context].concat(options.depths) : [context];
+	      if (options.depths) {
+	        depths = context !== options.depths[0] ? [context].concat(options.depths) : options.depths;
+	      } else {
+	        depths = [context];
+	      }
 	    }
 
-	    return templateSpec.main.call(container, context, container.helpers, container.partials, data, blockParams, depths);
+	    function main(context /*, options*/) {
+	      return '' + templateSpec.main(container, context, container.helpers, container.partials, data, blockParams, depths);
+	    }
+	    main = executeDecorators(templateSpec.main, main, container, options.depths || [], data, blockParams);
+	    return main(context, options);
 	  }
 	  ret.isTop = true;
 
@@ -18255,18 +18180,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	      if (templateSpec.usePartial) {
 	        container.partials = container.merge(options.partials, env.partials);
 	      }
+	      if (templateSpec.usePartial || templateSpec.useDecorators) {
+	        container.decorators = container.merge(options.decorators, env.decorators);
+	      }
 	    } else {
 	      container.helpers = options.helpers;
 	      container.partials = options.partials;
+	      container.decorators = options.decorators;
 	    }
 	  };
 
 	  ret._child = function (i, data, blockParams, depths) {
 	    if (templateSpec.useBlockParams && !blockParams) {
-	      throw new _Exception2['default']('must pass block params');
+	      throw new _exception2['default']('must pass block params');
 	    }
 	    if (templateSpec.useDepths && !depths) {
-	      throw new _Exception2['default']('must pass parent depths');
+	      throw new _exception2['default']('must pass parent depths');
 	    }
 
 	    return wrapProgram(container, i, templateSpec[i], data, 0, blockParams, depths);
@@ -18276,10 +18205,18 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function wrapProgram(container, i, fn, data, declaredBlockParams, blockParams, depths) {
 	  function prog(context) {
-	    var options = arguments[1] === undefined ? {} : arguments[1];
+	    var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-	    return fn.call(container, context, container.helpers, container.partials, options.data || data, blockParams && [options.blockParams].concat(blockParams), depths && [context].concat(depths));
+	    var currentDepths = depths;
+	    if (depths && context !== depths[0]) {
+	      currentDepths = [context].concat(depths);
+	    }
+
+	    return fn(container, context, container.helpers, container.partials, options.data || data, blockParams && [options.blockParams].concat(blockParams), currentDepths);
 	  }
+
+	  prog = executeDecorators(fn, prog, container, depths, data, blockParams);
+
 	  prog.program = i;
 	  prog.depth = depths ? depths.length : 0;
 	  prog.blockParams = declaredBlockParams || 0;
@@ -18288,7 +18225,11 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function resolvePartial(partial, context, options) {
 	  if (!partial) {
-	    partial = options.partials[options.name];
+	    if (options.name === '@partial-block') {
+	      partial = options.data['partial-block'];
+	    } else {
+	      partial = options.partials[options.name];
+	    }
 	  } else if (!partial.call && !options.name) {
 	    // This is a dynamic partial that returned a string
 	    options.name = partial;
@@ -18299,9 +18240,26 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function invokePartial(partial, context, options) {
 	  options.partial = true;
+	  if (options.ids) {
+	    options.data.contextPath = options.ids[0] || options.data.contextPath;
+	  }
+
+	  var partialBlock = undefined;
+	  if (options.fn && options.fn !== noop) {
+	    options.data = _base.createFrame(options.data);
+	    partialBlock = options.data['partial-block'] = options.fn;
+
+	    if (partialBlock.partials) {
+	      options.partials = Utils.extend({}, options.partials, partialBlock.partials);
+	    }
+	  }
+
+	  if (partial === undefined && partialBlock) {
+	    partial = partialBlock;
+	  }
 
 	  if (partial === undefined) {
-	    throw new _Exception2['default']('The partial ' + options.name + ' could not be found');
+	    throw new _exception2['default']('The partial ' + options.name + ' could not be found');
 	  } else if (partial instanceof Function) {
 	    return partial(context, options);
 	  }
@@ -18313,28 +18271,37 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	function initData(context, data) {
 	  if (!data || !('root' in data)) {
-	    data = data ? _COMPILER_REVISION$REVISION_CHANGES$createFrame.createFrame(data) : {};
+	    data = data ? _base.createFrame(data) : {};
 	    data.root = context;
 	  }
 	  return data;
 	}
 
+	function executeDecorators(fn, prog, container, depths, data, blockParams) {
+	  if (fn.decorator) {
+	    var props = {};
+	    prog = fn.decorator(prog, props, container, depths && depths[0], data, blockParams, depths);
+	    Utils.extend(prog, props);
+	  }
+	  return prog;
+	}
+
 /***/ },
-/* 14 */
+/* 15 */
 /***/ function(module, exports, __webpack_require__) {
 
-	"use strict";
-
-	exports.__esModule = true;
 	/* istanbul ignore next */
 	/* Jison generated parser */
+	"use strict";
+
 	var handlebars = (function () {
 	    var parser = { trace: function trace() {},
 	        yy: {},
-	        symbols_: { error: 2, root: 3, program: 4, EOF: 5, program_repetition0: 6, statement: 7, mustache: 8, block: 9, rawBlock: 10, partial: 11, content: 12, COMMENT: 13, CONTENT: 14, openRawBlock: 15, END_RAW_BLOCK: 16, OPEN_RAW_BLOCK: 17, helperName: 18, openRawBlock_repetition0: 19, openRawBlock_option0: 20, CLOSE_RAW_BLOCK: 21, openBlock: 22, block_option0: 23, closeBlock: 24, openInverse: 25, block_option1: 26, OPEN_BLOCK: 27, openBlock_repetition0: 28, openBlock_option0: 29, openBlock_option1: 30, CLOSE: 31, OPEN_INVERSE: 32, openInverse_repetition0: 33, openInverse_option0: 34, openInverse_option1: 35, openInverseChain: 36, OPEN_INVERSE_CHAIN: 37, openInverseChain_repetition0: 38, openInverseChain_option0: 39, openInverseChain_option1: 40, inverseAndProgram: 41, INVERSE: 42, inverseChain: 43, inverseChain_option0: 44, OPEN_ENDBLOCK: 45, OPEN: 46, mustache_repetition0: 47, mustache_option0: 48, OPEN_UNESCAPED: 49, mustache_repetition1: 50, mustache_option1: 51, CLOSE_UNESCAPED: 52, OPEN_PARTIAL: 53, partialName: 54, partial_repetition0: 55, partial_option0: 56, param: 57, sexpr: 58, OPEN_SEXPR: 59, sexpr_repetition0: 60, sexpr_option0: 61, CLOSE_SEXPR: 62, hash: 63, hash_repetition_plus0: 64, hashSegment: 65, ID: 66, EQUALS: 67, blockParams: 68, OPEN_BLOCK_PARAMS: 69, blockParams_repetition_plus0: 70, CLOSE_BLOCK_PARAMS: 71, path: 72, dataName: 73, STRING: 74, NUMBER: 75, BOOLEAN: 76, UNDEFINED: 77, NULL: 78, DATA: 79, pathSegments: 80, SEP: 81, $accept: 0, $end: 1 },
-	        terminals_: { 2: "error", 5: "EOF", 13: "COMMENT", 14: "CONTENT", 16: "END_RAW_BLOCK", 17: "OPEN_RAW_BLOCK", 21: "CLOSE_RAW_BLOCK", 27: "OPEN_BLOCK", 31: "CLOSE", 32: "OPEN_INVERSE", 37: "OPEN_INVERSE_CHAIN", 42: "INVERSE", 45: "OPEN_ENDBLOCK", 46: "OPEN", 49: "OPEN_UNESCAPED", 52: "CLOSE_UNESCAPED", 53: "OPEN_PARTIAL", 59: "OPEN_SEXPR", 62: "CLOSE_SEXPR", 66: "ID", 67: "EQUALS", 69: "OPEN_BLOCK_PARAMS", 71: "CLOSE_BLOCK_PARAMS", 74: "STRING", 75: "NUMBER", 76: "BOOLEAN", 77: "UNDEFINED", 78: "NULL", 79: "DATA", 81: "SEP" },
-	        productions_: [0, [3, 2], [4, 1], [7, 1], [7, 1], [7, 1], [7, 1], [7, 1], [7, 1], [12, 1], [10, 3], [15, 5], [9, 4], [9, 4], [22, 6], [25, 6], [36, 6], [41, 2], [43, 3], [43, 1], [24, 3], [8, 5], [8, 5], [11, 5], [57, 1], [57, 1], [58, 5], [63, 1], [65, 3], [68, 3], [18, 1], [18, 1], [18, 1], [18, 1], [18, 1], [18, 1], [18, 1], [54, 1], [54, 1], [73, 2], [72, 1], [80, 3], [80, 1], [6, 0], [6, 2], [19, 0], [19, 2], [20, 0], [20, 1], [23, 0], [23, 1], [26, 0], [26, 1], [28, 0], [28, 2], [29, 0], [29, 1], [30, 0], [30, 1], [33, 0], [33, 2], [34, 0], [34, 1], [35, 0], [35, 1], [38, 0], [38, 2], [39, 0], [39, 1], [40, 0], [40, 1], [44, 0], [44, 1], [47, 0], [47, 2], [48, 0], [48, 1], [50, 0], [50, 2], [51, 0], [51, 1], [55, 0], [55, 2], [56, 0], [56, 1], [60, 0], [60, 2], [61, 0], [61, 1], [64, 1], [64, 2], [70, 1], [70, 2]],
-	        performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$) {
+	        symbols_: { "error": 2, "root": 3, "program": 4, "EOF": 5, "program_repetition0": 6, "statement": 7, "mustache": 8, "block": 9, "rawBlock": 10, "partial": 11, "partialBlock": 12, "content": 13, "COMMENT": 14, "CONTENT": 15, "openRawBlock": 16, "rawBlock_repetition_plus0": 17, "END_RAW_BLOCK": 18, "OPEN_RAW_BLOCK": 19, "helperName": 20, "openRawBlock_repetition0": 21, "openRawBlock_option0": 22, "CLOSE_RAW_BLOCK": 23, "openBlock": 24, "block_option0": 25, "closeBlock": 26, "openInverse": 27, "block_option1": 28, "OPEN_BLOCK": 29, "openBlock_repetition0": 30, "openBlock_option0": 31, "openBlock_option1": 32, "CLOSE": 33, "OPEN_INVERSE": 34, "openInverse_repetition0": 35, "openInverse_option0": 36, "openInverse_option1": 37, "openInverseChain": 38, "OPEN_INVERSE_CHAIN": 39, "openInverseChain_repetition0": 40, "openInverseChain_option0": 41, "openInverseChain_option1": 42, "inverseAndProgram": 43, "INVERSE": 44, "inverseChain": 45, "inverseChain_option0": 46, "OPEN_ENDBLOCK": 47, "OPEN": 48, "mustache_repetition0": 49, "mustache_option0": 50, "OPEN_UNESCAPED": 51, "mustache_repetition1": 52, "mustache_option1": 53, "CLOSE_UNESCAPED": 54, "OPEN_PARTIAL": 55, "partialName": 56, "partial_repetition0": 57, "partial_option0": 58, "openPartialBlock": 59, "OPEN_PARTIAL_BLOCK": 60, "openPartialBlock_repetition0": 61, "openPartialBlock_option0": 62, "param": 63, "sexpr": 64, "OPEN_SEXPR": 65, "sexpr_repetition0": 66, "sexpr_option0": 67, "CLOSE_SEXPR": 68, "hash": 69, "hash_repetition_plus0": 70, "hashSegment": 71, "ID": 72, "EQUALS": 73, "blockParams": 74, "OPEN_BLOCK_PARAMS": 75, "blockParams_repetition_plus0": 76, "CLOSE_BLOCK_PARAMS": 77, "path": 78, "dataName": 79, "STRING": 80, "NUMBER": 81, "BOOLEAN": 82, "UNDEFINED": 83, "NULL": 84, "DATA": 85, "pathSegments": 86, "SEP": 87, "$accept": 0, "$end": 1 },
+	        terminals_: { 2: "error", 5: "EOF", 14: "COMMENT", 15: "CONTENT", 18: "END_RAW_BLOCK", 19: "OPEN_RAW_BLOCK", 23: "CLOSE_RAW_BLOCK", 29: "OPEN_BLOCK", 33: "CLOSE", 34: "OPEN_INVERSE", 39: "OPEN_INVERSE_CHAIN", 44: "INVERSE", 47: "OPEN_ENDBLOCK", 48: "OPEN", 51: "OPEN_UNESCAPED", 54: "CLOSE_UNESCAPED", 55: "OPEN_PARTIAL", 60: "OPEN_PARTIAL_BLOCK", 65: "OPEN_SEXPR", 68: "CLOSE_SEXPR", 72: "ID", 73: "EQUALS", 75: "OPEN_BLOCK_PARAMS", 77: "CLOSE_BLOCK_PARAMS", 80: "STRING", 81: "NUMBER", 82: "BOOLEAN", 83: "UNDEFINED", 84: "NULL", 85: "DATA", 87: "SEP" },
+	        productions_: [0, [3, 2], [4, 1], [7, 1], [7, 1], [7, 1], [7, 1], [7, 1], [7, 1], [7, 1], [13, 1], [10, 3], [16, 5], [9, 4], [9, 4], [24, 6], [27, 6], [38, 6], [43, 2], [45, 3], [45, 1], [26, 3], [8, 5], [8, 5], [11, 5], [12, 3], [59, 5], [63, 1], [63, 1], [64, 5], [69, 1], [71, 3], [74, 3], [20, 1], [20, 1], [20, 1], [20, 1], [20, 1], [20, 1], [20, 1], [56, 1], [56, 1], [79, 2], [78, 1], [86, 3], [86, 1], [6, 0], [6, 2], [17, 1], [17, 2], [21, 0], [21, 2], [22, 0], [22, 1], [25, 0], [25, 1], [28, 0], [28, 1], [30, 0], [30, 2], [31, 0], [31, 1], [32, 0], [32, 1], [35, 0], [35, 2], [36, 0], [36, 1], [37, 0], [37, 1], [40, 0], [40, 2], [41, 0], [41, 1], [42, 0], [42, 1], [46, 0], [46, 1], [49, 0], [49, 2], [50, 0], [50, 1], [52, 0], [52, 2], [53, 0], [53, 1], [57, 0], [57, 2], [58, 0], [58, 1], [61, 0], [61, 2], [62, 0], [62, 1], [66, 0], [66, 2], [67, 0], [67, 1], [70, 1], [70, 2], [76, 1], [76, 2]],
+	        performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$
+	        /**/) {
 
 	            var $0 = $$.length - 1;
 	            switch (yystate) {
@@ -18342,7 +18309,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    return $$[$0 - 1];
 	                    break;
 	                case 2:
-	                    this.$ = new yy.Program($$[$0], null, {}, yy.locInfo(this._$));
+	                    this.$ = yy.prepareProgram($$[$0]);
 	                    break;
 	                case 3:
 	                    this.$ = $$[$0];
@@ -18360,185 +18327,234 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    this.$ = $$[$0];
 	                    break;
 	                case 8:
-	                    this.$ = new yy.CommentStatement(yy.stripComment($$[$0]), yy.stripFlags($$[$0], $$[$0]), yy.locInfo(this._$));
+	                    this.$ = $$[$0];
 	                    break;
 	                case 9:
-	                    this.$ = new yy.ContentStatement($$[$0], yy.locInfo(this._$));
+	                    this.$ = {
+	                        type: 'CommentStatement',
+	                        value: yy.stripComment($$[$0]),
+	                        strip: yy.stripFlags($$[$0], $$[$0]),
+	                        loc: yy.locInfo(this._$)
+	                    };
+
 	                    break;
 	                case 10:
-	                    this.$ = yy.prepareRawBlock($$[$0 - 2], $$[$0 - 1], $$[$0], this._$);
+	                    this.$ = {
+	                        type: 'ContentStatement',
+	                        original: $$[$0],
+	                        value: $$[$0],
+	                        loc: yy.locInfo(this._$)
+	                    };
+
 	                    break;
 	                case 11:
-	                    this.$ = { path: $$[$0 - 3], params: $$[$0 - 2], hash: $$[$0 - 1] };
+	                    this.$ = yy.prepareRawBlock($$[$0 - 2], $$[$0 - 1], $$[$0], this._$);
 	                    break;
 	                case 12:
-	                    this.$ = yy.prepareBlock($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0], false, this._$);
+	                    this.$ = { path: $$[$0 - 3], params: $$[$0 - 2], hash: $$[$0 - 1] };
 	                    break;
 	                case 13:
-	                    this.$ = yy.prepareBlock($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0], true, this._$);
+	                    this.$ = yy.prepareBlock($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0], false, this._$);
 	                    break;
 	                case 14:
-	                    this.$ = { path: $$[$0 - 4], params: $$[$0 - 3], hash: $$[$0 - 2], blockParams: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 5], $$[$0]) };
+	                    this.$ = yy.prepareBlock($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0], true, this._$);
 	                    break;
 	                case 15:
-	                    this.$ = { path: $$[$0 - 4], params: $$[$0 - 3], hash: $$[$0 - 2], blockParams: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 5], $$[$0]) };
+	                    this.$ = { open: $$[$0 - 5], path: $$[$0 - 4], params: $$[$0 - 3], hash: $$[$0 - 2], blockParams: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 5], $$[$0]) };
 	                    break;
 	                case 16:
 	                    this.$ = { path: $$[$0 - 4], params: $$[$0 - 3], hash: $$[$0 - 2], blockParams: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 5], $$[$0]) };
 	                    break;
 	                case 17:
-	                    this.$ = { strip: yy.stripFlags($$[$0 - 1], $$[$0 - 1]), program: $$[$0] };
+	                    this.$ = { path: $$[$0 - 4], params: $$[$0 - 3], hash: $$[$0 - 2], blockParams: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 5], $$[$0]) };
 	                    break;
 	                case 18:
+	                    this.$ = { strip: yy.stripFlags($$[$0 - 1], $$[$0 - 1]), program: $$[$0] };
+	                    break;
+	                case 19:
 	                    var inverse = yy.prepareBlock($$[$0 - 2], $$[$0 - 1], $$[$0], $$[$0], false, this._$),
-	                        program = new yy.Program([inverse], null, {}, yy.locInfo(this._$));
+	                        program = yy.prepareProgram([inverse], $$[$0 - 1].loc);
 	                    program.chained = true;
 
 	                    this.$ = { strip: $$[$0 - 2].strip, program: program, chain: true };
 
 	                    break;
-	                case 19:
+	                case 20:
 	                    this.$ = $$[$0];
 	                    break;
-	                case 20:
-	                    this.$ = { path: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 2], $$[$0]) };
-	                    break;
 	                case 21:
-	                    this.$ = yy.prepareMustache($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0 - 4], yy.stripFlags($$[$0 - 4], $$[$0]), this._$);
+	                    this.$ = { path: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 2], $$[$0]) };
 	                    break;
 	                case 22:
 	                    this.$ = yy.prepareMustache($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0 - 4], yy.stripFlags($$[$0 - 4], $$[$0]), this._$);
 	                    break;
 	                case 23:
-	                    this.$ = new yy.PartialStatement($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], yy.stripFlags($$[$0 - 4], $$[$0]), yy.locInfo(this._$));
+	                    this.$ = yy.prepareMustache($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], $$[$0 - 4], yy.stripFlags($$[$0 - 4], $$[$0]), this._$);
 	                    break;
 	                case 24:
-	                    this.$ = $$[$0];
+	                    this.$ = {
+	                        type: 'PartialStatement',
+	                        name: $$[$0 - 3],
+	                        params: $$[$0 - 2],
+	                        hash: $$[$0 - 1],
+	                        indent: '',
+	                        strip: yy.stripFlags($$[$0 - 4], $$[$0]),
+	                        loc: yy.locInfo(this._$)
+	                    };
+
 	                    break;
 	                case 25:
-	                    this.$ = $$[$0];
+	                    this.$ = yy.preparePartialBlock($$[$0 - 2], $$[$0 - 1], $$[$0], this._$);
 	                    break;
 	                case 26:
-	                    this.$ = new yy.SubExpression($$[$0 - 3], $$[$0 - 2], $$[$0 - 1], yy.locInfo(this._$));
+	                    this.$ = { path: $$[$0 - 3], params: $$[$0 - 2], hash: $$[$0 - 1], strip: yy.stripFlags($$[$0 - 4], $$[$0]) };
 	                    break;
 	                case 27:
-	                    this.$ = new yy.Hash($$[$0], yy.locInfo(this._$));
+	                    this.$ = $$[$0];
 	                    break;
 	                case 28:
-	                    this.$ = new yy.HashPair(yy.id($$[$0 - 2]), $$[$0], yy.locInfo(this._$));
+	                    this.$ = $$[$0];
 	                    break;
 	                case 29:
-	                    this.$ = yy.id($$[$0 - 1]);
+	                    this.$ = {
+	                        type: 'SubExpression',
+	                        path: $$[$0 - 3],
+	                        params: $$[$0 - 2],
+	                        hash: $$[$0 - 1],
+	                        loc: yy.locInfo(this._$)
+	                    };
+
 	                    break;
 	                case 30:
-	                    this.$ = $$[$0];
+	                    this.$ = { type: 'Hash', pairs: $$[$0], loc: yy.locInfo(this._$) };
 	                    break;
 	                case 31:
-	                    this.$ = $$[$0];
+	                    this.$ = { type: 'HashPair', key: yy.id($$[$0 - 2]), value: $$[$0], loc: yy.locInfo(this._$) };
 	                    break;
 	                case 32:
-	                    this.$ = new yy.StringLiteral($$[$0], yy.locInfo(this._$));
+	                    this.$ = yy.id($$[$0 - 1]);
 	                    break;
 	                case 33:
-	                    this.$ = new yy.NumberLiteral($$[$0], yy.locInfo(this._$));
+	                    this.$ = $$[$0];
 	                    break;
 	                case 34:
-	                    this.$ = new yy.BooleanLiteral($$[$0], yy.locInfo(this._$));
+	                    this.$ = $$[$0];
 	                    break;
 	                case 35:
-	                    this.$ = new yy.UndefinedLiteral(yy.locInfo(this._$));
+	                    this.$ = { type: 'StringLiteral', value: $$[$0], original: $$[$0], loc: yy.locInfo(this._$) };
 	                    break;
 	                case 36:
-	                    this.$ = new yy.NullLiteral(yy.locInfo(this._$));
+	                    this.$ = { type: 'NumberLiteral', value: Number($$[$0]), original: Number($$[$0]), loc: yy.locInfo(this._$) };
 	                    break;
 	                case 37:
-	                    this.$ = $$[$0];
+	                    this.$ = { type: 'BooleanLiteral', value: $$[$0] === 'true', original: $$[$0] === 'true', loc: yy.locInfo(this._$) };
 	                    break;
 	                case 38:
-	                    this.$ = $$[$0];
+	                    this.$ = { type: 'UndefinedLiteral', original: undefined, value: undefined, loc: yy.locInfo(this._$) };
 	                    break;
 	                case 39:
-	                    this.$ = yy.preparePath(true, $$[$0], this._$);
+	                    this.$ = { type: 'NullLiteral', original: null, value: null, loc: yy.locInfo(this._$) };
 	                    break;
 	                case 40:
-	                    this.$ = yy.preparePath(false, $$[$0], this._$);
+	                    this.$ = $$[$0];
 	                    break;
 	                case 41:
-	                    $$[$0 - 2].push({ part: yy.id($$[$0]), original: $$[$0], separator: $$[$0 - 1] });this.$ = $$[$0 - 2];
+	                    this.$ = $$[$0];
 	                    break;
 	                case 42:
-	                    this.$ = [{ part: yy.id($$[$0]), original: $$[$0] }];
+	                    this.$ = yy.preparePath(true, $$[$0], this._$);
 	                    break;
 	                case 43:
-	                    this.$ = [];
+	                    this.$ = yy.preparePath(false, $$[$0], this._$);
 	                    break;
 	                case 44:
-	                    $$[$0 - 1].push($$[$0]);
+	                    $$[$0 - 2].push({ part: yy.id($$[$0]), original: $$[$0], separator: $$[$0 - 1] });this.$ = $$[$0 - 2];
 	                    break;
 	                case 45:
-	                    this.$ = [];
+	                    this.$ = [{ part: yy.id($$[$0]), original: $$[$0] }];
 	                    break;
 	                case 46:
-	                    $$[$0 - 1].push($$[$0]);
-	                    break;
-	                case 53:
 	                    this.$ = [];
 	                    break;
-	                case 54:
+	                case 47:
 	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 48:
+	                    this.$ = [$$[$0]];
+	                    break;
+	                case 49:
+	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 50:
+	                    this.$ = [];
+	                    break;
+	                case 51:
+	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 58:
+	                    this.$ = [];
 	                    break;
 	                case 59:
-	                    this.$ = [];
-	                    break;
-	                case 60:
 	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 64:
+	                    this.$ = [];
 	                    break;
 	                case 65:
-	                    this.$ = [];
-	                    break;
-	                case 66:
 	                    $$[$0 - 1].push($$[$0]);
 	                    break;
-	                case 73:
+	                case 70:
 	                    this.$ = [];
 	                    break;
-	                case 74:
+	                case 71:
 	                    $$[$0 - 1].push($$[$0]);
-	                    break;
-	                case 77:
-	                    this.$ = [];
 	                    break;
 	                case 78:
-	                    $$[$0 - 1].push($$[$0]);
-	                    break;
-	                case 81:
 	                    this.$ = [];
+	                    break;
+	                case 79:
+	                    $$[$0 - 1].push($$[$0]);
 	                    break;
 	                case 82:
-	                    $$[$0 - 1].push($$[$0]);
-	                    break;
-	                case 85:
 	                    this.$ = [];
 	                    break;
-	                case 86:
+	                case 83:
 	                    $$[$0 - 1].push($$[$0]);
 	                    break;
-	                case 89:
-	                    this.$ = [$$[$0]];
+	                case 86:
+	                    this.$ = [];
+	                    break;
+	                case 87:
+	                    $$[$0 - 1].push($$[$0]);
 	                    break;
 	                case 90:
-	                    $$[$0 - 1].push($$[$0]);
+	                    this.$ = [];
 	                    break;
 	                case 91:
+	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 94:
+	                    this.$ = [];
+	                    break;
+	                case 95:
+	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 98:
 	                    this.$ = [$$[$0]];
 	                    break;
-	                case 92:
+	                case 99:
+	                    $$[$0 - 1].push($$[$0]);
+	                    break;
+	                case 100:
+	                    this.$ = [$$[$0]];
+	                    break;
+	                case 101:
 	                    $$[$0 - 1].push($$[$0]);
 	                    break;
 	            }
 	        },
-	        table: [{ 3: 1, 4: 2, 5: [2, 43], 6: 3, 13: [2, 43], 14: [2, 43], 17: [2, 43], 27: [2, 43], 32: [2, 43], 46: [2, 43], 49: [2, 43], 53: [2, 43] }, { 1: [3] }, { 5: [1, 4] }, { 5: [2, 2], 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: 10, 13: [1, 11], 14: [1, 18], 15: 16, 17: [1, 21], 22: 14, 25: 15, 27: [1, 19], 32: [1, 20], 37: [2, 2], 42: [2, 2], 45: [2, 2], 46: [1, 12], 49: [1, 13], 53: [1, 17] }, { 1: [2, 1] }, { 5: [2, 44], 13: [2, 44], 14: [2, 44], 17: [2, 44], 27: [2, 44], 32: [2, 44], 37: [2, 44], 42: [2, 44], 45: [2, 44], 46: [2, 44], 49: [2, 44], 53: [2, 44] }, { 5: [2, 3], 13: [2, 3], 14: [2, 3], 17: [2, 3], 27: [2, 3], 32: [2, 3], 37: [2, 3], 42: [2, 3], 45: [2, 3], 46: [2, 3], 49: [2, 3], 53: [2, 3] }, { 5: [2, 4], 13: [2, 4], 14: [2, 4], 17: [2, 4], 27: [2, 4], 32: [2, 4], 37: [2, 4], 42: [2, 4], 45: [2, 4], 46: [2, 4], 49: [2, 4], 53: [2, 4] }, { 5: [2, 5], 13: [2, 5], 14: [2, 5], 17: [2, 5], 27: [2, 5], 32: [2, 5], 37: [2, 5], 42: [2, 5], 45: [2, 5], 46: [2, 5], 49: [2, 5], 53: [2, 5] }, { 5: [2, 6], 13: [2, 6], 14: [2, 6], 17: [2, 6], 27: [2, 6], 32: [2, 6], 37: [2, 6], 42: [2, 6], 45: [2, 6], 46: [2, 6], 49: [2, 6], 53: [2, 6] }, { 5: [2, 7], 13: [2, 7], 14: [2, 7], 17: [2, 7], 27: [2, 7], 32: [2, 7], 37: [2, 7], 42: [2, 7], 45: [2, 7], 46: [2, 7], 49: [2, 7], 53: [2, 7] }, { 5: [2, 8], 13: [2, 8], 14: [2, 8], 17: [2, 8], 27: [2, 8], 32: [2, 8], 37: [2, 8], 42: [2, 8], 45: [2, 8], 46: [2, 8], 49: [2, 8], 53: [2, 8] }, { 18: 22, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 18: 33, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 4: 34, 6: 3, 13: [2, 43], 14: [2, 43], 17: [2, 43], 27: [2, 43], 32: [2, 43], 37: [2, 43], 42: [2, 43], 45: [2, 43], 46: [2, 43], 49: [2, 43], 53: [2, 43] }, { 4: 35, 6: 3, 13: [2, 43], 14: [2, 43], 17: [2, 43], 27: [2, 43], 32: [2, 43], 42: [2, 43], 45: [2, 43], 46: [2, 43], 49: [2, 43], 53: [2, 43] }, { 12: 36, 14: [1, 18] }, { 18: 38, 54: 37, 58: 39, 59: [1, 40], 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 5: [2, 9], 13: [2, 9], 14: [2, 9], 16: [2, 9], 17: [2, 9], 27: [2, 9], 32: [2, 9], 37: [2, 9], 42: [2, 9], 45: [2, 9], 46: [2, 9], 49: [2, 9], 53: [2, 9] }, { 18: 41, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 18: 42, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 18: 43, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 31: [2, 73], 47: 44, 59: [2, 73], 66: [2, 73], 74: [2, 73], 75: [2, 73], 76: [2, 73], 77: [2, 73], 78: [2, 73], 79: [2, 73] }, { 21: [2, 30], 31: [2, 30], 52: [2, 30], 59: [2, 30], 62: [2, 30], 66: [2, 30], 69: [2, 30], 74: [2, 30], 75: [2, 30], 76: [2, 30], 77: [2, 30], 78: [2, 30], 79: [2, 30] }, { 21: [2, 31], 31: [2, 31], 52: [2, 31], 59: [2, 31], 62: [2, 31], 66: [2, 31], 69: [2, 31], 74: [2, 31], 75: [2, 31], 76: [2, 31], 77: [2, 31], 78: [2, 31], 79: [2, 31] }, { 21: [2, 32], 31: [2, 32], 52: [2, 32], 59: [2, 32], 62: [2, 32], 66: [2, 32], 69: [2, 32], 74: [2, 32], 75: [2, 32], 76: [2, 32], 77: [2, 32], 78: [2, 32], 79: [2, 32] }, { 21: [2, 33], 31: [2, 33], 52: [2, 33], 59: [2, 33], 62: [2, 33], 66: [2, 33], 69: [2, 33], 74: [2, 33], 75: [2, 33], 76: [2, 33], 77: [2, 33], 78: [2, 33], 79: [2, 33] }, { 21: [2, 34], 31: [2, 34], 52: [2, 34], 59: [2, 34], 62: [2, 34], 66: [2, 34], 69: [2, 34], 74: [2, 34], 75: [2, 34], 76: [2, 34], 77: [2, 34], 78: [2, 34], 79: [2, 34] }, { 21: [2, 35], 31: [2, 35], 52: [2, 35], 59: [2, 35], 62: [2, 35], 66: [2, 35], 69: [2, 35], 74: [2, 35], 75: [2, 35], 76: [2, 35], 77: [2, 35], 78: [2, 35], 79: [2, 35] }, { 21: [2, 36], 31: [2, 36], 52: [2, 36], 59: [2, 36], 62: [2, 36], 66: [2, 36], 69: [2, 36], 74: [2, 36], 75: [2, 36], 76: [2, 36], 77: [2, 36], 78: [2, 36], 79: [2, 36] }, { 21: [2, 40], 31: [2, 40], 52: [2, 40], 59: [2, 40], 62: [2, 40], 66: [2, 40], 69: [2, 40], 74: [2, 40], 75: [2, 40], 76: [2, 40], 77: [2, 40], 78: [2, 40], 79: [2, 40], 81: [1, 45] }, { 66: [1, 32], 80: 46 }, { 21: [2, 42], 31: [2, 42], 52: [2, 42], 59: [2, 42], 62: [2, 42], 66: [2, 42], 69: [2, 42], 74: [2, 42], 75: [2, 42], 76: [2, 42], 77: [2, 42], 78: [2, 42], 79: [2, 42], 81: [2, 42] }, { 50: 47, 52: [2, 77], 59: [2, 77], 66: [2, 77], 74: [2, 77], 75: [2, 77], 76: [2, 77], 77: [2, 77], 78: [2, 77], 79: [2, 77] }, { 23: 48, 36: 50, 37: [1, 52], 41: 51, 42: [1, 53], 43: 49, 45: [2, 49] }, { 26: 54, 41: 55, 42: [1, 53], 45: [2, 51] }, { 16: [1, 56] }, { 31: [2, 81], 55: 57, 59: [2, 81], 66: [2, 81], 74: [2, 81], 75: [2, 81], 76: [2, 81], 77: [2, 81], 78: [2, 81], 79: [2, 81] }, { 31: [2, 37], 59: [2, 37], 66: [2, 37], 74: [2, 37], 75: [2, 37], 76: [2, 37], 77: [2, 37], 78: [2, 37], 79: [2, 37] }, { 31: [2, 38], 59: [2, 38], 66: [2, 38], 74: [2, 38], 75: [2, 38], 76: [2, 38], 77: [2, 38], 78: [2, 38], 79: [2, 38] }, { 18: 58, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 28: 59, 31: [2, 53], 59: [2, 53], 66: [2, 53], 69: [2, 53], 74: [2, 53], 75: [2, 53], 76: [2, 53], 77: [2, 53], 78: [2, 53], 79: [2, 53] }, { 31: [2, 59], 33: 60, 59: [2, 59], 66: [2, 59], 69: [2, 59], 74: [2, 59], 75: [2, 59], 76: [2, 59], 77: [2, 59], 78: [2, 59], 79: [2, 59] }, { 19: 61, 21: [2, 45], 59: [2, 45], 66: [2, 45], 74: [2, 45], 75: [2, 45], 76: [2, 45], 77: [2, 45], 78: [2, 45], 79: [2, 45] }, { 18: 65, 31: [2, 75], 48: 62, 57: 63, 58: 66, 59: [1, 40], 63: 64, 64: 67, 65: 68, 66: [1, 69], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 66: [1, 70] }, { 21: [2, 39], 31: [2, 39], 52: [2, 39], 59: [2, 39], 62: [2, 39], 66: [2, 39], 69: [2, 39], 74: [2, 39], 75: [2, 39], 76: [2, 39], 77: [2, 39], 78: [2, 39], 79: [2, 39], 81: [1, 45] }, { 18: 65, 51: 71, 52: [2, 79], 57: 72, 58: 66, 59: [1, 40], 63: 73, 64: 67, 65: 68, 66: [1, 69], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 24: 74, 45: [1, 75] }, { 45: [2, 50] }, { 4: 76, 6: 3, 13: [2, 43], 14: [2, 43], 17: [2, 43], 27: [2, 43], 32: [2, 43], 37: [2, 43], 42: [2, 43], 45: [2, 43], 46: [2, 43], 49: [2, 43], 53: [2, 43] }, { 45: [2, 19] }, { 18: 77, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 4: 78, 6: 3, 13: [2, 43], 14: [2, 43], 17: [2, 43], 27: [2, 43], 32: [2, 43], 45: [2, 43], 46: [2, 43], 49: [2, 43], 53: [2, 43] }, { 24: 79, 45: [1, 75] }, { 45: [2, 52] }, { 5: [2, 10], 13: [2, 10], 14: [2, 10], 17: [2, 10], 27: [2, 10], 32: [2, 10], 37: [2, 10], 42: [2, 10], 45: [2, 10], 46: [2, 10], 49: [2, 10], 53: [2, 10] }, { 18: 65, 31: [2, 83], 56: 80, 57: 81, 58: 66, 59: [1, 40], 63: 82, 64: 67, 65: 68, 66: [1, 69], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 59: [2, 85], 60: 83, 62: [2, 85], 66: [2, 85], 74: [2, 85], 75: [2, 85], 76: [2, 85], 77: [2, 85], 78: [2, 85], 79: [2, 85] }, { 18: 65, 29: 84, 31: [2, 55], 57: 85, 58: 66, 59: [1, 40], 63: 86, 64: 67, 65: 68, 66: [1, 69], 69: [2, 55], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 18: 65, 31: [2, 61], 34: 87, 57: 88, 58: 66, 59: [1, 40], 63: 89, 64: 67, 65: 68, 66: [1, 69], 69: [2, 61], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 18: 65, 20: 90, 21: [2, 47], 57: 91, 58: 66, 59: [1, 40], 63: 92, 64: 67, 65: 68, 66: [1, 69], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 31: [1, 93] }, { 31: [2, 74], 59: [2, 74], 66: [2, 74], 74: [2, 74], 75: [2, 74], 76: [2, 74], 77: [2, 74], 78: [2, 74], 79: [2, 74] }, { 31: [2, 76] }, { 21: [2, 24], 31: [2, 24], 52: [2, 24], 59: [2, 24], 62: [2, 24], 66: [2, 24], 69: [2, 24], 74: [2, 24], 75: [2, 24], 76: [2, 24], 77: [2, 24], 78: [2, 24], 79: [2, 24] }, { 21: [2, 25], 31: [2, 25], 52: [2, 25], 59: [2, 25], 62: [2, 25], 66: [2, 25], 69: [2, 25], 74: [2, 25], 75: [2, 25], 76: [2, 25], 77: [2, 25], 78: [2, 25], 79: [2, 25] }, { 21: [2, 27], 31: [2, 27], 52: [2, 27], 62: [2, 27], 65: 94, 66: [1, 95], 69: [2, 27] }, { 21: [2, 89], 31: [2, 89], 52: [2, 89], 62: [2, 89], 66: [2, 89], 69: [2, 89] }, { 21: [2, 42], 31: [2, 42], 52: [2, 42], 59: [2, 42], 62: [2, 42], 66: [2, 42], 67: [1, 96], 69: [2, 42], 74: [2, 42], 75: [2, 42], 76: [2, 42], 77: [2, 42], 78: [2, 42], 79: [2, 42], 81: [2, 42] }, { 21: [2, 41], 31: [2, 41], 52: [2, 41], 59: [2, 41], 62: [2, 41], 66: [2, 41], 69: [2, 41], 74: [2, 41], 75: [2, 41], 76: [2, 41], 77: [2, 41], 78: [2, 41], 79: [2, 41], 81: [2, 41] }, { 52: [1, 97] }, { 52: [2, 78], 59: [2, 78], 66: [2, 78], 74: [2, 78], 75: [2, 78], 76: [2, 78], 77: [2, 78], 78: [2, 78], 79: [2, 78] }, { 52: [2, 80] }, { 5: [2, 12], 13: [2, 12], 14: [2, 12], 17: [2, 12], 27: [2, 12], 32: [2, 12], 37: [2, 12], 42: [2, 12], 45: [2, 12], 46: [2, 12], 49: [2, 12], 53: [2, 12] }, { 18: 98, 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 36: 50, 37: [1, 52], 41: 51, 42: [1, 53], 43: 100, 44: 99, 45: [2, 71] }, { 31: [2, 65], 38: 101, 59: [2, 65], 66: [2, 65], 69: [2, 65], 74: [2, 65], 75: [2, 65], 76: [2, 65], 77: [2, 65], 78: [2, 65], 79: [2, 65] }, { 45: [2, 17] }, { 5: [2, 13], 13: [2, 13], 14: [2, 13], 17: [2, 13], 27: [2, 13], 32: [2, 13], 37: [2, 13], 42: [2, 13], 45: [2, 13], 46: [2, 13], 49: [2, 13], 53: [2, 13] }, { 31: [1, 102] }, { 31: [2, 82], 59: [2, 82], 66: [2, 82], 74: [2, 82], 75: [2, 82], 76: [2, 82], 77: [2, 82], 78: [2, 82], 79: [2, 82] }, { 31: [2, 84] }, { 18: 65, 57: 104, 58: 66, 59: [1, 40], 61: 103, 62: [2, 87], 63: 105, 64: 67, 65: 68, 66: [1, 69], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 30: 106, 31: [2, 57], 68: 107, 69: [1, 108] }, { 31: [2, 54], 59: [2, 54], 66: [2, 54], 69: [2, 54], 74: [2, 54], 75: [2, 54], 76: [2, 54], 77: [2, 54], 78: [2, 54], 79: [2, 54] }, { 31: [2, 56], 69: [2, 56] }, { 31: [2, 63], 35: 109, 68: 110, 69: [1, 108] }, { 31: [2, 60], 59: [2, 60], 66: [2, 60], 69: [2, 60], 74: [2, 60], 75: [2, 60], 76: [2, 60], 77: [2, 60], 78: [2, 60], 79: [2, 60] }, { 31: [2, 62], 69: [2, 62] }, { 21: [1, 111] }, { 21: [2, 46], 59: [2, 46], 66: [2, 46], 74: [2, 46], 75: [2, 46], 76: [2, 46], 77: [2, 46], 78: [2, 46], 79: [2, 46] }, { 21: [2, 48] }, { 5: [2, 21], 13: [2, 21], 14: [2, 21], 17: [2, 21], 27: [2, 21], 32: [2, 21], 37: [2, 21], 42: [2, 21], 45: [2, 21], 46: [2, 21], 49: [2, 21], 53: [2, 21] }, { 21: [2, 90], 31: [2, 90], 52: [2, 90], 62: [2, 90], 66: [2, 90], 69: [2, 90] }, { 67: [1, 96] }, { 18: 65, 57: 112, 58: 66, 59: [1, 40], 66: [1, 32], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 5: [2, 22], 13: [2, 22], 14: [2, 22], 17: [2, 22], 27: [2, 22], 32: [2, 22], 37: [2, 22], 42: [2, 22], 45: [2, 22], 46: [2, 22], 49: [2, 22], 53: [2, 22] }, { 31: [1, 113] }, { 45: [2, 18] }, { 45: [2, 72] }, { 18: 65, 31: [2, 67], 39: 114, 57: 115, 58: 66, 59: [1, 40], 63: 116, 64: 67, 65: 68, 66: [1, 69], 69: [2, 67], 72: 23, 73: 24, 74: [1, 25], 75: [1, 26], 76: [1, 27], 77: [1, 28], 78: [1, 29], 79: [1, 31], 80: 30 }, { 5: [2, 23], 13: [2, 23], 14: [2, 23], 17: [2, 23], 27: [2, 23], 32: [2, 23], 37: [2, 23], 42: [2, 23], 45: [2, 23], 46: [2, 23], 49: [2, 23], 53: [2, 23] }, { 62: [1, 117] }, { 59: [2, 86], 62: [2, 86], 66: [2, 86], 74: [2, 86], 75: [2, 86], 76: [2, 86], 77: [2, 86], 78: [2, 86], 79: [2, 86] }, { 62: [2, 88] }, { 31: [1, 118] }, { 31: [2, 58] }, { 66: [1, 120], 70: 119 }, { 31: [1, 121] }, { 31: [2, 64] }, { 14: [2, 11] }, { 21: [2, 28], 31: [2, 28], 52: [2, 28], 62: [2, 28], 66: [2, 28], 69: [2, 28] }, { 5: [2, 20], 13: [2, 20], 14: [2, 20], 17: [2, 20], 27: [2, 20], 32: [2, 20], 37: [2, 20], 42: [2, 20], 45: [2, 20], 46: [2, 20], 49: [2, 20], 53: [2, 20] }, { 31: [2, 69], 40: 122, 68: 123, 69: [1, 108] }, { 31: [2, 66], 59: [2, 66], 66: [2, 66], 69: [2, 66], 74: [2, 66], 75: [2, 66], 76: [2, 66], 77: [2, 66], 78: [2, 66], 79: [2, 66] }, { 31: [2, 68], 69: [2, 68] }, { 21: [2, 26], 31: [2, 26], 52: [2, 26], 59: [2, 26], 62: [2, 26], 66: [2, 26], 69: [2, 26], 74: [2, 26], 75: [2, 26], 76: [2, 26], 77: [2, 26], 78: [2, 26], 79: [2, 26] }, { 13: [2, 14], 14: [2, 14], 17: [2, 14], 27: [2, 14], 32: [2, 14], 37: [2, 14], 42: [2, 14], 45: [2, 14], 46: [2, 14], 49: [2, 14], 53: [2, 14] }, { 66: [1, 125], 71: [1, 124] }, { 66: [2, 91], 71: [2, 91] }, { 13: [2, 15], 14: [2, 15], 17: [2, 15], 27: [2, 15], 32: [2, 15], 42: [2, 15], 45: [2, 15], 46: [2, 15], 49: [2, 15], 53: [2, 15] }, { 31: [1, 126] }, { 31: [2, 70] }, { 31: [2, 29] }, { 66: [2, 92], 71: [2, 92] }, { 13: [2, 16], 14: [2, 16], 17: [2, 16], 27: [2, 16], 32: [2, 16], 37: [2, 16], 42: [2, 16], 45: [2, 16], 46: [2, 16], 49: [2, 16], 53: [2, 16] }],
-	        defaultActions: { 4: [2, 1], 49: [2, 50], 51: [2, 19], 55: [2, 52], 64: [2, 76], 73: [2, 80], 78: [2, 17], 82: [2, 84], 92: [2, 48], 99: [2, 18], 100: [2, 72], 105: [2, 88], 107: [2, 58], 110: [2, 64], 111: [2, 11], 123: [2, 70], 124: [2, 29] },
+	        table: [{ 3: 1, 4: 2, 5: [2, 46], 6: 3, 14: [2, 46], 15: [2, 46], 19: [2, 46], 29: [2, 46], 34: [2, 46], 48: [2, 46], 51: [2, 46], 55: [2, 46], 60: [2, 46] }, { 1: [3] }, { 5: [1, 4] }, { 5: [2, 2], 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: 10, 13: 11, 14: [1, 12], 15: [1, 20], 16: 17, 19: [1, 23], 24: 15, 27: 16, 29: [1, 21], 34: [1, 22], 39: [2, 2], 44: [2, 2], 47: [2, 2], 48: [1, 13], 51: [1, 14], 55: [1, 18], 59: 19, 60: [1, 24] }, { 1: [2, 1] }, { 5: [2, 47], 14: [2, 47], 15: [2, 47], 19: [2, 47], 29: [2, 47], 34: [2, 47], 39: [2, 47], 44: [2, 47], 47: [2, 47], 48: [2, 47], 51: [2, 47], 55: [2, 47], 60: [2, 47] }, { 5: [2, 3], 14: [2, 3], 15: [2, 3], 19: [2, 3], 29: [2, 3], 34: [2, 3], 39: [2, 3], 44: [2, 3], 47: [2, 3], 48: [2, 3], 51: [2, 3], 55: [2, 3], 60: [2, 3] }, { 5: [2, 4], 14: [2, 4], 15: [2, 4], 19: [2, 4], 29: [2, 4], 34: [2, 4], 39: [2, 4], 44: [2, 4], 47: [2, 4], 48: [2, 4], 51: [2, 4], 55: [2, 4], 60: [2, 4] }, { 5: [2, 5], 14: [2, 5], 15: [2, 5], 19: [2, 5], 29: [2, 5], 34: [2, 5], 39: [2, 5], 44: [2, 5], 47: [2, 5], 48: [2, 5], 51: [2, 5], 55: [2, 5], 60: [2, 5] }, { 5: [2, 6], 14: [2, 6], 15: [2, 6], 19: [2, 6], 29: [2, 6], 34: [2, 6], 39: [2, 6], 44: [2, 6], 47: [2, 6], 48: [2, 6], 51: [2, 6], 55: [2, 6], 60: [2, 6] }, { 5: [2, 7], 14: [2, 7], 15: [2, 7], 19: [2, 7], 29: [2, 7], 34: [2, 7], 39: [2, 7], 44: [2, 7], 47: [2, 7], 48: [2, 7], 51: [2, 7], 55: [2, 7], 60: [2, 7] }, { 5: [2, 8], 14: [2, 8], 15: [2, 8], 19: [2, 8], 29: [2, 8], 34: [2, 8], 39: [2, 8], 44: [2, 8], 47: [2, 8], 48: [2, 8], 51: [2, 8], 55: [2, 8], 60: [2, 8] }, { 5: [2, 9], 14: [2, 9], 15: [2, 9], 19: [2, 9], 29: [2, 9], 34: [2, 9], 39: [2, 9], 44: [2, 9], 47: [2, 9], 48: [2, 9], 51: [2, 9], 55: [2, 9], 60: [2, 9] }, { 20: 25, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 36, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 4: 37, 6: 3, 14: [2, 46], 15: [2, 46], 19: [2, 46], 29: [2, 46], 34: [2, 46], 39: [2, 46], 44: [2, 46], 47: [2, 46], 48: [2, 46], 51: [2, 46], 55: [2, 46], 60: [2, 46] }, { 4: 38, 6: 3, 14: [2, 46], 15: [2, 46], 19: [2, 46], 29: [2, 46], 34: [2, 46], 44: [2, 46], 47: [2, 46], 48: [2, 46], 51: [2, 46], 55: [2, 46], 60: [2, 46] }, { 13: 40, 15: [1, 20], 17: 39 }, { 20: 42, 56: 41, 64: 43, 65: [1, 44], 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 4: 45, 6: 3, 14: [2, 46], 15: [2, 46], 19: [2, 46], 29: [2, 46], 34: [2, 46], 47: [2, 46], 48: [2, 46], 51: [2, 46], 55: [2, 46], 60: [2, 46] }, { 5: [2, 10], 14: [2, 10], 15: [2, 10], 18: [2, 10], 19: [2, 10], 29: [2, 10], 34: [2, 10], 39: [2, 10], 44: [2, 10], 47: [2, 10], 48: [2, 10], 51: [2, 10], 55: [2, 10], 60: [2, 10] }, { 20: 46, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 47, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 48, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 42, 56: 49, 64: 43, 65: [1, 44], 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 33: [2, 78], 49: 50, 65: [2, 78], 72: [2, 78], 80: [2, 78], 81: [2, 78], 82: [2, 78], 83: [2, 78], 84: [2, 78], 85: [2, 78] }, { 23: [2, 33], 33: [2, 33], 54: [2, 33], 65: [2, 33], 68: [2, 33], 72: [2, 33], 75: [2, 33], 80: [2, 33], 81: [2, 33], 82: [2, 33], 83: [2, 33], 84: [2, 33], 85: [2, 33] }, { 23: [2, 34], 33: [2, 34], 54: [2, 34], 65: [2, 34], 68: [2, 34], 72: [2, 34], 75: [2, 34], 80: [2, 34], 81: [2, 34], 82: [2, 34], 83: [2, 34], 84: [2, 34], 85: [2, 34] }, { 23: [2, 35], 33: [2, 35], 54: [2, 35], 65: [2, 35], 68: [2, 35], 72: [2, 35], 75: [2, 35], 80: [2, 35], 81: [2, 35], 82: [2, 35], 83: [2, 35], 84: [2, 35], 85: [2, 35] }, { 23: [2, 36], 33: [2, 36], 54: [2, 36], 65: [2, 36], 68: [2, 36], 72: [2, 36], 75: [2, 36], 80: [2, 36], 81: [2, 36], 82: [2, 36], 83: [2, 36], 84: [2, 36], 85: [2, 36] }, { 23: [2, 37], 33: [2, 37], 54: [2, 37], 65: [2, 37], 68: [2, 37], 72: [2, 37], 75: [2, 37], 80: [2, 37], 81: [2, 37], 82: [2, 37], 83: [2, 37], 84: [2, 37], 85: [2, 37] }, { 23: [2, 38], 33: [2, 38], 54: [2, 38], 65: [2, 38], 68: [2, 38], 72: [2, 38], 75: [2, 38], 80: [2, 38], 81: [2, 38], 82: [2, 38], 83: [2, 38], 84: [2, 38], 85: [2, 38] }, { 23: [2, 39], 33: [2, 39], 54: [2, 39], 65: [2, 39], 68: [2, 39], 72: [2, 39], 75: [2, 39], 80: [2, 39], 81: [2, 39], 82: [2, 39], 83: [2, 39], 84: [2, 39], 85: [2, 39] }, { 23: [2, 43], 33: [2, 43], 54: [2, 43], 65: [2, 43], 68: [2, 43], 72: [2, 43], 75: [2, 43], 80: [2, 43], 81: [2, 43], 82: [2, 43], 83: [2, 43], 84: [2, 43], 85: [2, 43], 87: [1, 51] }, { 72: [1, 35], 86: 52 }, { 23: [2, 45], 33: [2, 45], 54: [2, 45], 65: [2, 45], 68: [2, 45], 72: [2, 45], 75: [2, 45], 80: [2, 45], 81: [2, 45], 82: [2, 45], 83: [2, 45], 84: [2, 45], 85: [2, 45], 87: [2, 45] }, { 52: 53, 54: [2, 82], 65: [2, 82], 72: [2, 82], 80: [2, 82], 81: [2, 82], 82: [2, 82], 83: [2, 82], 84: [2, 82], 85: [2, 82] }, { 25: 54, 38: 56, 39: [1, 58], 43: 57, 44: [1, 59], 45: 55, 47: [2, 54] }, { 28: 60, 43: 61, 44: [1, 59], 47: [2, 56] }, { 13: 63, 15: [1, 20], 18: [1, 62] }, { 15: [2, 48], 18: [2, 48] }, { 33: [2, 86], 57: 64, 65: [2, 86], 72: [2, 86], 80: [2, 86], 81: [2, 86], 82: [2, 86], 83: [2, 86], 84: [2, 86], 85: [2, 86] }, { 33: [2, 40], 65: [2, 40], 72: [2, 40], 80: [2, 40], 81: [2, 40], 82: [2, 40], 83: [2, 40], 84: [2, 40], 85: [2, 40] }, { 33: [2, 41], 65: [2, 41], 72: [2, 41], 80: [2, 41], 81: [2, 41], 82: [2, 41], 83: [2, 41], 84: [2, 41], 85: [2, 41] }, { 20: 65, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 26: 66, 47: [1, 67] }, { 30: 68, 33: [2, 58], 65: [2, 58], 72: [2, 58], 75: [2, 58], 80: [2, 58], 81: [2, 58], 82: [2, 58], 83: [2, 58], 84: [2, 58], 85: [2, 58] }, { 33: [2, 64], 35: 69, 65: [2, 64], 72: [2, 64], 75: [2, 64], 80: [2, 64], 81: [2, 64], 82: [2, 64], 83: [2, 64], 84: [2, 64], 85: [2, 64] }, { 21: 70, 23: [2, 50], 65: [2, 50], 72: [2, 50], 80: [2, 50], 81: [2, 50], 82: [2, 50], 83: [2, 50], 84: [2, 50], 85: [2, 50] }, { 33: [2, 90], 61: 71, 65: [2, 90], 72: [2, 90], 80: [2, 90], 81: [2, 90], 82: [2, 90], 83: [2, 90], 84: [2, 90], 85: [2, 90] }, { 20: 75, 33: [2, 80], 50: 72, 63: 73, 64: 76, 65: [1, 44], 69: 74, 70: 77, 71: 78, 72: [1, 79], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 72: [1, 80] }, { 23: [2, 42], 33: [2, 42], 54: [2, 42], 65: [2, 42], 68: [2, 42], 72: [2, 42], 75: [2, 42], 80: [2, 42], 81: [2, 42], 82: [2, 42], 83: [2, 42], 84: [2, 42], 85: [2, 42], 87: [1, 51] }, { 20: 75, 53: 81, 54: [2, 84], 63: 82, 64: 76, 65: [1, 44], 69: 83, 70: 77, 71: 78, 72: [1, 79], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 26: 84, 47: [1, 67] }, { 47: [2, 55] }, { 4: 85, 6: 3, 14: [2, 46], 15: [2, 46], 19: [2, 46], 29: [2, 46], 34: [2, 46], 39: [2, 46], 44: [2, 46], 47: [2, 46], 48: [2, 46], 51: [2, 46], 55: [2, 46], 60: [2, 46] }, { 47: [2, 20] }, { 20: 86, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 4: 87, 6: 3, 14: [2, 46], 15: [2, 46], 19: [2, 46], 29: [2, 46], 34: [2, 46], 47: [2, 46], 48: [2, 46], 51: [2, 46], 55: [2, 46], 60: [2, 46] }, { 26: 88, 47: [1, 67] }, { 47: [2, 57] }, { 5: [2, 11], 14: [2, 11], 15: [2, 11], 19: [2, 11], 29: [2, 11], 34: [2, 11], 39: [2, 11], 44: [2, 11], 47: [2, 11], 48: [2, 11], 51: [2, 11], 55: [2, 11], 60: [2, 11] }, { 15: [2, 49], 18: [2, 49] }, { 20: 75, 33: [2, 88], 58: 89, 63: 90, 64: 76, 65: [1, 44], 69: 91, 70: 77, 71: 78, 72: [1, 79], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 65: [2, 94], 66: 92, 68: [2, 94], 72: [2, 94], 80: [2, 94], 81: [2, 94], 82: [2, 94], 83: [2, 94], 84: [2, 94], 85: [2, 94] }, { 5: [2, 25], 14: [2, 25], 15: [2, 25], 19: [2, 25], 29: [2, 25], 34: [2, 25], 39: [2, 25], 44: [2, 25], 47: [2, 25], 48: [2, 25], 51: [2, 25], 55: [2, 25], 60: [2, 25] }, { 20: 93, 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 75, 31: 94, 33: [2, 60], 63: 95, 64: 76, 65: [1, 44], 69: 96, 70: 77, 71: 78, 72: [1, 79], 75: [2, 60], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 75, 33: [2, 66], 36: 97, 63: 98, 64: 76, 65: [1, 44], 69: 99, 70: 77, 71: 78, 72: [1, 79], 75: [2, 66], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 75, 22: 100, 23: [2, 52], 63: 101, 64: 76, 65: [1, 44], 69: 102, 70: 77, 71: 78, 72: [1, 79], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 20: 75, 33: [2, 92], 62: 103, 63: 104, 64: 76, 65: [1, 44], 69: 105, 70: 77, 71: 78, 72: [1, 79], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 33: [1, 106] }, { 33: [2, 79], 65: [2, 79], 72: [2, 79], 80: [2, 79], 81: [2, 79], 82: [2, 79], 83: [2, 79], 84: [2, 79], 85: [2, 79] }, { 33: [2, 81] }, { 23: [2, 27], 33: [2, 27], 54: [2, 27], 65: [2, 27], 68: [2, 27], 72: [2, 27], 75: [2, 27], 80: [2, 27], 81: [2, 27], 82: [2, 27], 83: [2, 27], 84: [2, 27], 85: [2, 27] }, { 23: [2, 28], 33: [2, 28], 54: [2, 28], 65: [2, 28], 68: [2, 28], 72: [2, 28], 75: [2, 28], 80: [2, 28], 81: [2, 28], 82: [2, 28], 83: [2, 28], 84: [2, 28], 85: [2, 28] }, { 23: [2, 30], 33: [2, 30], 54: [2, 30], 68: [2, 30], 71: 107, 72: [1, 108], 75: [2, 30] }, { 23: [2, 98], 33: [2, 98], 54: [2, 98], 68: [2, 98], 72: [2, 98], 75: [2, 98] }, { 23: [2, 45], 33: [2, 45], 54: [2, 45], 65: [2, 45], 68: [2, 45], 72: [2, 45], 73: [1, 109], 75: [2, 45], 80: [2, 45], 81: [2, 45], 82: [2, 45], 83: [2, 45], 84: [2, 45], 85: [2, 45], 87: [2, 45] }, { 23: [2, 44], 33: [2, 44], 54: [2, 44], 65: [2, 44], 68: [2, 44], 72: [2, 44], 75: [2, 44], 80: [2, 44], 81: [2, 44], 82: [2, 44], 83: [2, 44], 84: [2, 44], 85: [2, 44], 87: [2, 44] }, { 54: [1, 110] }, { 54: [2, 83], 65: [2, 83], 72: [2, 83], 80: [2, 83], 81: [2, 83], 82: [2, 83], 83: [2, 83], 84: [2, 83], 85: [2, 83] }, { 54: [2, 85] }, { 5: [2, 13], 14: [2, 13], 15: [2, 13], 19: [2, 13], 29: [2, 13], 34: [2, 13], 39: [2, 13], 44: [2, 13], 47: [2, 13], 48: [2, 13], 51: [2, 13], 55: [2, 13], 60: [2, 13] }, { 38: 56, 39: [1, 58], 43: 57, 44: [1, 59], 45: 112, 46: 111, 47: [2, 76] }, { 33: [2, 70], 40: 113, 65: [2, 70], 72: [2, 70], 75: [2, 70], 80: [2, 70], 81: [2, 70], 82: [2, 70], 83: [2, 70], 84: [2, 70], 85: [2, 70] }, { 47: [2, 18] }, { 5: [2, 14], 14: [2, 14], 15: [2, 14], 19: [2, 14], 29: [2, 14], 34: [2, 14], 39: [2, 14], 44: [2, 14], 47: [2, 14], 48: [2, 14], 51: [2, 14], 55: [2, 14], 60: [2, 14] }, { 33: [1, 114] }, { 33: [2, 87], 65: [2, 87], 72: [2, 87], 80: [2, 87], 81: [2, 87], 82: [2, 87], 83: [2, 87], 84: [2, 87], 85: [2, 87] }, { 33: [2, 89] }, { 20: 75, 63: 116, 64: 76, 65: [1, 44], 67: 115, 68: [2, 96], 69: 117, 70: 77, 71: 78, 72: [1, 79], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 33: [1, 118] }, { 32: 119, 33: [2, 62], 74: 120, 75: [1, 121] }, { 33: [2, 59], 65: [2, 59], 72: [2, 59], 75: [2, 59], 80: [2, 59], 81: [2, 59], 82: [2, 59], 83: [2, 59], 84: [2, 59], 85: [2, 59] }, { 33: [2, 61], 75: [2, 61] }, { 33: [2, 68], 37: 122, 74: 123, 75: [1, 121] }, { 33: [2, 65], 65: [2, 65], 72: [2, 65], 75: [2, 65], 80: [2, 65], 81: [2, 65], 82: [2, 65], 83: [2, 65], 84: [2, 65], 85: [2, 65] }, { 33: [2, 67], 75: [2, 67] }, { 23: [1, 124] }, { 23: [2, 51], 65: [2, 51], 72: [2, 51], 80: [2, 51], 81: [2, 51], 82: [2, 51], 83: [2, 51], 84: [2, 51], 85: [2, 51] }, { 23: [2, 53] }, { 33: [1, 125] }, { 33: [2, 91], 65: [2, 91], 72: [2, 91], 80: [2, 91], 81: [2, 91], 82: [2, 91], 83: [2, 91], 84: [2, 91], 85: [2, 91] }, { 33: [2, 93] }, { 5: [2, 22], 14: [2, 22], 15: [2, 22], 19: [2, 22], 29: [2, 22], 34: [2, 22], 39: [2, 22], 44: [2, 22], 47: [2, 22], 48: [2, 22], 51: [2, 22], 55: [2, 22], 60: [2, 22] }, { 23: [2, 99], 33: [2, 99], 54: [2, 99], 68: [2, 99], 72: [2, 99], 75: [2, 99] }, { 73: [1, 109] }, { 20: 75, 63: 126, 64: 76, 65: [1, 44], 72: [1, 35], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 5: [2, 23], 14: [2, 23], 15: [2, 23], 19: [2, 23], 29: [2, 23], 34: [2, 23], 39: [2, 23], 44: [2, 23], 47: [2, 23], 48: [2, 23], 51: [2, 23], 55: [2, 23], 60: [2, 23] }, { 47: [2, 19] }, { 47: [2, 77] }, { 20: 75, 33: [2, 72], 41: 127, 63: 128, 64: 76, 65: [1, 44], 69: 129, 70: 77, 71: 78, 72: [1, 79], 75: [2, 72], 78: 26, 79: 27, 80: [1, 28], 81: [1, 29], 82: [1, 30], 83: [1, 31], 84: [1, 32], 85: [1, 34], 86: 33 }, { 5: [2, 24], 14: [2, 24], 15: [2, 24], 19: [2, 24], 29: [2, 24], 34: [2, 24], 39: [2, 24], 44: [2, 24], 47: [2, 24], 48: [2, 24], 51: [2, 24], 55: [2, 24], 60: [2, 24] }, { 68: [1, 130] }, { 65: [2, 95], 68: [2, 95], 72: [2, 95], 80: [2, 95], 81: [2, 95], 82: [2, 95], 83: [2, 95], 84: [2, 95], 85: [2, 95] }, { 68: [2, 97] }, { 5: [2, 21], 14: [2, 21], 15: [2, 21], 19: [2, 21], 29: [2, 21], 34: [2, 21], 39: [2, 21], 44: [2, 21], 47: [2, 21], 48: [2, 21], 51: [2, 21], 55: [2, 21], 60: [2, 21] }, { 33: [1, 131] }, { 33: [2, 63] }, { 72: [1, 133], 76: 132 }, { 33: [1, 134] }, { 33: [2, 69] }, { 15: [2, 12] }, { 14: [2, 26], 15: [2, 26], 19: [2, 26], 29: [2, 26], 34: [2, 26], 47: [2, 26], 48: [2, 26], 51: [2, 26], 55: [2, 26], 60: [2, 26] }, { 23: [2, 31], 33: [2, 31], 54: [2, 31], 68: [2, 31], 72: [2, 31], 75: [2, 31] }, { 33: [2, 74], 42: 135, 74: 136, 75: [1, 121] }, { 33: [2, 71], 65: [2, 71], 72: [2, 71], 75: [2, 71], 80: [2, 71], 81: [2, 71], 82: [2, 71], 83: [2, 71], 84: [2, 71], 85: [2, 71] }, { 33: [2, 73], 75: [2, 73] }, { 23: [2, 29], 33: [2, 29], 54: [2, 29], 65: [2, 29], 68: [2, 29], 72: [2, 29], 75: [2, 29], 80: [2, 29], 81: [2, 29], 82: [2, 29], 83: [2, 29], 84: [2, 29], 85: [2, 29] }, { 14: [2, 15], 15: [2, 15], 19: [2, 15], 29: [2, 15], 34: [2, 15], 39: [2, 15], 44: [2, 15], 47: [2, 15], 48: [2, 15], 51: [2, 15], 55: [2, 15], 60: [2, 15] }, { 72: [1, 138], 77: [1, 137] }, { 72: [2, 100], 77: [2, 100] }, { 14: [2, 16], 15: [2, 16], 19: [2, 16], 29: [2, 16], 34: [2, 16], 44: [2, 16], 47: [2, 16], 48: [2, 16], 51: [2, 16], 55: [2, 16], 60: [2, 16] }, { 33: [1, 139] }, { 33: [2, 75] }, { 33: [2, 32] }, { 72: [2, 101], 77: [2, 101] }, { 14: [2, 17], 15: [2, 17], 19: [2, 17], 29: [2, 17], 34: [2, 17], 39: [2, 17], 44: [2, 17], 47: [2, 17], 48: [2, 17], 51: [2, 17], 55: [2, 17], 60: [2, 17] }],
+	        defaultActions: { 4: [2, 1], 55: [2, 55], 57: [2, 20], 61: [2, 57], 74: [2, 81], 83: [2, 85], 87: [2, 18], 91: [2, 89], 102: [2, 53], 105: [2, 93], 111: [2, 19], 112: [2, 77], 117: [2, 97], 120: [2, 63], 123: [2, 69], 124: [2, 12], 136: [2, 75], 137: [2, 32] },
 	        parseError: function parseError(str, hash) {
 	            throw new Error(str);
 	        },
@@ -18676,8 +18692,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	                this._input = input;
 	                this._more = this._less = this.done = false;
 	                this.yylineno = this.yyleng = 0;
-	                this.yytext = this.matched = this.match = "";
-	                this.conditionStack = ["INITIAL"];
+	                this.yytext = this.matched = this.match = '';
+	                this.conditionStack = ['INITIAL'];
 	                this.yylloc = { first_line: 1, first_column: 0, last_line: 1, last_column: 0 };
 	                if (this.options.ranges) this.yylloc.range = [0, 0];
 	                this.offset = 0;
@@ -18737,14 +18753,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	            },
 	            pastInput: function pastInput() {
 	                var past = this.matched.substr(0, this.matched.length - this.match.length);
-	                return (past.length > 20 ? "..." : "") + past.substr(-20).replace(/\n/g, "");
+	                return (past.length > 20 ? '...' : '') + past.substr(-20).replace(/\n/g, "");
 	            },
 	            upcomingInput: function upcomingInput() {
 	                var next = this.match;
 	                if (next.length < 20) {
 	                    next += this._input.substr(0, 20 - next.length);
 	                }
-	                return (next.substr(0, 20) + (next.length > 20 ? "..." : "")).replace(/\n/g, "");
+	                return (next.substr(0, 20) + (next.length > 20 ? '...' : '')).replace(/\n/g, "");
 	            },
 	            showPosition: function showPosition() {
 	                var pre = this.pastInput();
@@ -18759,8 +18775,8 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	                var token, match, tempMatch, index, col, lines;
 	                if (!this._more) {
-	                    this.yytext = "";
-	                    this.match = "";
+	                    this.yytext = '';
+	                    this.match = '';
 	                }
 	                var rules = this._currentRules();
 	                for (var i = 0; i < rules.length; i++) {
@@ -18790,21 +18806,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    this.matched += match[0];
 	                    token = this.performAction.call(this, this.yy, this, rules[index], this.conditionStack[this.conditionStack.length - 1]);
 	                    if (this.done && this._input) this.done = false;
-	                    if (token) {
-	                        return token;
-	                    } else {
-	                        return;
-	                    }
+	                    if (token) return token;else return;
 	                }
 	                if (this._input === "") {
 	                    return this.EOF;
 	                } else {
-	                    return this.parseError("Lexical error on line " + (this.yylineno + 1) + ". Unrecognized text.\n" + this.showPosition(), { text: "", token: null, line: this.yylineno });
+	                    return this.parseError('Lexical error on line ' + (this.yylineno + 1) + '. Unrecognized text.\n' + this.showPosition(), { text: "", token: null, line: this.yylineno });
 	                }
 	            },
 	            lex: function lex() {
 	                var r = this.next();
-	                if (typeof r !== "undefined") {
+	                if (typeof r !== 'undefined') {
 	                    return r;
 	                } else {
 	                    return this.lex();
@@ -18826,7 +18838,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	                this.begin(condition);
 	            } };
 	        lexer.options = {};
-	        lexer.performAction = function anonymous(yy, yy_, $avoiding_name_collisions, YY_START) {
+	        lexer.performAction = function anonymous(yy, yy_, $avoiding_name_collisions, YY_START
+	        /**/) {
 
 	            function strip(start, end) {
 	                return yy_.yytext = yy_.yytext.substr(start, yy_.yyleng - end);
@@ -18844,154 +18857,167 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    } else {
 	                        this.begin("mu");
 	                    }
-	                    if (yy_.yytext) {
-	                        return 14;
-	                    }break;
+	                    if (yy_.yytext) return 15;
+
+	                    break;
 	                case 1:
-	                    return 14;
+	                    return 15;
 	                    break;
 	                case 2:
 	                    this.popState();
-	                    return 14;
+	                    return 15;
 
 	                    break;
 	                case 3:
-	                    yy_.yytext = yy_.yytext.substr(5, yy_.yyleng - 9);
-	                    this.popState();
-	                    return 16;
-
+	                    this.begin('raw');return 15;
 	                    break;
 	                case 4:
-	                    return 14;
+	                    this.popState();
+	                    // Should be using `this.topState()` below, but it currently
+	                    // returns the second top instead of the first top. Opened an
+	                    // issue about it at https://github.com/zaach/jison/issues/291
+	                    if (this.conditionStack[this.conditionStack.length - 1] === 'raw') {
+	                        return 15;
+	                    } else {
+	                        yy_.yytext = yy_.yytext.substr(5, yy_.yyleng - 9);
+	                        return 'END_RAW_BLOCK';
+	                    }
+
 	                    break;
 	                case 5:
-	                    this.popState();
-	                    return 13;
-
+	                    return 15;
 	                    break;
 	                case 6:
-	                    return 59;
+	                    this.popState();
+	                    return 14;
+
 	                    break;
 	                case 7:
-	                    return 62;
+	                    return 65;
 	                    break;
 	                case 8:
-	                    return 17;
+	                    return 68;
 	                    break;
 	                case 9:
-	                    this.popState();
-	                    this.begin("raw");
-	                    return 21;
-
+	                    return 19;
 	                    break;
 	                case 10:
-	                    return 53;
+	                    this.popState();
+	                    this.begin('raw');
+	                    return 23;
+
 	                    break;
 	                case 11:
-	                    return 27;
+	                    return 55;
 	                    break;
 	                case 12:
-	                    return 45;
+	                    return 60;
 	                    break;
 	                case 13:
-	                    this.popState();return 42;
+	                    return 29;
 	                    break;
 	                case 14:
-	                    this.popState();return 42;
+	                    return 47;
 	                    break;
 	                case 15:
-	                    return 32;
+	                    this.popState();return 44;
 	                    break;
 	                case 16:
-	                    return 37;
+	                    this.popState();return 44;
 	                    break;
 	                case 17:
-	                    return 49;
+	                    return 34;
 	                    break;
 	                case 18:
-	                    return 46;
+	                    return 39;
 	                    break;
 	                case 19:
-	                    this.unput(yy_.yytext);
-	                    this.popState();
-	                    this.begin("com");
-
+	                    return 51;
 	                    break;
 	                case 20:
-	                    this.popState();
-	                    return 13;
-
+	                    return 48;
 	                    break;
 	                case 21:
-	                    return 46;
+	                    this.unput(yy_.yytext);
+	                    this.popState();
+	                    this.begin('com');
+
 	                    break;
 	                case 22:
-	                    return 67;
+	                    this.popState();
+	                    return 14;
+
 	                    break;
 	                case 23:
-	                    return 66;
+	                    return 48;
 	                    break;
 	                case 24:
-	                    return 66;
+	                    return 73;
 	                    break;
 	                case 25:
-	                    return 81;
+	                    return 72;
 	                    break;
 	                case 26:
-	                    // ignore whitespace
+	                    return 72;
 	                    break;
 	                case 27:
-	                    this.popState();return 52;
+	                    return 87;
 	                    break;
 	                case 28:
-	                    this.popState();return 31;
+	                    // ignore whitespace
 	                    break;
 	                case 29:
-	                    yy_.yytext = strip(1, 2).replace(/\\"/g, "\"");return 74;
+	                    this.popState();return 54;
 	                    break;
 	                case 30:
-	                    yy_.yytext = strip(1, 2).replace(/\\'/g, "'");return 74;
+	                    this.popState();return 33;
 	                    break;
 	                case 31:
-	                    return 79;
+	                    yy_.yytext = strip(1, 2).replace(/\\"/g, '"');return 80;
 	                    break;
 	                case 32:
-	                    return 76;
+	                    yy_.yytext = strip(1, 2).replace(/\\'/g, "'");return 80;
 	                    break;
 	                case 33:
-	                    return 76;
+	                    return 85;
 	                    break;
 	                case 34:
-	                    return 77;
+	                    return 82;
 	                    break;
 	                case 35:
-	                    return 78;
+	                    return 82;
 	                    break;
 	                case 36:
-	                    return 75;
+	                    return 83;
 	                    break;
 	                case 37:
-	                    return 69;
+	                    return 84;
 	                    break;
 	                case 38:
-	                    return 71;
+	                    return 81;
 	                    break;
 	                case 39:
-	                    return 66;
+	                    return 75;
 	                    break;
 	                case 40:
-	                    return 66;
+	                    return 77;
 	                    break;
 	                case 41:
-	                    return "INVALID";
+	                    return 72;
 	                    break;
 	                case 42:
+	                    yy_.yytext = yy_.yytext.replace(/\\([\\\]])/g, '$1');return 72;
+	                    break;
+	                case 43:
+	                    return 'INVALID';
+	                    break;
+	                case 44:
 	                    return 5;
 	                    break;
 	            }
 	        };
-	        lexer.rules = [/^(?:[^\x00]*?(?=(\{\{)))/, /^(?:[^\x00]+)/, /^(?:[^\x00]{2,}?(?=(\{\{|\\\{\{|\\\\\{\{|$)))/, /^(?:\{\{\{\{\/[^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=[=}\s\/.])\}\}\}\})/, /^(?:[^\x00]*?(?=(\{\{\{\{\/)))/, /^(?:[\s\S]*?--(~)?\}\})/, /^(?:\()/, /^(?:\))/, /^(?:\{\{\{\{)/, /^(?:\}\}\}\})/, /^(?:\{\{(~)?>)/, /^(?:\{\{(~)?#)/, /^(?:\{\{(~)?\/)/, /^(?:\{\{(~)?\^\s*(~)?\}\})/, /^(?:\{\{(~)?\s*else\s*(~)?\}\})/, /^(?:\{\{(~)?\^)/, /^(?:\{\{(~)?\s*else\b)/, /^(?:\{\{(~)?\{)/, /^(?:\{\{(~)?&)/, /^(?:\{\{(~)?!--)/, /^(?:\{\{(~)?![\s\S]*?\}\})/, /^(?:\{\{(~)?)/, /^(?:=)/, /^(?:\.\.)/, /^(?:\.(?=([=~}\s\/.)|])))/, /^(?:[\/.])/, /^(?:\s+)/, /^(?:\}(~)?\}\})/, /^(?:(~)?\}\})/, /^(?:"(\\["]|[^"])*")/, /^(?:'(\\[']|[^'])*')/, /^(?:@)/, /^(?:true(?=([~}\s)])))/, /^(?:false(?=([~}\s)])))/, /^(?:undefined(?=([~}\s)])))/, /^(?:null(?=([~}\s)])))/, /^(?:-?[0-9]+(?:\.[0-9]+)?(?=([~}\s)])))/, /^(?:as\s+\|)/, /^(?:\|)/, /^(?:([^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=([=~}\s\/.)|]))))/, /^(?:\[[^\]]*\])/, /^(?:.)/, /^(?:$)/];
-	        lexer.conditions = { mu: { rules: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42], inclusive: false }, emu: { rules: [2], inclusive: false }, com: { rules: [5], inclusive: false }, raw: { rules: [3, 4], inclusive: false }, INITIAL: { rules: [0, 1, 42], inclusive: true } };
+	        lexer.rules = [/^(?:[^\x00]*?(?=(\{\{)))/, /^(?:[^\x00]+)/, /^(?:[^\x00]{2,}?(?=(\{\{|\\\{\{|\\\\\{\{|$)))/, /^(?:\{\{\{\{(?=[^/]))/, /^(?:\{\{\{\{\/[^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=[=}\s\/.])\}\}\}\})/, /^(?:[^\x00]*?(?=(\{\{\{\{)))/, /^(?:[\s\S]*?--(~)?\}\})/, /^(?:\()/, /^(?:\))/, /^(?:\{\{\{\{)/, /^(?:\}\}\}\})/, /^(?:\{\{(~)?>)/, /^(?:\{\{(~)?#>)/, /^(?:\{\{(~)?#\*?)/, /^(?:\{\{(~)?\/)/, /^(?:\{\{(~)?\^\s*(~)?\}\})/, /^(?:\{\{(~)?\s*else\s*(~)?\}\})/, /^(?:\{\{(~)?\^)/, /^(?:\{\{(~)?\s*else\b)/, /^(?:\{\{(~)?\{)/, /^(?:\{\{(~)?&)/, /^(?:\{\{(~)?!--)/, /^(?:\{\{(~)?![\s\S]*?\}\})/, /^(?:\{\{(~)?\*?)/, /^(?:=)/, /^(?:\.\.)/, /^(?:\.(?=([=~}\s\/.)|])))/, /^(?:[\/.])/, /^(?:\s+)/, /^(?:\}(~)?\}\})/, /^(?:(~)?\}\})/, /^(?:"(\\["]|[^"])*")/, /^(?:'(\\[']|[^'])*')/, /^(?:@)/, /^(?:true(?=([~}\s)])))/, /^(?:false(?=([~}\s)])))/, /^(?:undefined(?=([~}\s)])))/, /^(?:null(?=([~}\s)])))/, /^(?:-?[0-9]+(?:\.[0-9]+)?(?=([~}\s)])))/, /^(?:as\s+\|)/, /^(?:\|)/, /^(?:([^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=([=~}\s\/.)|]))))/, /^(?:\[(\\\]|[^\]])*\])/, /^(?:.)/, /^(?:$)/];
+	        lexer.conditions = { "mu": { "rules": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44], "inclusive": false }, "emu": { "rules": [2], "inclusive": false }, "com": { "rules": [6], "inclusive": false }, "raw": { "rules": [3, 4, 5], "inclusive": false }, "INITIAL": { "rules": [0, 1, 44], "inclusive": true } };
 	        return lexer;
 	    })();
 	    parser.lexer = lexer;
@@ -18999,27 +19025,33 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.yy = {};
 	    }Parser.prototype = parser;parser.Parser = Parser;
 	    return new Parser();
-	})();exports["default"] = handlebars;
-	module.exports = exports["default"];
+	})();exports.__esModule = true;
+	exports['default'] = handlebars;
 
 /***/ },
-/* 15 */
+/* 16 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 
-	var _Visitor = __webpack_require__(6);
+	var _visitor = __webpack_require__(6);
 
-	var _Visitor2 = _interopRequireWildcard(_Visitor);
+	var _visitor2 = _interopRequireDefault(_visitor);
 
-	function WhitespaceControl() {}
-	WhitespaceControl.prototype = new _Visitor2['default']();
+	function WhitespaceControl() {
+	  var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
+
+	  this.options = options;
+	}
+	WhitespaceControl.prototype = new _visitor2['default']();
 
 	WhitespaceControl.prototype.Program = function (program) {
+	  var doStandalone = !this.options.ignoreStandalone;
+
 	  var isRoot = !this.isRootSeen;
 	  this.isRootSeen = true;
 
@@ -19045,7 +19077,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      omitLeft(body, i, true);
 	    }
 
-	    if (inlineStandalone) {
+	    if (doStandalone && inlineStandalone) {
 	      omitRight(body, i);
 
 	      if (omitLeft(body, i)) {
@@ -19056,13 +19088,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	      }
 	    }
-	    if (openStandalone) {
+	    if (doStandalone && openStandalone) {
 	      omitRight((current.program || current.inverse).body);
 
 	      // Strip out the previous content node if it's whitespace only
 	      omitLeft(body, i);
 	    }
-	    if (closeStandalone) {
+	    if (doStandalone && closeStandalone) {
 	      // Always strip the next node
 	      omitRight(body, i);
 
@@ -19072,7 +19104,8 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	  return program;
 	};
-	WhitespaceControl.prototype.BlockStatement = function (block) {
+
+	WhitespaceControl.prototype.BlockStatement = WhitespaceControl.prototype.DecoratorBlock = WhitespaceControl.prototype.PartialBlockStatement = function (block) {
 	  this.accept(block.program);
 	  this.accept(block.inverse);
 
@@ -19120,7 +19153,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 
 	    // Find standalone else statments
-	    if (isPrevWhitespace(program.body) && isNextWhitespace(firstInverse.body)) {
+	    if (!this.options.ignoreStandalone && isPrevWhitespace(program.body) && isNextWhitespace(firstInverse.body)) {
 	      omitLeft(program.body);
 	      omitRight(firstInverse.body);
 	    }
@@ -19131,7 +19164,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  return strip;
 	};
 
-	WhitespaceControl.prototype.MustacheStatement = function (mustache) {
+	WhitespaceControl.prototype.Decorator = WhitespaceControl.prototype.MustacheStatement = function (mustache) {
 	  return mustache.strip;
 	};
 
@@ -19220,12 +19253,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 16 */
+/* 17 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _interopRequireWildcard = __webpack_require__(8)['default'];
+	var _interopRequireDefault = __webpack_require__(8)['default'];
 
 	exports.__esModule = true;
 	exports.SourceLocation = SourceLocation;
@@ -19236,10 +19269,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	exports.prepareMustache = prepareMustache;
 	exports.prepareRawBlock = prepareRawBlock;
 	exports.prepareBlock = prepareBlock;
+	exports.prepareProgram = prepareProgram;
+	exports.preparePartialBlock = preparePartialBlock;
 
-	var _Exception = __webpack_require__(11);
+	var _exception = __webpack_require__(12);
 
-	var _Exception2 = _interopRequireWildcard(_Exception);
+	var _exception2 = _interopRequireDefault(_exception);
+
+	function validateClose(open, close) {
+	  close = close.path ? close.path.original : close;
+
+	  if (open.path.original !== close) {
+	    var errorNode = { loc: open.path.loc };
+
+	    throw new _exception2['default'](open.path.original + " doesn't match " + close, errorNode);
+	  }
+	}
 
 	function SourceLocation(source, locInfo) {
 	  this.source = source;
@@ -19272,8 +19317,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	  return comment.replace(/^\{\{~?\!-?-?/, '').replace(/-?-?~?\}\}$/, '');
 	}
 
-	function preparePath(data, parts, locInfo) {
-	  locInfo = this.locInfo(locInfo);
+	function preparePath(data, parts, loc) {
+	  loc = this.locInfo(loc);
 
 	  var original = data ? '@' : '',
 	      dig = [],
@@ -19290,7 +19335,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	    if (!isLiteral && (part === '..' || part === '.' || part === 'this')) {
 	      if (dig.length > 0) {
-	        throw new _Exception2['default']('Invalid path: ' + original, { loc: locInfo });
+	        throw new _exception2['default']('Invalid path: ' + original, { loc: loc });
 	      } else if (part === '..') {
 	        depth++;
 	        depthString += '../';
@@ -19300,7 +19345,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	  }
 
-	  return new this.PathExpression(data, depth, dig, original, locInfo);
+	  return {
+	    type: 'PathExpression',
+	    data: data,
+	    depth: depth,
+	    parts: dig,
+	    original: original,
+	    loc: loc
+	  };
 	}
 
 	function prepareMustache(path, params, hash, open, strip, locInfo) {
@@ -19308,29 +19360,48 @@ return /******/ (function(modules) { // webpackBootstrap
 	  var escapeFlag = open.charAt(3) || open.charAt(2),
 	      escaped = escapeFlag !== '{' && escapeFlag !== '&';
 
-	  return new this.MustacheStatement(path, params, hash, escaped, strip, this.locInfo(locInfo));
+	  var decorator = /\*/.test(open);
+	  return {
+	    type: decorator ? 'Decorator' : 'MustacheStatement',
+	    path: path,
+	    params: params,
+	    hash: hash,
+	    escaped: escaped,
+	    strip: strip,
+	    loc: this.locInfo(locInfo)
+	  };
 	}
 
-	function prepareRawBlock(openRawBlock, content, close, locInfo) {
-	  if (openRawBlock.path.original !== close) {
-	    var errorNode = { loc: openRawBlock.path.loc };
-
-	    throw new _Exception2['default'](openRawBlock.path.original + ' doesn\'t match ' + close, errorNode);
-	  }
+	function prepareRawBlock(openRawBlock, contents, close, locInfo) {
+	  validateClose(openRawBlock, close);
 
 	  locInfo = this.locInfo(locInfo);
-	  var program = new this.Program([content], null, {}, locInfo);
+	  var program = {
+	    type: 'Program',
+	    body: contents,
+	    strip: {},
+	    loc: locInfo
+	  };
 
-	  return new this.BlockStatement(openRawBlock.path, openRawBlock.params, openRawBlock.hash, program, undefined, {}, {}, {}, locInfo);
+	  return {
+	    type: 'BlockStatement',
+	    path: openRawBlock.path,
+	    params: openRawBlock.params,
+	    hash: openRawBlock.hash,
+	    program: program,
+	    openStrip: {},
+	    inverseStrip: {},
+	    closeStrip: {},
+	    loc: locInfo
+	  };
 	}
 
 	function prepareBlock(openBlock, program, inverseAndProgram, close, inverted, locInfo) {
-	  // When we are chaining inverse calls, we will not have a close path
-	  if (close && close.path && openBlock.path.original !== close.path.original) {
-	    var errorNode = { loc: openBlock.path.loc };
-
-	    throw new _Exception2['default'](openBlock.path.original + ' doesn\'t match ' + close.path.original, errorNode);
+	  if (close && close.path) {
+	    validateClose(openBlock, close);
 	  }
+
+	  var decorator = /\*/.test(openBlock.open);
 
 	  program.blockParams = openBlock.blockParams;
 
@@ -19338,6 +19409,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	      inverseStrip = undefined;
 
 	  if (inverseAndProgram) {
+	    if (decorator) {
+	      throw new _exception2['default']('Unexpected inverse block on decorator', inverseAndProgram);
+	    }
+
 	    if (inverseAndProgram.chain) {
 	      inverseAndProgram.program.body[0].closeStrip = close.strip;
 	    }
@@ -19352,19 +19427,74 @@ return /******/ (function(modules) { // webpackBootstrap
 	    program = inverted;
 	  }
 
-	  return new this.BlockStatement(openBlock.path, openBlock.params, openBlock.hash, program, inverse, openBlock.strip, inverseStrip, close && close.strip, this.locInfo(locInfo));
+	  return {
+	    type: decorator ? 'DecoratorBlock' : 'BlockStatement',
+	    path: openBlock.path,
+	    params: openBlock.params,
+	    hash: openBlock.hash,
+	    program: program,
+	    inverse: inverse,
+	    openStrip: openBlock.strip,
+	    inverseStrip: inverseStrip,
+	    closeStrip: close && close.strip,
+	    loc: this.locInfo(locInfo)
+	  };
+	}
+
+	function prepareProgram(statements, loc) {
+	  if (!loc && statements.length) {
+	    var firstLoc = statements[0].loc,
+	        lastLoc = statements[statements.length - 1].loc;
+
+	    /* istanbul ignore else */
+	    if (firstLoc && lastLoc) {
+	      loc = {
+	        source: firstLoc.source,
+	        start: {
+	          line: firstLoc.start.line,
+	          column: firstLoc.start.column
+	        },
+	        end: {
+	          line: lastLoc.end.line,
+	          column: lastLoc.end.column
+	        }
+	      };
+	    }
+	  }
+
+	  return {
+	    type: 'Program',
+	    body: statements,
+	    strip: {},
+	    loc: loc
+	  };
+	}
+
+	function preparePartialBlock(open, program, close, locInfo) {
+	  validateClose(open, close);
+
+	  return {
+	    type: 'PartialBlockStatement',
+	    name: open.path,
+	    params: open.params,
+	    hash: open.hash,
+	    program: program,
+	    openStrip: open.strip,
+	    closeStrip: close && close.strip,
+	    loc: this.locInfo(locInfo)
+	  };
 	}
 
 /***/ },
-/* 17 */
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/* global define */
 	'use strict';
 
 	exports.__esModule = true;
-	/*global define */
 
-	var _isArray = __webpack_require__(12);
+	var _utils = __webpack_require__(13);
 
 	var SourceNode = undefined;
 
@@ -19377,6 +19507,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    SourceNode = SourceMap.SourceNode;
 	  }
 	} catch (err) {}
+	/* NOP */
 
 	/* istanbul ignore if: tested but not covered in istanbul due to dist build  */
 	if (!SourceNode) {
@@ -19389,13 +19520,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	  /* istanbul ignore next */
 	  SourceNode.prototype = {
 	    add: function add(chunks) {
-	      if (_isArray.isArray(chunks)) {
+	      if (_utils.isArray(chunks)) {
 	        chunks = chunks.join('');
 	      }
 	      this.src += chunks;
 	    },
 	    prepend: function prepend(chunks) {
-	      if (_isArray.isArray(chunks)) {
+	      if (_utils.isArray(chunks)) {
 	        chunks = chunks.join('');
 	      }
 	      this.src = chunks + this.src;
@@ -19410,7 +19541,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 	function castChunk(chunk, codeGen, loc) {
-	  if (_isArray.isArray(chunk)) {
+	  if (_utils.isArray(chunk)) {
 	    var ret = [];
 
 	    for (var i = 0, len = chunk.length; i < len; i++) {
@@ -19430,6 +19561,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 	CodeGen.prototype = {
+	  isEmpty: function isEmpty() {
+	    return !this.source.length;
+	  },
 	  prepend: function prepend(source, loc) {
 	    this.source.unshift(this.wrap(source, loc));
 	  },
@@ -19452,12 +19586,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	  },
 
 	  empty: function empty() {
-	    var loc = arguments[0] === undefined ? this.currentLocation || { start: {} } : arguments[0];
-
+	    var loc = this.currentLocation || { start: {} };
 	    return new SourceNode(loc.start.line, loc.start.column, this.srcFile);
 	  },
 	  wrap: function wrap(chunk) {
-	    var loc = arguments[1] === undefined ? this.currentLocation || { start: {} } : arguments[1];
+	    var loc = arguments.length <= 1 || arguments[1] === undefined ? this.currentLocation || { start: {} } : arguments[1];
 
 	    if (chunk instanceof SourceNode) {
 	      return chunk;
@@ -19496,22 +19629,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return ret;
 	  },
 
-	  generateList: function generateList(entries, loc) {
-	    var ret = this.empty(loc);
+	  generateList: function generateList(entries) {
+	    var ret = this.empty();
 
 	    for (var i = 0, len = entries.length; i < len; i++) {
 	      if (i) {
 	        ret.add(',');
 	      }
 
-	      ret.add(castChunk(entries[i], this, loc));
+	      ret.add(castChunk(entries[i], this));
 	    }
 
 	    return ret;
 	  },
 
-	  generateArray: function generateArray(entries, loc) {
-	    var ret = this.generateList(entries, loc);
+	  generateArray: function generateArray(entries) {
+	    var ret = this.generateList(entries);
 	    ret.prepend('[');
 	    ret.add(']');
 
@@ -19522,7 +19655,441 @@ return /******/ (function(modules) { // webpackBootstrap
 	exports['default'] = CodeGen;
 	module.exports = exports['default'];
 
-	/* NOP */
+/***/ },
+/* 19 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _interopRequireDefault = __webpack_require__(8)['default'];
+
+	exports.__esModule = true;
+	exports.registerDefaultHelpers = registerDefaultHelpers;
+
+	var _helpersBlockHelperMissing = __webpack_require__(22);
+
+	var _helpersBlockHelperMissing2 = _interopRequireDefault(_helpersBlockHelperMissing);
+
+	var _helpersEach = __webpack_require__(23);
+
+	var _helpersEach2 = _interopRequireDefault(_helpersEach);
+
+	var _helpersHelperMissing = __webpack_require__(24);
+
+	var _helpersHelperMissing2 = _interopRequireDefault(_helpersHelperMissing);
+
+	var _helpersIf = __webpack_require__(25);
+
+	var _helpersIf2 = _interopRequireDefault(_helpersIf);
+
+	var _helpersLog = __webpack_require__(26);
+
+	var _helpersLog2 = _interopRequireDefault(_helpersLog);
+
+	var _helpersLookup = __webpack_require__(27);
+
+	var _helpersLookup2 = _interopRequireDefault(_helpersLookup);
+
+	var _helpersWith = __webpack_require__(28);
+
+	var _helpersWith2 = _interopRequireDefault(_helpersWith);
+
+	function registerDefaultHelpers(instance) {
+	  _helpersBlockHelperMissing2['default'](instance);
+	  _helpersEach2['default'](instance);
+	  _helpersHelperMissing2['default'](instance);
+	  _helpersIf2['default'](instance);
+	  _helpersLog2['default'](instance);
+	  _helpersLookup2['default'](instance);
+	  _helpersWith2['default'](instance);
+	}
+
+/***/ },
+/* 20 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _interopRequireDefault = __webpack_require__(8)['default'];
+
+	exports.__esModule = true;
+	exports.registerDefaultDecorators = registerDefaultDecorators;
+
+	var _decoratorsInline = __webpack_require__(29);
+
+	var _decoratorsInline2 = _interopRequireDefault(_decoratorsInline);
+
+	function registerDefaultDecorators(instance) {
+	  _decoratorsInline2['default'](instance);
+	}
+
+/***/ },
+/* 21 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	var _utils = __webpack_require__(13);
+
+	var logger = {
+	  methodMap: ['debug', 'info', 'warn', 'error'],
+	  level: 'info',
+
+	  // Maps a given level value to the `methodMap` indexes above.
+	  lookupLevel: function lookupLevel(level) {
+	    if (typeof level === 'string') {
+	      var levelMap = _utils.indexOf(logger.methodMap, level.toLowerCase());
+	      if (levelMap >= 0) {
+	        level = levelMap;
+	      } else {
+	        level = parseInt(level, 10);
+	      }
+	    }
+
+	    return level;
+	  },
+
+	  // Can be overridden in the host environment
+	  log: function log(level) {
+	    level = logger.lookupLevel(level);
+
+	    if (typeof console !== 'undefined' && logger.lookupLevel(logger.level) <= level) {
+	      var method = logger.methodMap[level];
+	      if (!console[method]) {
+	        // eslint-disable-line no-console
+	        method = 'log';
+	      }
+
+	      for (var _len = arguments.length, message = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	        message[_key - 1] = arguments[_key];
+	      }
+
+	      console[method].apply(console, message); // eslint-disable-line no-console
+	    }
+	  }
+	};
+
+	exports['default'] = logger;
+	module.exports = exports['default'];
+
+/***/ },
+/* 22 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	var _utils = __webpack_require__(13);
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('blockHelperMissing', function (context, options) {
+	    var inverse = options.inverse,
+	        fn = options.fn;
+
+	    if (context === true) {
+	      return fn(this);
+	    } else if (context === false || context == null) {
+	      return inverse(this);
+	    } else if (_utils.isArray(context)) {
+	      if (context.length > 0) {
+	        if (options.ids) {
+	          options.ids = [options.name];
+	        }
+
+	        return instance.helpers.each(context, options);
+	      } else {
+	        return inverse(this);
+	      }
+	    } else {
+	      if (options.data && options.ids) {
+	        var data = _utils.createFrame(options.data);
+	        data.contextPath = _utils.appendContextPath(options.data.contextPath, options.name);
+	        options = { data: data };
+	      }
+
+	      return fn(context, options);
+	    }
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 23 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _interopRequireDefault = __webpack_require__(8)['default'];
+
+	exports.__esModule = true;
+
+	var _utils = __webpack_require__(13);
+
+	var _exception = __webpack_require__(12);
+
+	var _exception2 = _interopRequireDefault(_exception);
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('each', function (context, options) {
+	    if (!options) {
+	      throw new _exception2['default']('Must pass iterator to #each');
+	    }
+
+	    var fn = options.fn,
+	        inverse = options.inverse,
+	        i = 0,
+	        ret = '',
+	        data = undefined,
+	        contextPath = undefined;
+
+	    if (options.data && options.ids) {
+	      contextPath = _utils.appendContextPath(options.data.contextPath, options.ids[0]) + '.';
+	    }
+
+	    if (_utils.isFunction(context)) {
+	      context = context.call(this);
+	    }
+
+	    if (options.data) {
+	      data = _utils.createFrame(options.data);
+	    }
+
+	    function execIteration(field, index, last) {
+	      if (data) {
+	        data.key = field;
+	        data.index = index;
+	        data.first = index === 0;
+	        data.last = !!last;
+
+	        if (contextPath) {
+	          data.contextPath = contextPath + field;
+	        }
+	      }
+
+	      ret = ret + fn(context[field], {
+	        data: data,
+	        blockParams: _utils.blockParams([context[field], field], [contextPath + field, null])
+	      });
+	    }
+
+	    if (context && typeof context === 'object') {
+	      if (_utils.isArray(context)) {
+	        for (var j = context.length; i < j; i++) {
+	          if (i in context) {
+	            execIteration(i, i, i === context.length - 1);
+	          }
+	        }
+	      } else {
+	        var priorKey = undefined;
+
+	        for (var key in context) {
+	          if (context.hasOwnProperty(key)) {
+	            // We're running the iterations one step out of sync so we can detect
+	            // the last iteration without have to scan the object twice and create
+	            // an itermediate keys array.
+	            if (priorKey !== undefined) {
+	              execIteration(priorKey, i - 1);
+	            }
+	            priorKey = key;
+	            i++;
+	          }
+	        }
+	        if (priorKey !== undefined) {
+	          execIteration(priorKey, i - 1, true);
+	        }
+	      }
+	    }
+
+	    if (i === 0) {
+	      ret = inverse(this);
+	    }
+
+	    return ret;
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 24 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _interopRequireDefault = __webpack_require__(8)['default'];
+
+	exports.__esModule = true;
+
+	var _exception = __webpack_require__(12);
+
+	var _exception2 = _interopRequireDefault(_exception);
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('helperMissing', function () /* [args, ]options */{
+	    if (arguments.length === 1) {
+	      // A missing field in a {{foo}} construct.
+	      return undefined;
+	    } else {
+	      // Someone is actually trying to call something, blow up.
+	      throw new _exception2['default']('Missing helper: "' + arguments[arguments.length - 1].name + '"');
+	    }
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 25 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	var _utils = __webpack_require__(13);
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('if', function (conditional, options) {
+	    if (_utils.isFunction(conditional)) {
+	      conditional = conditional.call(this);
+	    }
+
+	    // Default behavior is to render the positive path if the value is truthy and not empty.
+	    // The `includeZero` option may be set to treat the condtional as purely not empty based on the
+	    // behavior of isEmpty. Effectively this determines if 0 is handled by the positive path or negative.
+	    if (!options.hash.includeZero && !conditional || _utils.isEmpty(conditional)) {
+	      return options.inverse(this);
+	    } else {
+	      return options.fn(this);
+	    }
+	  });
+
+	  instance.registerHelper('unless', function (conditional, options) {
+	    return instance.helpers['if'].call(this, conditional, { fn: options.inverse, inverse: options.fn, hash: options.hash });
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 26 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('log', function () /* message, options */{
+	    var args = [undefined],
+	        options = arguments[arguments.length - 1];
+	    for (var i = 0; i < arguments.length - 1; i++) {
+	      args.push(arguments[i]);
+	    }
+
+	    var level = 1;
+	    if (options.hash.level != null) {
+	      level = options.hash.level;
+	    } else if (options.data && options.data.level != null) {
+	      level = options.data.level;
+	    }
+	    args[0] = level;
+
+	    instance.log.apply(instance, args);
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 27 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('lookup', function (obj, field) {
+	    return obj && obj[field];
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 28 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	var _utils = __webpack_require__(13);
+
+	exports['default'] = function (instance) {
+	  instance.registerHelper('with', function (context, options) {
+	    if (_utils.isFunction(context)) {
+	      context = context.call(this);
+	    }
+
+	    var fn = options.fn;
+
+	    if (!_utils.isEmpty(context)) {
+	      var data = options.data;
+	      if (options.data && options.ids) {
+	        data = _utils.createFrame(options.data);
+	        data.contextPath = _utils.appendContextPath(options.data.contextPath, options.ids[0]);
+	      }
+
+	      return fn(context, {
+	        data: data,
+	        blockParams: _utils.blockParams([context], [data && data.contextPath])
+	      });
+	    } else {
+	      return options.inverse(this);
+	    }
+	  });
+	};
+
+	module.exports = exports['default'];
+
+/***/ },
+/* 29 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.__esModule = true;
+
+	var _utils = __webpack_require__(13);
+
+	exports['default'] = function (instance) {
+	  instance.registerDecorator('inline', function (fn, props, container, options) {
+	    var ret = fn;
+	    if (!props.partials) {
+	      props.partials = {};
+	      ret = function (context, options) {
+	        // Create a new partials stack frame prior to exec.
+	        var original = container.partials;
+	        container.partials = _utils.extend({}, original, props.partials);
+	        var ret = fn(context, options);
+	        container.partials = original;
+	        return ret;
+	      };
+	    }
+
+	    props.partials[options.args[0]] = options.fn;
+
+	    return ret;
+	  });
+	};
+
+	module.exports = exports['default'];
 
 /***/ }
 /******/ ])
@@ -19914,7 +20481,7 @@ return /******/ (function(modules) { // webpackBootstrap
 })(jQuery);
 
 /**
- * @license AngularJS v1.4.4
+ * @license AngularJS v1.4.6
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -19972,7 +20539,7 @@ function minErr(module, ErrorConstructor) {
       return match;
     });
 
-    message += '\nhttp://errors.angularjs.org/1.4.4/' +
+    message += '\nhttp://errors.angularjs.org/1.4.6/' +
       (module ? module + '/' : '') + code;
 
     for (i = SKIP_INDEXES, paramPrefix = '?'; i < templateArgs.length; i++, paramPrefix = '&') {
@@ -20809,6 +21376,8 @@ function copy(source, destination, stackSource, stackDest) {
       } else if (isRegExp(source)) {
         destination = new RegExp(source.source, source.toString().match(/[^\/]*$/)[0]);
         destination.lastIndex = source.lastIndex;
+      } else if (isFunction(source.cloneNode)) {
+          destination = source.cloneNode(true);
       } else {
         var emptyObject = Object.create(getPrototypeOf(source));
         return copy(source, emptyObject, stackSource, stackDest);
@@ -20959,7 +21528,7 @@ function equals(o1, o2) {
         for (key in o2) {
           if (!(key in keySet) &&
               key.charAt(0) !== '$' &&
-              o2[key] !== undefined &&
+              isDefined(o2[key]) &&
               !isFunction(o2[key])) return false;
         }
         return true;
@@ -21655,10 +22224,9 @@ function bindJQuery() {
 
   // bind to jQuery if present;
   var jqName = jq();
-  jQuery = window.jQuery; // use default jQuery.
-  if (isDefined(jqName)) { // `ngJq` present
-    jQuery = jqName === null ? undefined : window[jqName]; // if empty; use jqLite. if not empty, use jQuery specified by `ngJq`.
-  }
+  jQuery = isUndefined(jqName) ? window.jQuery :   // use jQuery (if present)
+           !jqName             ? undefined     :   // use jqLite
+                                 window[jqName];   // use jQuery specified by `ngJq`
 
   // Use jQuery if it exists with proper functionality, otherwise default to us.
   // Angular 1.2+ requires jQuery 1.7+ for on()/off() support.
@@ -21763,22 +22331,24 @@ function getter(obj, path, bindFnToScope) {
 /**
  * Return the DOM siblings between the first and last node in the given array.
  * @param {Array} array like object
- * @returns {jqLite} jqLite collection containing the nodes
+ * @returns {Array} the inputted object or a jqLite collection containing the nodes
  */
 function getBlockNodes(nodes) {
-  // TODO(perf): just check if all items in `nodes` are siblings and if they are return the original
-  //             collection, otherwise update the original collection.
+  // TODO(perf): update `nodes` instead of creating a new object?
   var node = nodes[0];
   var endNode = nodes[nodes.length - 1];
-  var blockNodes = [node];
+  var blockNodes;
 
-  do {
-    node = node.nextSibling;
-    if (!node) break;
-    blockNodes.push(node);
-  } while (node !== endNode);
+  for (var i = 1; node !== endNode && (node = node.nextSibling); i++) {
+    if (blockNodes || nodes[i] !== node) {
+      if (!blockNodes) {
+        blockNodes = jqLite(slice.call(nodes, 0, i));
+      }
+      blockNodes.push(node);
+    }
+  }
 
-  return jqLite(blockNodes);
+  return blockNodes || nodes;
 }
 
 
@@ -22162,7 +22732,7 @@ function serializeObject(obj) {
     val = toJsonReplacer(key, val);
     if (isObject(val)) {
 
-      if (seen.indexOf(val) >= 0) return '<<already seen>>';
+      if (seen.indexOf(val) >= 0) return '...';
 
       seen.push(val);
     }
@@ -22173,7 +22743,7 @@ function serializeObject(obj) {
 function toDebugString(obj) {
   if (typeof obj === 'function') {
     return obj.toString().replace(/ \{[\s\S]*$/, '');
-  } else if (typeof obj === 'undefined') {
+  } else if (isUndefined(obj)) {
     return 'undefined';
   } else if (typeof obj !== 'string') {
     return serializeObject(obj);
@@ -22279,8 +22849,9 @@ function toDebugString(obj) {
  * @name angular.version
  * @module ng
  * @description
- * An object that contains information about the current AngularJS version. This object has the
- * following properties:
+ * An object that contains information about the current AngularJS version.
+ *
+ * This object has the following properties:
  *
  * - `full` – `{string}` – Full version string, such as "0.9.18".
  * - `major` – `{number}` – Major version number, such as "0".
@@ -22289,11 +22860,11 @@ function toDebugString(obj) {
  * - `codeName` – `{string}` – Code name of the release, such as "jiggling-armfat".
  */
 var version = {
-  full: '1.4.4',    // all of these placeholder strings will be replaced by grunt's
+  full: '1.4.6',    // all of these placeholder strings will be replaced by grunt's
   major: 1,    // package task
   minor: 4,
-  dot: 4,
-  codeName: 'pylon-requirement'
+  dot: 6,
+  codeName: 'multiplicative-elevation'
 };
 
 
@@ -22498,7 +23069,7 @@ function publishExternalAPI(angular) {
  * - [`html()`](http://api.jquery.com/html/)
  * - [`next()`](http://api.jquery.com/next/) - Does not support selectors
  * - [`on()`](http://api.jquery.com/on/) - Does not support namespaces, selectors or eventData
- * - [`off()`](http://api.jquery.com/off/) - Does not support namespaces or selectors
+ * - [`off()`](http://api.jquery.com/off/) - Does not support namespaces, selectors or event object as parameter
  * - [`one()`](http://api.jquery.com/one/) - Does not support namespaces or selectors
  * - [`parent()`](http://api.jquery.com/parent/) - Does not support selectors
  * - [`prepend()`](http://api.jquery.com/prepend/)
@@ -22512,7 +23083,7 @@ function publishExternalAPI(angular) {
  * - [`text()`](http://api.jquery.com/text/)
  * - [`toggleClass()`](http://api.jquery.com/toggleClass/)
  * - [`triggerHandler()`](http://api.jquery.com/triggerHandler/) - Passes a dummy event object to handlers.
- * - [`unbind()`](http://api.jquery.com/unbind/) - Does not support namespaces
+ * - [`unbind()`](http://api.jquery.com/unbind/) - Does not support namespaces or event object as parameter
  * - [`val()`](http://api.jquery.com/val/)
  * - [`wrap()`](http://api.jquery.com/wrap/)
  *
@@ -22883,7 +23454,7 @@ function jqLiteInheritedData(element, name, value) {
 
   while (element) {
     for (var i = 0, ii = names.length; i < ii; i++) {
-      if ((value = jqLite.data(element, names[i])) !== undefined) return value;
+      if (isDefined(value = jqLite.data(element, names[i]))) return value;
     }
 
     // If dealing with a document fragment node with a host element, and no parent, use the host
@@ -22989,9 +23560,8 @@ function getBooleanAttrName(element, name) {
   return booleanAttr && BOOLEAN_ELEMENTS[nodeName_(element)] && booleanAttr;
 }
 
-function getAliasedAttrName(element, name) {
-  var nodeName = element.nodeName;
-  return (nodeName === 'INPUT' || nodeName === 'TEXTAREA') && ALIASED_ATTR[name];
+function getAliasedAttrName(name) {
+  return ALIASED_ATTR[name];
 }
 
 forEach({
@@ -23128,7 +23698,7 @@ forEach({
     // in a way that survives minification.
     // jqLiteEmpty takes no arguments but is a setter.
     if (fn !== jqLiteEmpty &&
-        (((fn.length == 2 && (fn !== jqLiteHasClass && fn !== jqLiteController)) ? arg1 : arg2) === undefined)) {
+        (isUndefined((fn.length == 2 && (fn !== jqLiteHasClass && fn !== jqLiteController)) ? arg1 : arg2))) {
       if (isObject(arg1)) {
 
         // we are a write, but the object properties are the key/values
@@ -23149,7 +23719,7 @@ forEach({
         // TODO: do we still need this?
         var value = fn.$dv;
         // Only if we have $dv do we iterate over all, otherwise it is just the first element.
-        var jj = (value === undefined) ? Math.min(nodeCount, 1) : nodeCount;
+        var jj = (isUndefined(value)) ? Math.min(nodeCount, 1) : nodeCount;
         for (var j = 0; j < jj; j++) {
           var nodeValue = fn(this[j], arg1, arg2);
           value = value ? value + nodeValue : nodeValue;
@@ -24788,61 +25358,66 @@ var $$CoreAnimateQueueProvider = function() {
       }
     };
 
-    function addRemoveClassesPostDigest(element, add, remove) {
-      var classVal, data = postDigestQueue.get(element);
 
-      if (!data) {
-        postDigestQueue.put(element, data = {});
-        postDigestElements.push(element);
-      }
-
-      var updateData = function(classes, value) {
-        var changed = false;
-        if (classes) {
-          classes = isString(classes) ? classes.split(' ') :
-                    isArray(classes) ? classes : [];
-          forEach(classes, function(className) {
-            if (className) {
-              changed = true;
-              data[className] = value;
-            }
-          });
-        }
-        return changed;
-      };
-
-      var classesAdded = updateData(add, true);
-      var classesRemoved = updateData(remove, false);
-      if ((!classesAdded && !classesRemoved) || postDigestElements.length > 1) return;
-
-      $rootScope.$$postDigest(function() {
-        forEach(postDigestElements, function(element) {
-          var data = postDigestQueue.get(element);
-          if (data) {
-            var existing = splitClasses(element.attr('class'));
-            var toAdd = '';
-            var toRemove = '';
-            forEach(data, function(status, className) {
-              var hasClass = !!existing[className];
-              if (status !== hasClass) {
-                if (status) {
-                  toAdd += (toAdd.length ? ' ' : '') + className;
-                } else {
-                  toRemove += (toRemove.length ? ' ' : '') + className;
-                }
-              }
-            });
-
-            forEach(element, function(elm) {
-              toAdd    && jqLiteAddClass(elm, toAdd);
-              toRemove && jqLiteRemoveClass(elm, toRemove);
-            });
-            postDigestQueue.remove(element);
+    function updateData(data, classes, value) {
+      var changed = false;
+      if (classes) {
+        classes = isString(classes) ? classes.split(' ') :
+                  isArray(classes) ? classes : [];
+        forEach(classes, function(className) {
+          if (className) {
+            changed = true;
+            data[className] = value;
           }
         });
+      }
+      return changed;
+    }
 
-        postDigestElements.length = 0;
+    function handleCSSClassChanges() {
+      forEach(postDigestElements, function(element) {
+        var data = postDigestQueue.get(element);
+        if (data) {
+          var existing = splitClasses(element.attr('class'));
+          var toAdd = '';
+          var toRemove = '';
+          forEach(data, function(status, className) {
+            var hasClass = !!existing[className];
+            if (status !== hasClass) {
+              if (status) {
+                toAdd += (toAdd.length ? ' ' : '') + className;
+              } else {
+                toRemove += (toRemove.length ? ' ' : '') + className;
+              }
+            }
+          });
+
+          forEach(element, function(elm) {
+            toAdd    && jqLiteAddClass(elm, toAdd);
+            toRemove && jqLiteRemoveClass(elm, toRemove);
+          });
+          postDigestQueue.remove(element);
+        }
       });
+      postDigestElements.length = 0;
+    }
+
+
+    function addRemoveClassesPostDigest(element, add, remove) {
+      var data = postDigestQueue.get(element) || {};
+
+      var classesAdded = updateData(data, add, true);
+      var classesRemoved = updateData(data, remove, false);
+
+      if (classesAdded || classesRemoved) {
+
+        postDigestQueue.put(element, data);
+        postDigestElements.push(element);
+
+        if (postDigestElements.length === 1) {
+          $rootScope.$$postDigest(handleCSSClassChanges);
+        }
+      }
     }
   }];
 };
@@ -25307,10 +25882,10 @@ var $CoreAnimateCssProvider = function() {
         return this.getPromise().then(f1,f2);
       },
       'catch': function(f1) {
-        return this.getPromise().catch(f1);
+        return this.getPromise()['catch'](f1);
       },
       'finally': function(f1) {
-        return this.getPromise().finally(f1);
+        return this.getPromise()['finally'](f1);
       }
     };
 
@@ -25443,7 +26018,7 @@ function Browser(window, document, $log, $sniffer) {
   var cachedState, lastHistoryState,
       lastBrowserUrl = location.href,
       baseElement = document.find('base'),
-      reloadLocation = null;
+      pendingLocation = null;
 
   cacheState();
   lastHistoryState = cachedState;
@@ -25503,8 +26078,8 @@ function Browser(window, document, $log, $sniffer) {
         // Do the assignment again so that those two variables are referentially identical.
         lastHistoryState = cachedState;
       } else {
-        if (!sameBase || reloadLocation) {
-          reloadLocation = url;
+        if (!sameBase || pendingLocation) {
+          pendingLocation = url;
         }
         if (replace) {
           location.replace(url);
@@ -25513,14 +26088,18 @@ function Browser(window, document, $log, $sniffer) {
         } else {
           location.hash = getHash(url);
         }
+        if (location.href !== url) {
+          pendingLocation = url;
+        }
       }
       return self;
     // getter
     } else {
-      // - reloadLocation is needed as browsers don't allow to read out
-      //   the new location.href if a reload happened.
+      // - pendingLocation is needed as browsers don't allow to read out
+      //   the new location.href if a reload happened or if there is a bug like in iOS 9 (see
+      //   https://openradar.appspot.com/22186109).
       // - the replacement is a workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=407172
-      return reloadLocation || location.href.replace(/%27/g,"'");
+      return pendingLocation || location.href.replace(/%27/g,"'");
     }
   };
 
@@ -25542,6 +26121,7 @@ function Browser(window, document, $log, $sniffer) {
       urlChangeInit = false;
 
   function cacheStateAndFireUrlChange() {
+    pendingLocation = null;
     cacheState();
     fireUrlChange();
   }
@@ -25777,10 +26357,10 @@ function $BrowserProvider() {
            $scope.keys = [];
            $scope.cache = $cacheFactory('cacheId');
            $scope.put = function(key, value) {
-             if ($scope.cache.get(key) === undefined) {
+             if (isUndefined($scope.cache.get(key))) {
                $scope.keys.push(key);
              }
-             $scope.cache.put(key, value === undefined ? null : value);
+             $scope.cache.put(key, isUndefined(value) ? null : value);
            };
          }]);
      </file>
@@ -26256,18 +26836,24 @@ function $TemplateCacheProvider() {
  * and other directives used in the directive's template will also be excluded from execution.
  *
  * #### `scope`
- * **If set to `true`,** then a new scope will be created for this directive. If multiple directives on the
- * same element request a new scope, only one new scope is created. The new scope rule does not
- * apply for the root of the template since the root of the template always gets a new scope.
+ * The scope property can be `true`, an object or a falsy value:
  *
- * **If set to `{}` (object hash),** then a new "isolate" scope is created. The 'isolate' scope differs from
- * normal scope in that it does not prototypically inherit from the parent scope. This is useful
- * when creating reusable components, which should not accidentally read or modify data in the
- * parent scope.
+ * * **falsy:** No scope will be created for the directive. The directive will use its parent's scope.
  *
- * The 'isolate' scope takes an object hash which defines a set of local scope properties
- * derived from the parent scope. These local properties are useful for aliasing values for
- * templates. Locals definition is a hash of local scope property to its source:
+ * * **`true`:** A new child scope that prototypically inherits from its parent will be created for
+ * the directive's element. If multiple directives on the same element request a new scope,
+ * only one new scope is created. The new scope rule does not apply for the root of the template
+ * since the root of the template always gets a new scope.
+ *
+ * * **`{...}` (an object hash):** A new "isolate" scope is created for the directive's element. The
+ * 'isolate' scope differs from normal scope in that it does not prototypically inherit from its parent
+ * scope. This is useful when creating reusable components, which should not accidentally read or modify
+ * data in the parent scope.
+ *
+ * The 'isolate' scope object hash defines a set of local scope properties derived from attributes on the
+ * directive's element. These local properties are useful for aliasing values for templates. The keys in
+ * the object hash map to the name of the property on the isolate scope; the values define how the property
+ * is bound to the parent scope, via matching attributes on the directive's element:
  *
  * * `@` or `@attr` - bind a local scope property to the value of DOM attribute. The result is
  *   always a string since DOM attributes are strings. If no `attr` name is specified  then the
@@ -26300,6 +26886,20 @@ function $TemplateCacheProvider() {
  *   For example, if the expression is `increment(amount)` then we can specify the amount value
  *   by calling the `localFn` as `localFn({amount: 22})`.
  *
+ * In general it's possible to apply more than one directive to one element, but there might be limitations
+ * depending on the type of scope required by the directives. The following points will help explain these limitations.
+ * For simplicity only two directives are taken into account, but it is also applicable for several directives:
+ *
+ * * **no scope** + **no scope** => Two directives which don't require their own scope will use their parent's scope
+ * * **child scope** + **no scope** =>  Both directives will share one single child scope
+ * * **child scope** + **child scope** =>  Both directives will share one single child scope
+ * * **isolated scope** + **no scope** =>  The isolated directive will use it's own created isolated scope. The other directive will use
+ * its parent's scope
+ * * **isolated scope** + **child scope** =>  **Won't work!** Only one scope can be related to one element. Therefore these directives cannot
+ * be applied to the same element.
+ * * **isolated scope** + **isolated scope**  =>  **Won't work!** Only one scope can be related to one element. Therefore these directives
+ * cannot be applied to the same element.
+ *
  *
  * #### `bindToController`
  * When an isolate scope is used for a component (see above), and `controllerAs` is used, `bindToController: true` will
@@ -26308,7 +26908,7 @@ function $TemplateCacheProvider() {
  *
  * #### `controller`
  * Controller constructor function. The controller is instantiated before the
- * pre-linking phase and it is shared with other directives (see
+ * pre-linking phase and can be accessed by other directives (see
  * `require` attribute). This allows the directives to communicate with each other and augment
  * each other's behavior. The controller is injectable (and supports bracket notation) with the following locals:
  *
@@ -26348,9 +26948,10 @@ function $TemplateCacheProvider() {
  *
  * #### `controllerAs`
  * Identifier name for a reference to the controller in the directive's scope.
- * This allows the controller to be referenced from the directive template. The directive
- * needs to define a scope for this configuration to be used. Useful in the case when
- * directive is used as component.
+ * This allows the controller to be referenced from the directive template. This is especially
+ * useful when a directive is used as component, i.e. with an `isolate` scope. It's also possible
+ * to use it in a directive without an `isolate` / `new` scope, but you need to be aware that the
+ * `controllerAs` reference might overwrite a property that already exists on the parent scope.
  *
  *
  * #### `restrict`
@@ -27187,7 +27788,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
 
         var node = this.$$element[0],
             booleanKey = getBooleanAttrName(node, key),
-            aliasedKey = getAliasedAttrName(node, key),
+            aliasedKey = getAliasedAttrName(key),
             observer = key,
             nodeName;
 
@@ -27254,7 +27855,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
         }
 
         if (writeAttr !== false) {
-          if (value === null || value === undefined) {
+          if (value === null || isUndefined(value)) {
             this.$$element.removeAttr(attrName);
           } else {
             this.$$element.attr(attrName, value);
@@ -28220,7 +28821,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
             i = 0, ii = directives.length; i < ii; i++) {
           try {
             directive = directives[i];
-            if ((maxPriority === undefined || maxPriority > directive.priority) &&
+            if ((isUndefined(maxPriority) || maxPriority > directive.priority) &&
                  directive.restrict.indexOf(location) != -1) {
               if (startAttrName) {
                 directive = inherit(directive, {$$start: startAttrName, $$end: endAttrName});
@@ -30432,8 +31033,8 @@ function $HttpProvider() {
        * Resolves the raw $http promise.
        */
       function resolvePromise(response, status, headers, statusText) {
-        // normalize internal statuses to 0
-        status = Math.max(status, 0);
+        //status: HTTP response status code, 0, -1 (aborted by timeout / promise)
+        status = status >= -1 ? status : 0;
 
         (isSuccess(status) ? deferred.resolve : deferred.reject)({
           data: response,
@@ -30573,7 +31174,7 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
         }
       }
 
-      xhr.send(post);
+      xhr.send(isUndefined(post) ? null : post);
     }
 
     if (timeout > 0) {
@@ -30590,7 +31191,7 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
 
     function completeRequest(callback, status, response, headersString, statusText) {
       // cancel timeout and subsequent timeout promise resolution
-      if (timeoutId !== undefined) {
+      if (isDefined(timeoutId)) {
         $browserDefer.cancel(timeoutId);
       }
       jsonpDone = xhr = null;
@@ -30776,7 +31377,7 @@ function $InterpolateProvider() {
      * ```js
      *   var $interpolate = ...; // injected
      *   var exp = $interpolate('Hello {{name | uppercase}}!');
-     *   expect(exp({name:'Angular'}).toEqual('Hello ANGULAR!');
+     *   expect(exp({name:'Angular'})).toEqual('Hello ANGULAR!');
      * ```
      *
      * `$interpolate` takes an optional fourth argument, `allOrNothing`. If `allOrNothing` is
@@ -31329,14 +31930,14 @@ function LocationHtml5Url(appBase, appBaseNoFile, basePrefix) {
     var appUrl, prevAppUrl;
     var rewrittenUrl;
 
-    if ((appUrl = beginsWith(appBase, url)) !== undefined) {
+    if (isDefined(appUrl = beginsWith(appBase, url))) {
       prevAppUrl = appUrl;
-      if ((appUrl = beginsWith(basePrefix, appUrl)) !== undefined) {
+      if (isDefined(appUrl = beginsWith(basePrefix, appUrl))) {
         rewrittenUrl = appBaseNoFile + (beginsWith('/', appUrl) || appUrl);
       } else {
         rewrittenUrl = appBase + prevAppUrl;
       }
-    } else if ((appUrl = beginsWith(appBaseNoFile, url)) !== undefined) {
+    } else if (isDefined(appUrl = beginsWith(appBaseNoFile, url))) {
       rewrittenUrl = appBaseNoFile + appUrl;
     } else if (appBaseNoFile == url + '/') {
       rewrittenUrl = appBaseNoFile;
@@ -32379,6 +32980,15 @@ var $parseMinErr = minErr('$parse');
 
 
 function ensureSafeMemberName(name, fullExpression) {
+  // From the JavaScript docs:
+  // Property names must be strings. This means that non-string objects cannot be used
+  // as keys in an object. Any non-string object, including a number, is typecasted
+  // into a string via the toString method.
+  //
+  // So, to ensure that we are checking the same `name` that JavaScript would use,
+  // we cast it to a string, if possible
+  name =  (isObject(name) && name.toString) ? name.toString() : name;
+
   if (name === "__defineGetter__" || name === "__defineSetter__"
       || name === "__lookupGetter__" || name === "__lookupSetter__"
       || name === "__proto__") {
@@ -33115,6 +33725,7 @@ ASTCompiler.prototype = {
       this.state.computing = 'assign';
       var result = this.nextId();
       this.recurse(assignable, result);
+      this.return_(result);
       extra = 'fn.assign=' + this.generateFunction('assign', 's,v,l');
     }
     var toWatch = getInputs(ast.body);
@@ -34832,7 +35443,7 @@ function $$RAFProvider() { //rAF
                                $window.webkitCancelRequestAnimationFrame;
 
     var rafSupported = !!requestAnimationFrame;
-    var rafFn = rafSupported
+    var raf = rafSupported
       ? function(fn) {
           var id = requestAnimationFrame(fn);
           return function() {
@@ -34846,47 +35457,9 @@ function $$RAFProvider() { //rAF
           };
         };
 
-    queueFn.supported = rafSupported;
+    raf.supported = rafSupported;
 
-    var cancelLastRAF;
-    var taskCount = 0;
-    var taskQueue = [];
-    return queueFn;
-
-    function flush() {
-      for (var i = 0; i < taskQueue.length; i++) {
-        var task = taskQueue[i];
-        if (task) {
-          taskQueue[i] = null;
-          task();
-        }
-      }
-      taskCount = taskQueue.length = 0;
-    }
-
-    function queueFn(asyncFn) {
-      var index = taskQueue.length;
-
-      taskCount++;
-      taskQueue.push(asyncFn);
-
-      if (index === 0) {
-        cancelLastRAF = rafFn(flush);
-      }
-
-      return function cancelQueueFn() {
-        if (index >= 0) {
-          taskQueue[index] = null;
-          index = null;
-
-          if (--taskCount === 0 && cancelLastRAF) {
-            cancelLastRAF();
-            cancelLastRAF = null;
-            taskQueue.length = 0;
-          }
-        }
-      };
-    }
+    return raf;
   }];
 }
 
@@ -35143,10 +35716,10 @@ function $RootScopeProvider() {
        * Registers a `listener` callback to be executed whenever the `watchExpression` changes.
        *
        * - The `watchExpression` is called on every call to {@link ng.$rootScope.Scope#$digest
-       *   $digest()} and should return the value that will be watched. (Since
-       *   {@link ng.$rootScope.Scope#$digest $digest()} reruns when it detects changes the
-       *   `watchExpression` can execute multiple times per
-       *   {@link ng.$rootScope.Scope#$digest $digest()} and should be idempotent.)
+       *   $digest()} and should return the value that will be watched. (`watchExpression` should not change
+       *   its value when executed multiple times with the same input because it may be executed multiple
+       *   times by {@link ng.$rootScope.Scope#$digest $digest()}. That is, `watchExpression` should be
+       *   [idempotent](http://en.wikipedia.org/wiki/Idempotence).
        * - The `listener` is called only when the value from the current `watchExpression` and the
        *   previous call to `watchExpression` are not equal (with the exception of the initial run,
        *   see below). Inequality is determined according to reference inequality,
@@ -35495,7 +36068,7 @@ function $RootScopeProvider() {
             // copy the items to oldValue and look for changes.
             newLength = 0;
             for (key in newValue) {
-              if (newValue.hasOwnProperty(key)) {
+              if (hasOwnProperty.call(newValue, key)) {
                 newLength++;
                 newItem = newValue[key];
                 oldItem = oldValue[key];
@@ -35517,7 +36090,7 @@ function $RootScopeProvider() {
               // we used to have more keys, need to find them and destroy them.
               changeDetected++;
               for (key in oldValue) {
-                if (!newValue.hasOwnProperty(key)) {
+                if (!hasOwnProperty.call(newValue, key)) {
                   oldLength--;
                   delete oldValue[key];
                 }
@@ -36602,7 +37175,7 @@ function $SceDelegateProvider() {
             'Attempted to trust a value in invalid context. Context: {0}; Value: {1}',
             type, trustedValue);
       }
-      if (trustedValue === null || trustedValue === undefined || trustedValue === '') {
+      if (trustedValue === null || isUndefined(trustedValue) || trustedValue === '') {
         return trustedValue;
       }
       // All the current contexts in SCE_CONTEXTS happen to be strings.  In order to avoid trusting
@@ -36657,7 +37230,7 @@ function $SceDelegateProvider() {
      *     `$sceDelegate.trustAs`} if valid in this context.  Otherwise, throws an exception.
      */
     function getTrusted(type, maybeTrusted) {
-      if (maybeTrusted === null || maybeTrusted === undefined || maybeTrusted === '') {
+      if (maybeTrusted === null || isUndefined(maybeTrusted) || maybeTrusted === '') {
         return maybeTrusted;
       }
       var constructor = (byType.hasOwnProperty(type) ? byType[type] : null);
@@ -37918,7 +38491,7 @@ function $$CookieReader($document) {
           // the first value that is seen for a cookie is the most
           // specific one.  values for the same cookie name that
           // follow are for less specific paths.
-          if (lastCookies[name] === undefined) {
+          if (isUndefined(lastCookies[name])) {
             lastCookies[name] = safeDecodeURIComponent(cookie.substring(index + 1));
           }
         }
@@ -39864,6 +40437,7 @@ function nullFormRenameControl(control, name) {
  * @property {boolean} $dirty True if user has already interacted with the form.
  * @property {boolean} $valid True if all of the containing forms and controls are valid.
  * @property {boolean} $invalid True if at least one containing control or form is invalid.
+ * @property {boolean} $pending True if at least one containing control or form is pending.
  * @property {boolean} $submitted True if user has submitted the form even if its invalid.
  *
  * @property {Object} $error Is an object hash, containing references to controls or
@@ -39903,8 +40477,6 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
   var form = this,
       controls = [];
 
-  var parentForm = form.$$parentForm = element.parent().controller('form') || nullFormCtrl;
-
   // init state
   form.$error = {};
   form.$$success = {};
@@ -39915,8 +40487,7 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
   form.$valid = true;
   form.$invalid = false;
   form.$submitted = false;
-
-  parentForm.$addControl(form);
+  form.$$parentForm = nullFormCtrl;
 
   /**
    * @ngdoc method
@@ -39955,11 +40526,23 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
   /**
    * @ngdoc method
    * @name form.FormController#$addControl
+   * @param {object} control control object, either a {@link form.FormController} or an
+   * {@link ngModel.NgModelController}
    *
    * @description
-   * Register a control with the form.
+   * Register a control with the form. Input elements using ngModelController do this automatically
+   * when they are linked.
    *
-   * Input elements using ngModelController do this automatically when they are linked.
+   * Note that the current state of the control will not be reflected on the new parent form. This
+   * is not an issue with normal use, as freshly compiled and linked controls are in a `$pristine`
+   * state.
+   *
+   * However, if the method is used programmatically, for example by adding dynamically created controls,
+   * or controls that have been previously removed without destroying their corresponding DOM element,
+   * it's the developers responsiblity to make sure the current state propagates to the parent form.
+   *
+   * For example, if an input control is added that is already `$dirty` and has `$error` properties,
+   * calling `$setDirty()` and `$validate()` afterwards will propagate the state to the parent form.
    */
   form.$addControl = function(control) {
     // Breaking change - before, inputs whose name was "hasOwnProperty" were quietly ignored
@@ -39970,6 +40553,8 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
     if (control.$name) {
       form[control.$name] = control;
     }
+
+    control.$$parentForm = form;
   };
 
   // Private API: rename a form control
@@ -39986,11 +40571,18 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
   /**
    * @ngdoc method
    * @name form.FormController#$removeControl
+   * @param {object} control control object, either a {@link form.FormController} or an
+   * {@link ngModel.NgModelController}
    *
    * @description
    * Deregister a control from the form.
    *
    * Input elements using ngModelController do this automatically when they are destroyed.
+   *
+   * Note that only the removed control's validation state (`$errors`etc.) will be removed from the
+   * form. `$dirty`, `$submitted` states will not be changed, because the expected behavior can be
+   * different from case to case. For example, removing the only `$dirty` control from a form may or
+   * may not mean that the form is still `$dirty`.
    */
   form.$removeControl = function(control) {
     if (control.$name && form[control.$name] === control) {
@@ -40007,6 +40599,7 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
     });
 
     arrayRemove(controls, control);
+    control.$$parentForm = nullFormCtrl;
   };
 
 
@@ -40043,7 +40636,6 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
         delete object[property];
       }
     },
-    parentForm: parentForm,
     $animate: $animate
   });
 
@@ -40062,7 +40654,7 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
     $animate.addClass(element, DIRTY_CLASS);
     form.$dirty = true;
     form.$pristine = false;
-    parentForm.$setDirty();
+    form.$$parentForm.$setDirty();
   };
 
   /**
@@ -40118,7 +40710,7 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
   form.$setSubmitted = function() {
     $animate.addClass(element, SUBMITTED_CLASS);
     form.$submitted = true;
-    parentForm.$setSubmitted();
+    form.$$parentForm.$setSubmitted();
   };
 }
 
@@ -40168,6 +40760,7 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
  * # CSS classes
  *  - `ng-valid` is set if the form is valid.
  *  - `ng-invalid` is set if the form is invalid.
+ *  - `ng-pending` is set if the form is pending.
  *  - `ng-pristine` is set if the form is pristine.
  *  - `ng-dirty` is set if the form is dirty.
  *  - `ng-submitted` is set if the form was submitted.
@@ -40243,7 +40836,6 @@ function FormController(element, attrs, $scope, $animate, $interpolate) {
        </script>
        <style>
         .my-form {
-          -webkit-transition:all linear 0.5s;
           transition:all linear 0.5s;
           background: transparent;
         }
@@ -40292,6 +40884,7 @@ var formDirectiveFactory = function(isNgForm) {
     var formDirective = {
       name: 'form',
       restrict: isNgForm ? 'EAC' : 'E',
+      require: ['form', '^^?form'], //first is the form's own ctrl, second is an optional parent form
       controller: FormController,
       compile: function ngFormCompile(formElement, attr) {
         // Setup initial state of the control
@@ -40300,7 +40893,9 @@ var formDirectiveFactory = function(isNgForm) {
         var nameAttr = attr.name ? 'name' : (isNgForm && attr.ngForm ? 'ngForm' : false);
 
         return {
-          pre: function ngFormPreLink(scope, formElement, attr, controller) {
+          pre: function ngFormPreLink(scope, formElement, attr, ctrls) {
+            var controller = ctrls[0];
+
             // if `action` attr is not present on the form, prevent the default action (submission)
             if (!('action' in attr)) {
               // we can't use jq events because if a form is destroyed during submission the default
@@ -40329,7 +40924,9 @@ var formDirectiveFactory = function(isNgForm) {
               });
             }
 
-            var parentFormCtrl = controller.$$parentForm;
+            var parentFormCtrl = ctrls[1] || controller.$$parentForm;
+            parentFormCtrl.$addControl(controller);
+
             var setter = nameAttr ? getSetter(controller.$name) : noop;
 
             if (nameAttr) {
@@ -40337,13 +40934,13 @@ var formDirectiveFactory = function(isNgForm) {
               attr.$observe(nameAttr, function(newValue) {
                 if (controller.$name === newValue) return;
                 setter(scope, undefined);
-                parentFormCtrl.$$renameControl(controller, newValue);
+                controller.$$parentForm.$$renameControl(controller, newValue);
                 setter = getSetter(controller.$name);
                 setter(scope, controller);
               });
             }
             formElement.on('$destroy', function() {
-              parentFormCtrl.$removeControl(controller);
+              controller.$$parentForm.$removeControl(controller);
               setter(scope, undefined);
               extend(controller, nullFormCtrl); //stop propagating child destruction handlers upwards
             });
@@ -40505,9 +41102,17 @@ var inputType = {
      * @param {string} ngModel Assignable angular expression to data-bind to.
      * @param {string=} name Property name of the form under which the control is published.
      * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be a
-     * valid ISO date string (yyyy-MM-dd).
+     *   valid ISO date string (yyyy-MM-dd). You can also use interpolation inside this attribute
+     *   (e.g. `min="{{minDate | date:'yyyy-MM-dd'}}"`). Note that `min` will also add native HTML5
+     *   constraint validation.
      * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must be
-     * a valid ISO date string (yyyy-MM-dd).
+     *   a valid ISO date string (yyyy-MM-dd). You can also use interpolation inside this attribute
+     *   (e.g. `max="{{maxDate | date:'yyyy-MM-dd'}}"`). Note that `max` will also add native HTML5
+     *   constraint validation.
+     * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO date string
+     *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+     * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO date string
+     *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
      * @param {string=} required Sets `required` validation error key if the value is not entered.
      * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
      *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
@@ -40599,10 +41204,18 @@ var inputType = {
     *
     * @param {string} ngModel Assignable angular expression to data-bind to.
     * @param {string=} name Property name of the form under which the control is published.
-    * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be a
-    * valid ISO datetime format (yyyy-MM-ddTHH:mm:ss).
-    * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must be
-    * a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss).
+    * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
+    *   This must be a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss). You can also use interpolation
+    *   inside this attribute (e.g. `min="{{minDatetimeLocal | date:'yyyy-MM-ddTHH:mm:ss'}}"`).
+    *   Note that `min` will also add native HTML5 constraint validation.
+    * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
+    *   This must be a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss). You can also use interpolation
+    *   inside this attribute (e.g. `max="{{maxDatetimeLocal | date:'yyyy-MM-ddTHH:mm:ss'}}"`).
+    *   Note that `max` will also add native HTML5 constraint validation.
+    * @param {(date|string)=} ngMin Sets the `min` validation error key to the Date / ISO datetime string
+    *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+    * @param {(date|string)=} ngMax Sets the `max` validation error key to the Date / ISO datetime string
+    *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
     * @param {string=} required Sets `required` validation error key if the value is not entered.
     * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
     *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
@@ -40695,10 +41308,18 @@ var inputType = {
    *
    * @param {string} ngModel Assignable angular expression to data-bind to.
    * @param {string=} name Property name of the form under which the control is published.
-   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be a
-   * valid ISO time format (HH:mm:ss).
-   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must be a
-   * valid ISO time format (HH:mm:ss).
+   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
+   *   This must be a valid ISO time format (HH:mm:ss). You can also use interpolation inside this
+   *   attribute (e.g. `min="{{minTime | date:'HH:mm:ss'}}"`). Note that `min` will also add
+   *   native HTML5 constraint validation.
+   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
+   *   This must be a valid ISO time format (HH:mm:ss). You can also use interpolation inside this
+   *   attribute (e.g. `max="{{maxTime | date:'HH:mm:ss'}}"`). Note that `max` will also add
+   *   native HTML5 constraint validation.
+   * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO time string the
+   *   `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+   * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO time string the
+   *   `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
    * @param {string=} required Sets `required` validation error key if the value is not entered.
    * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
    *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
@@ -40790,10 +41411,18 @@ var inputType = {
     *
     * @param {string} ngModel Assignable angular expression to data-bind to.
     * @param {string=} name Property name of the form under which the control is published.
-    * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be a
-    * valid ISO week format (yyyy-W##).
-    * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must be
-    * a valid ISO week format (yyyy-W##).
+    * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
+    *   This must be a valid ISO week format (yyyy-W##). You can also use interpolation inside this
+    *   attribute (e.g. `min="{{minWeek | date:'yyyy-Www'}}"`). Note that `min` will also add
+    *   native HTML5 constraint validation.
+    * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
+    *   This must be a valid ISO week format (yyyy-W##). You can also use interpolation inside this
+    *   attribute (e.g. `max="{{maxWeek | date:'yyyy-Www'}}"`). Note that `max` will also add
+    *   native HTML5 constraint validation.
+    * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO week string
+    *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+    * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO week string
+    *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
     * @param {string=} required Sets `required` validation error key if the value is not entered.
     * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
     *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
@@ -40887,10 +41516,19 @@ var inputType = {
    *
    * @param {string} ngModel Assignable angular expression to data-bind to.
    * @param {string=} name Property name of the form under which the control is published.
-   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be
-   * a valid ISO month format (yyyy-MM).
-   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must
-   * be a valid ISO month format (yyyy-MM).
+   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
+   *   This must be a valid ISO month format (yyyy-MM). You can also use interpolation inside this
+   *   attribute (e.g. `min="{{minMonth | date:'yyyy-MM'}}"`). Note that `min` will also add
+   *   native HTML5 constraint validation.
+   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
+   *   This must be a valid ISO month format (yyyy-MM). You can also use interpolation inside this
+   *   attribute (e.g. `max="{{maxMonth | date:'yyyy-MM'}}"`). Note that `max` will also add
+   *   native HTML5 constraint validation.
+   * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO week string
+   *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+   * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO week string
+   *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
+
    * @param {string=} required Sets `required` validation error key if the value is not entered.
    * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
    *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
@@ -41652,7 +42290,7 @@ function createDateInputType(type, regexp, parseDate, format) {
     }
 
     function parseObservedDateValue(val) {
-      return isDefined(val) ? (isDate(val) ? val : parseDate(val)) : undefined;
+      return isDefined(val) && !isDate(val) ? parseDate(val) || undefined : val;
     }
   };
 }
@@ -42147,7 +42785,7 @@ var ngBindDirective = ['$compile', function($compile) {
         $compile.$$addBindingInfo(element, attr.ngBind);
         element = element[0];
         scope.$watch(attr.ngBind, function ngBindWatchAction(value) {
-          element.textContent = value === undefined ? '' : value;
+          element.textContent = isUndefined(value) ? '' : value;
         });
       };
     }
@@ -42215,7 +42853,7 @@ var ngBindTemplateDirective = ['$interpolate', '$compile', function($interpolate
         $compile.$$addBindingInfo(element, interpolateFn.expressions);
         element = element[0];
         attr.$observe('ngBindTemplate', function(value) {
-          element.textContent = value === undefined ? '' : value;
+          element.textContent = isUndefined(value) ? '' : value;
         });
       };
     }
@@ -42632,7 +43270,6 @@ function classDirective(name, selector) {
      </file>
      <file name="style.css">
        .base-class {
-         -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
          transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
        }
 
@@ -43807,7 +44444,6 @@ forEach(
       }
 
       .animate-if.ng-enter, .animate-if.ng-leave {
-        -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
         transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
       }
 
@@ -43956,7 +44592,6 @@ var ngIfDirective = ['$animate', function($animate) {
       }
 
       .slide-animate.ng-enter, .slide-animate.ng-leave {
-        -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
         transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
 
         position:absolute;
@@ -44175,16 +44810,18 @@ var ngIncludeFillContentDirective = ['$compile',
  * current scope.
  *
  * <div class="alert alert-danger">
- * The only appropriate use of `ngInit` is for aliasing special properties of
- * {@link ng.directive:ngRepeat `ngRepeat`}, as seen in the demo below. Besides this case, you
- * should use {@link guide/controller controllers} rather than `ngInit`
- * to initialize values on a scope.
+ * This directive can be abused to add unnecessary amounts of logic into your templates.
+ * There are only a few appropriate uses of `ngInit`, such as for aliasing special properties of
+ * {@link ng.directive:ngRepeat `ngRepeat`}, as seen in the demo below; and for injecting data via
+ * server side scripting. Besides these few cases, you should use {@link guide/controller controllers}
+ * rather than `ngInit` to initialize values on a scope.
  * </div>
+ *
  * <div class="alert alert-warning">
- * **Note**: If you have assignment in `ngInit` along with {@link ng.$filter `$filter`}, make
- * sure you have parenthesis for correct precedence:
+ * **Note**: If you have assignment in `ngInit` along with a {@link ng.$filter `filter`}, make
+ * sure you have parentheses to ensure correct operator precedence:
  * <pre class="prettyprint">
- * `<div ng-init="test1 = (data | orderBy:'name')"></div>`
+ * `<div ng-init="test1 = ($index | toString)"></div>`
  * </pre>
  * </div>
  *
@@ -44596,7 +45233,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
   this.$$success = {}; // keep valid keys here
   this.$pending = undefined; // keep pending keys here
   this.$name = $interpolate($attr.name || '', false)($scope);
-
+  this.$$parentForm = nullFormCtrl;
 
   var parsedNgModel = $parse($attr.ngModel),
       parsedNgModelAssign = parsedNgModel.assign,
@@ -44676,8 +45313,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
     return isUndefined(value) || value === '' || value === null || value !== value;
   };
 
-  var parentForm = $element.inheritedData('$formController') || nullFormCtrl,
-      currentValidationRunId = 0;
+  var currentValidationRunId = 0;
 
   /**
    * @ngdoc method
@@ -44710,7 +45346,6 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
     unset: function(object, property) {
       delete object[property];
     },
-    parentForm: parentForm,
     $animate: $animate
   });
 
@@ -44748,7 +45383,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
     ctrl.$pristine = false;
     $animate.removeClass($element, PRISTINE_CLASS);
     $animate.addClass($element, DIRTY_CLASS);
-    parentForm.$setDirty();
+    ctrl.$$parentForm.$setDirty();
   };
 
   /**
@@ -44918,7 +45553,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
 
     function processParseErrors() {
       var errorKey = ctrl.$$parserName || 'parse';
-      if (parserValid === undefined) {
+      if (isUndefined(parserValid)) {
         setValidity(errorKey, null);
       } else {
         if (!parserValid) {
@@ -45088,37 +45723,47 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
    * @description
    * Update the view value.
    *
-   * This method should be called when an input directive want to change the view value; typically,
-   * this is done from within a DOM event handler.
+   * This method should be called when a control wants to change the view value; typically,
+   * this is done from within a DOM event handler. For example, the {@link ng.directive:input input}
+   * directive calls it when the value of the input changes and {@link ng.directive:select select}
+   * calls it when an option is selected.
    *
-   * For example {@link ng.directive:input input} calls it when the value of the input changes and
-   * {@link ng.directive:select select} calls it when an option is selected.
-   *
-   * If the new `value` is an object (rather than a string or a number), we should make a copy of the
-   * object before passing it to `$setViewValue`.  This is because `ngModel` does not perform a deep
-   * watch of objects, it only looks for a change of identity. If you only change the property of
-   * the object then ngModel will not realise that the object has changed and will not invoke the
-   * `$parsers` and `$validators` pipelines.
-   *
-   * For this reason, you should not change properties of the copy once it has been passed to
-   * `$setViewValue`. Otherwise you may cause the model value on the scope to change incorrectly.
-   *
-   * When this method is called, the new `value` will be staged for committing through the `$parsers`
+   * When `$setViewValue` is called, the new `value` will be staged for committing through the `$parsers`
    * and `$validators` pipelines. If there are no special {@link ngModelOptions} specified then the staged
    * value sent directly for processing, finally to be applied to `$modelValue` and then the
-   * **expression** specified in the `ng-model` attribute.
-   *
-   * Lastly, all the registered change listeners, in the `$viewChangeListeners` list, are called.
+   * **expression** specified in the `ng-model` attribute. Lastly, all the registered change listeners,
+   * in the `$viewChangeListeners` list, are called.
    *
    * In case the {@link ng.directive:ngModelOptions ngModelOptions} directive is used with `updateOn`
    * and the `default` trigger is not listed, all those actions will remain pending until one of the
    * `updateOn` events is triggered on the DOM element.
    * All these actions will be debounced if the {@link ng.directive:ngModelOptions ngModelOptions}
    * directive is used with a custom debounce for this particular event.
+   * Note that a `$digest` is only triggered once the `updateOn` events are fired, or if `debounce`
+   * is specified, once the timer runs out.
    *
-   * Note that calling this function does not trigger a `$digest`.
+   * When used with standard inputs, the view value will always be a string (which is in some cases
+   * parsed into another type, such as a `Date` object for `input[date]`.)
+   * However, custom controls might also pass objects to this method. In this case, we should make
+   * a copy of the object before passing it to `$setViewValue`. This is because `ngModel` does not
+   * perform a deep watch of objects, it only looks for a change of identity. If you only change
+   * the property of the object then ngModel will not realise that the object has changed and
+   * will not invoke the `$parsers` and `$validators` pipelines. For this reason, you should
+   * not change properties of the copy once it has been passed to `$setViewValue`.
+   * Otherwise you may cause the model value on the scope to change incorrectly.
    *
-   * @param {string} value Value from the view.
+   * <div class="alert alert-info">
+   * In any case, the value passed to the method should always reflect the current value
+   * of the control. For example, if you are calling `$setViewValue` for an input element,
+   * you should pass the input DOM value. Otherwise, the control and the scope model become
+   * out of sync. It's also important to note that `$setViewValue` does not call `$render` or change
+   * the control's DOM value in any way. If we want to change the control's DOM value
+   * programmatically, we should update the `ngModel` scope expression. Its new value will be
+   * picked up by the model controller, which will run it through the `$formatters`, `$render` it
+   * to update the DOM, and finally call `$validate` on it.
+   * </div>
+   *
+   * @param {*} value value from the view.
    * @param {string} trigger Event that triggered the update.
    */
   this.$setViewValue = function(value, trigger) {
@@ -45295,7 +45940,6 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
        </script>
        <style>
          .my-input {
-           -webkit-transition:all linear 0.5s;
            transition:all linear 0.5s;
            background: transparent;
          }
@@ -45382,7 +46026,7 @@ var ngModelDirective = ['$rootScope', function($rootScope) {
       return {
         pre: function ngModelPreLink(scope, element, attr, ctrls) {
           var modelCtrl = ctrls[0],
-              formCtrl = ctrls[1] || nullFormCtrl;
+              formCtrl = ctrls[1] || modelCtrl.$$parentForm;
 
           modelCtrl.$$setOptions(ctrls[2] && ctrls[2].$options);
 
@@ -45391,12 +46035,12 @@ var ngModelDirective = ['$rootScope', function($rootScope) {
 
           attr.$observe('name', function(newValue) {
             if (modelCtrl.$name !== newValue) {
-              formCtrl.$$renameControl(modelCtrl, newValue);
+              modelCtrl.$$parentForm.$$renameControl(modelCtrl, newValue);
             }
           });
 
           scope.$on('$destroy', function() {
-            formCtrl.$removeControl(modelCtrl);
+            modelCtrl.$$parentForm.$removeControl(modelCtrl);
           });
         },
         post: function ngModelPostLink(scope, element, attr, ctrls) {
@@ -45591,7 +46235,7 @@ var ngModelOptionsDirective = function() {
       var that = this;
       this.$options = copy($scope.$eval($attrs.ngModelOptions));
       // Allow adding/overriding bound events
-      if (this.$options.updateOn !== undefined) {
+      if (isDefined(this.$options.updateOn)) {
         this.$options.updateOnDefault = false;
         // extract "default" pseudo-event from list of events that can trigger a model update
         this.$options.updateOn = trim(this.$options.updateOn.replace(DEFAULT_REGEXP, function() {
@@ -45614,7 +46258,6 @@ function addSetValidityMethod(context) {
       classCache = {},
       set = context.set,
       unset = context.unset,
-      parentForm = context.parentForm,
       $animate = context.$animate;
 
   classCache[INVALID_CLASS] = !(classCache[VALID_CLASS] = $element.hasClass(VALID_CLASS));
@@ -45622,7 +46265,7 @@ function addSetValidityMethod(context) {
   ctrl.$setValidity = setValidity;
 
   function setValidity(validationErrorKey, state, controller) {
-    if (state === undefined) {
+    if (isUndefined(state)) {
       createAndSet('$pending', validationErrorKey, controller);
     } else {
       unsetAndCleanup('$pending', validationErrorKey, controller);
@@ -45666,7 +46309,7 @@ function addSetValidityMethod(context) {
     }
 
     toggleValidationCss(validationErrorKey, combinedState);
-    parentForm.$setValidity(validationErrorKey, combinedState, ctrl);
+    ctrl.$$parentForm.$setValidity(validationErrorKey, combinedState, ctrl);
   }
 
   function createAndSet(name, value, controller) {
@@ -46734,8 +47377,10 @@ var ngPluralizeDirective = ['$locale', '$interpolate', '$log', function($locale,
  * | `$even`   | {@type boolean} | true if the iterator position `$index` is even (otherwise false).           |
  * | `$odd`    | {@type boolean} | true if the iterator position `$index` is odd (otherwise false).            |
  *
- * Creating aliases for these properties is possible with {@link ng.directive:ngInit `ngInit`}.
- * This may be useful when, for instance, nesting ngRepeats.
+ * <div class="alert alert-info">
+ *   Creating aliases for these properties is possible with {@link ng.directive:ngInit `ngInit`}.
+ *   This may be useful when, for instance, nesting ngRepeats.
+ * </div>
  *
  *
  * # Iterating over object properties
@@ -46969,7 +47614,6 @@ var ngPluralizeDirective = ['$locale', '$interpolate', '$log', function($locale,
       .animate-repeat.ng-move,
       .animate-repeat.ng-enter,
       .animate-repeat.ng-leave {
-        -webkit-transition:all linear 0.5s;
         transition:all linear 0.5s;
       }
 
@@ -47141,7 +47785,7 @@ var ngRepeatDirective = ['$parse', '$animate', function($parse, $animate) {
             // if object, extract keys, in enumeration order, unsorted
             collectionKeys = [];
             for (var itemKey in collection) {
-              if (collection.hasOwnProperty(itemKey) && itemKey.charAt(0) !== '$') {
+              if (hasOwnProperty.call(collection, itemKey) && itemKey.charAt(0) !== '$') {
                 collectionKeys.push(itemKey);
               }
             }
@@ -47366,9 +48010,7 @@ var NG_HIDE_IN_PROGRESS_CLASS = 'ng-hide-animate';
         background: white;
       }
 
-      .animate-show.ng-hide-add.ng-hide-add-active,
-      .animate-show.ng-hide-remove.ng-hide-remove-active {
-        -webkit-transition: all linear 0.5s;
+      .animate-show.ng-hide-add, .animate-show.ng-hide-remove {
         transition: all linear 0.5s;
       }
 
@@ -47525,7 +48167,6 @@ var ngShowDirective = ['$animate', function($animate) {
     </file>
     <file name="animations.css">
       .animate-hide {
-        -webkit-transition: all linear 0.5s;
         transition: all linear 0.5s;
         line-height: 20px;
         opacity: 1;
@@ -47724,7 +48365,6 @@ var ngStyleDirective = ngDirective(function(scope, element, attr) {
       }
 
       .animate-switch.ng-animate {
-        -webkit-transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
         transition:all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.5s;
 
         position:absolute;
@@ -48065,31 +48705,162 @@ var SelectController =
  * @description
  * HTML `SELECT` element with angular data-binding.
  *
- * In many cases, `ngRepeat` can be used on `<option>` elements instead of {@link ng.directive:ngOptions
- * ngOptions} to achieve a similar result. However, `ngOptions` provides some benefits such as reducing
- * memory and increasing speed by not creating a new scope for each repeated instance, as well as providing
- * more flexibility in how the `<select>`'s model is assigned via the `select` **`as`** part of the
- * comprehension expression.
+ * The `select` directive is used together with {@link ngModel `ngModel`} to provide data-binding
+ * between the scope and the `<select>` control (including setting default values).
+ * Ìt also handles dynamic `<option>` elements, which can be added using the {@link ngRepeat `ngRepeat}` or
+ * {@link ngOptions `ngOptions`} directives.
  *
- * When an item in the `<select>` menu is selected, the array element or object property
- * represented by the selected option will be bound to the model identified by the `ngModel`
- * directive.
+ * When an item in the `<select>` menu is selected, the value of the selected option will be bound
+ * to the model identified by the `ngModel` directive. With static or repeated options, this is
+ * the content of the `value` attribute or the textContent of the `<option>`, if the value attribute is missing.
+ * If you want dynamic value attributes, you can use interpolation inside the value attribute.
  *
- * If the viewValue contains a value that doesn't match any of the options then the control
- * will automatically add an "unknown" option, which it then removes when this is resolved.
+ * <div class="alert alert-warning">
+ * Note that the value of a `select` directive used without `ngOptions` is always a string.
+ * When the model needs to be bound to a non-string value, you must either explictly convert it
+ * using a directive (see example below) or use `ngOptions` to specify the set of options.
+ * This is because an option element can only be bound to string values at present.
+ * </div>
+ *
+ * If the viewValue of `ngModel` does not match any of the options, then the control
+ * will automatically add an "unknown" option, which it then removes when the mismatch is resolved.
  *
  * Optionally, a single hard-coded `<option>` element, with the value set to an empty string, can
  * be nested into the `<select>` element. This element will then represent the `null` or "not selected"
  * option. See example below for demonstration.
  *
  * <div class="alert alert-info">
- * The value of a `select` directive used without `ngOptions` is always a string.
- * When the model needs to be bound to a non-string value, you must either explictly convert it
- * using a directive (see example below) or use `ngOptions` to specify the set of options.
- * This is because an option element can only be bound to string values at present.
+ * In many cases, `ngRepeat` can be used on `<option>` elements instead of {@link ng.directive:ngOptions
+ * ngOptions} to achieve a similar result. However, `ngOptions` provides some benefits, such as
+ * more flexibility in how the `<select>`'s model is assigned via the `select` **`as`** part of the
+ * comprehension expression, and additionally in reducing memory and increasing speed by not creating
+ * a new scope for each repeated instance.
  * </div>
  *
- * ### Example (binding `select` to a non-string value)
+ *
+ * @param {string} ngModel Assignable angular expression to data-bind to.
+ * @param {string=} name Property name of the form under which the control is published.
+ * @param {string=} required Sets `required` validation error key if the value is not entered.
+ * @param {string=} ngRequired Adds required attribute and required validation constraint to
+ * the element when the ngRequired expression evaluates to true. Use ngRequired instead of required
+ * when you want to data-bind to the required attribute.
+ * @param {string=} ngChange Angular expression to be executed when selected option(s) changes due to user
+ *    interaction with the select element.
+ * @param {string=} ngOptions sets the options that the select is populated with and defines what is
+ * set on the model on selection. See {@link ngOptions `ngOptions`}.
+ *
+ * @example
+ * ### Simple `select` elements with static options
+ *
+ * <example name="static-select" module="staticSelect">
+ * <file name="index.html">
+ * <div ng-controller="ExampleController">
+ *   <form name="myForm">
+ *     <label for="singleSelect"> Single select: </label><br>
+ *     <select name="singleSelect" ng-model="data.singleSelect">
+ *       <option value="option-1">Option 1</option>
+ *       <option value="option-2">Option 2</option>
+ *     </select><br>
+ *
+ *     <label for="singleSelect"> Single select with "not selected" option and dynamic option values: </label><br>
+ *     <select name="singleSelect" ng-model="data.singleSelect">
+ *       <option value="">---Please select---</option> <!-- not selected / blank option -->
+ *       <option value="{{data.option1}}">Option 1</option> <!-- interpolation -->
+ *       <option value="option-2">Option 2</option>
+ *     </select><br>
+ *     <button ng-click="forceUnknownOption()">Force unknown option</button><br>
+ *     <tt>singleSelect = {{data.singleSelect}}</tt>
+ *
+ *     <hr>
+ *     <label for="multipleSelect"> Multiple select: </label><br>
+ *     <select name="multipleSelect" id="multipleSelect" ng-model="data.multipleSelect" multiple>
+ *       <option value="option-1">Option 1</option>
+ *       <option value="option-2">Option 2</option>
+ *       <option value="option-3">Option 3</option>
+ *     </select><br>
+ *     <tt>multipleSelect = {{data.multipleSelect}}</tt><br/>
+ *   </form>
+ * </div>
+ * </file>
+ * <file name="app.js">
+ *  angular.module('staticSelect', [])
+ *    .controller('ExampleController', ['$scope', function($scope) {
+ *      $scope.data = {
+ *       singleSelect: null,
+ *       multipleSelect: [],
+ *       option1: 'option-1',
+ *      };
+ *
+ *      $scope.forceUnknownOption = function() {
+ *        $scope.data.singleSelect = 'nonsense';
+ *      };
+ *   }]);
+ * </file>
+ *</example>
+ *
+ * ### Using `ngRepeat` to generate `select` options
+ * <example name="ngrepeat-select" module="ngrepeatSelect">
+ * <file name="index.html">
+ * <div ng-controller="ExampleController">
+ *   <form name="myForm">
+ *     <label for="repeatSelect"> Repeat select: </label>
+ *     <select name="repeatSelect" ng-model="data.repeatSelect">
+ *       <option ng-repeat="option in data.availableOptions" value="{{option.id}}">{{option.name}}</option>
+ *     </select>
+ *   </form>
+ *   <hr>
+ *   <tt>repeatSelect = {{data.repeatSelect}}</tt><br/>
+ * </div>
+ * </file>
+ * <file name="app.js">
+ *  angular.module('ngrepeatSelect', [])
+ *    .controller('ExampleController', ['$scope', function($scope) {
+ *      $scope.data = {
+ *       singleSelect: null,
+ *       availableOptions: [
+ *         {id: '1', name: 'Option A'},
+ *         {id: '2', name: 'Option B'},
+ *         {id: '3', name: 'Option C'}
+ *       ],
+ *      };
+ *   }]);
+ * </file>
+ *</example>
+ *
+ *
+ * ### Using `select` with `ngOptions` and setting a default value
+ * See the {@link ngOptions ngOptions documentation} for more `ngOptions` usage examples.
+ *
+ * <example name="select-with-default-values" module="defaultValueSelect">
+ * <file name="index.html">
+ * <div ng-controller="ExampleController">
+ *   <form name="myForm">
+ *     <label for="mySelect">Make a choice:</label>
+ *     <select name="mySelect" id="mySelect"
+ *       ng-options="option.name for option in data.availableOptions track by option.id"
+ *       ng-model="data.selectedOption"></select>
+ *   </form>
+ *   <hr>
+ *   <tt>option = {{data.selectedOption}}</tt><br/>
+ * </div>
+ * </file>
+ * <file name="app.js">
+ *  angular.module('defaultValueSelect', [])
+ *    .controller('ExampleController', ['$scope', function($scope) {
+ *      $scope.data = {
+ *       availableOptions: [
+ *         {id: '1', name: 'Option A'},
+ *         {id: '2', name: 'Option B'},
+ *         {id: '3', name: 'Option C'}
+ *       ],
+ *       selectedOption: {id: '3', name: 'Option C'} //This sets the default value of the select in the ui
+ *       };
+ *   }]);
+ * </file>
+ *</example>
+ *
+ *
+ * ### Binding `select` to a non-string value via `ngModel` parsing / formatting
  *
  * <example name="select-with-non-string-options" module="nonStringSelect">
  *   <file name="index.html">
@@ -48227,9 +48998,12 @@ var optionDirective = ['$interpolate', function($interpolate) {
     priority: 100,
     compile: function(element, attr) {
 
-      // If the value attribute is not defined then we fall back to the
-      // text content of the option element, which may be interpolated
-      if (isUndefined(attr.value)) {
+      if (isDefined(attr.value)) {
+        // If the value attribute is defined, check if it contains an interpolation
+        var valueInterpolated = $interpolate(attr.value, true);
+      } else {
+        // If the value attribute is not defined then we fall back to the
+        // text content of the option element, which may be interpolated
         var interpolateFn = $interpolate(element.text(), true);
         if (!interpolateFn) {
           attr.$set('value', element.text());
@@ -48245,24 +49019,38 @@ var optionDirective = ['$interpolate', function($interpolate) {
             selectCtrl = parent.data(selectCtrlName) ||
               parent.parent().data(selectCtrlName); // in case we are in optgroup
 
+        function addOption(optionValue) {
+          selectCtrl.addOption(optionValue, element);
+          selectCtrl.ngModelCtrl.$render();
+          chromeHack(element);
+        }
+
         // Only update trigger option updates if this is an option within a `select`
         // that also has `ngModel` attached
         if (selectCtrl && selectCtrl.ngModelCtrl) {
 
-          if (interpolateFn) {
+          if (valueInterpolated) {
+            // The value attribute is interpolated
+            var oldVal;
+            attr.$observe('value', function valueAttributeObserveAction(newVal) {
+              if (isDefined(oldVal)) {
+                selectCtrl.removeOption(oldVal);
+              }
+              oldVal = newVal;
+              addOption(newVal);
+            });
+          } else if (interpolateFn) {
+            // The text content is interpolated
             scope.$watch(interpolateFn, function interpolateWatchAction(newVal, oldVal) {
               attr.$set('value', newVal);
               if (oldVal !== newVal) {
                 selectCtrl.removeOption(oldVal);
               }
-              selectCtrl.addOption(newVal, element);
-              selectCtrl.ngModelCtrl.$render();
-              chromeHack(element);
+              addOption(newVal);
             });
           } else {
-            selectCtrl.addOption(attr.value, element);
-            selectCtrl.ngModelCtrl.$render();
-            chromeHack(element);
+            // The value attribute is static
+            addOption(attr.value);
           }
 
           element.on('$destroy', function() {
@@ -48323,8 +49111,9 @@ var patternDirective = function() {
         ctrl.$validate();
       });
 
-      ctrl.$validators.pattern = function(value) {
-        return ctrl.$isEmpty(value) || isUndefined(regexp) || regexp.test(value);
+      ctrl.$validators.pattern = function(modelValue, viewValue) {
+        // HTML5 pattern constraint validates the input value, so we validate the viewValue
+        return ctrl.$isEmpty(viewValue) || isUndefined(regexp) || regexp.test(viewValue);
       };
     }
   };
@@ -48615,7 +49404,7 @@ angular.module('exceptionless', [])
     }]);
 
 /**
- * @license AngularJS v1.4.4
+ * @license AngularJS v1.4.6
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -48657,7 +49446,7 @@ var CSS_PREFIX = '', TRANSITION_PROP, TRANSITIONEND_EVENT, ANIMATION_PROP, ANIMA
 // Also, the only modern browser that uses vendor prefixes for transitions/keyframes is webkit
 // therefore there is no reason to test anymore for other vendor prefixes:
 // http://caniuse.com/#search=transition
-if (window.ontransitionend === undefined && window.onwebkittransitionend !== undefined) {
+if (isUndefined(window.ontransitionend) && isDefined(window.onwebkittransitionend)) {
   CSS_PREFIX = '-webkit-';
   TRANSITION_PROP = 'WebkitTransition';
   TRANSITIONEND_EVENT = 'webkitTransitionEnd transitionend';
@@ -48666,7 +49455,7 @@ if (window.ontransitionend === undefined && window.onwebkittransitionend !== und
   TRANSITIONEND_EVENT = 'transitionend';
 }
 
-if (window.onanimationend === undefined && window.onwebkitanimationend !== undefined) {
+if (isUndefined(window.onanimationend) && isDefined(window.onwebkitanimationend)) {
   CSS_PREFIX = '-webkit-';
   ANIMATION_PROP = 'WebkitAnimation';
   ANIMATIONEND_EVENT = 'webkitAnimationEnd animationend';
@@ -48995,6 +49784,55 @@ function $$BodyProvider() {
   }];
 }
 
+var $$rAFSchedulerFactory = ['$$rAF', function($$rAF) {
+  var queue, cancelFn;
+
+  function scheduler(tasks) {
+    // we make a copy since RAFScheduler mutates the state
+    // of the passed in array variable and this would be difficult
+    // to track down on the outside code
+    queue = queue.concat(tasks);
+    nextTick();
+  }
+
+  queue = scheduler.queue = [];
+
+  /* waitUntilQuiet does two things:
+   * 1. It will run the FINAL `fn` value only when an uncancelled RAF has passed through
+   * 2. It will delay the next wave of tasks from running until the quiet `fn` has run.
+   *
+   * The motivation here is that animation code can request more time from the scheduler
+   * before the next wave runs. This allows for certain DOM properties such as classes to
+   * be resolved in time for the next animation to run.
+   */
+  scheduler.waitUntilQuiet = function(fn) {
+    if (cancelFn) cancelFn();
+
+    cancelFn = $$rAF(function() {
+      cancelFn = null;
+      fn();
+      nextTick();
+    });
+  };
+
+  return scheduler;
+
+  function nextTick() {
+    if (!queue.length) return;
+
+    var items = queue.shift();
+    for (var i = 0; i < items.length; i++) {
+      items[i]();
+    }
+
+    if (!cancelFn) {
+      $$rAF(function() {
+        if (!cancelFn) nextTick();
+      });
+    }
+  }
+}];
+
 var $$AnimateChildrenDirective = [function() {
   return function(scope, element, attrs) {
     var val = attrs.ngAnimateChildren;
@@ -49008,6 +49846,8 @@ var $$AnimateChildrenDirective = [function() {
     }
   };
 }];
+
+var ANIMATE_TIMER_KEY = '$$animateCss';
 
 /**
  * @ngdoc service
@@ -49335,8 +50175,10 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
   var gcsLookup = createLocalCacheLookup();
   var gcsStaggerLookup = createLocalCacheLookup();
 
-  this.$get = ['$window', '$$jqLite', '$$AnimateRunner', '$timeout', '$$forceReflow', '$sniffer', '$$rAF',
-       function($window,   $$jqLite,   $$AnimateRunner,   $timeout,   $$forceReflow,   $sniffer,   $$rAF) {
+  this.$get = ['$window', '$$jqLite', '$$AnimateRunner', '$timeout',
+               '$$forceReflow', '$sniffer', '$$rAFScheduler', '$animate',
+       function($window,   $$jqLite,   $$AnimateRunner,   $timeout,
+                $$forceReflow,   $sniffer,   $$rAFScheduler, $animate) {
 
     var applyAnimationClasses = applyAnimationClassesFactory($$jqLite);
 
@@ -49396,12 +50238,8 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
     var cancelLastRAFRequest;
     var rafWaitQueue = [];
     function waitUntilQuiet(callback) {
-      if (cancelLastRAFRequest) {
-        cancelLastRAFRequest(); //cancels the request
-      }
       rafWaitQueue.push(callback);
-      cancelLastRAFRequest = $$rAF(function() {
-        cancelLastRAFRequest = null;
+      $$rAFScheduler.waitUntilQuiet(function() {
         gcsLookup.flush();
         gcsStaggerLookup.flush();
 
@@ -49418,8 +50256,6 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
       });
     }
 
-    return init;
-
     function computeTimings(node, className, cacheKey) {
       var timings = computeCachedCssStyles(node, className, cacheKey, DETECT_CSS_PROPERTIES);
       var aD = timings.animationDelay;
@@ -49434,9 +50270,11 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
       return timings;
     }
 
-    function init(element, options) {
+    return function init(element, options) {
       var node = getDomNode(element);
-      if (!node || !node.parentNode) {
+      if (!node
+          || !node.parentNode
+          || !$animate.enabled()) {
         return closeAndReturnNoopAnimator();
       }
 
@@ -49492,7 +50330,6 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
       // there actually is a detected transition or keyframe animation
       if (options.applyClassesEarly && addRemoveClassName.length) {
         applyAnimationClasses(element, options);
-        addRemoveClassName = '';
       }
 
       var preparationClasses = [structuralClassName, addRemoveClassName].join(' ').trim();
@@ -49605,6 +50442,18 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
 
       if (maxDuration === 0 && !flags.recalculateTimingStyles) {
         return closeAndReturnNoopAnimator();
+      }
+
+      if (options.delay != null) {
+        var delayStyle = parseFloat(options.delay);
+
+        if (flags.applyTransitionDelay) {
+          temporaryStyles.push(getCssDelayStyle(delayStyle));
+        }
+
+        if (flags.applyAnimationDelay) {
+          temporaryStyles.push(getCssDelayStyle(delayStyle, true));
+        }
       }
 
       // we need to recalculate the delay value since we used a pre-emptive negative
@@ -49721,6 +50570,8 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
           cancel: cancelFn
         });
 
+        // should flush the cache animation
+        waitUntilQuiet(noop);
         close();
 
         return {
@@ -49818,27 +50669,16 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
             flags.hasAnimations = timings.animationDuration > 0;
           }
 
-          if (flags.applyTransitionDelay || flags.applyAnimationDelay) {
+          if (flags.applyAnimationDelay) {
             relativeDelay = typeof options.delay !== "boolean" && truthyTimingValue(options.delay)
                   ? parseFloat(options.delay)
                   : relativeDelay;
 
             maxDelay = Math.max(relativeDelay, 0);
-
-            var delayStyle;
-            if (flags.applyTransitionDelay) {
-              timings.transitionDelay = relativeDelay;
-              delayStyle = getCssDelayStyle(relativeDelay);
-              temporaryStyles.push(delayStyle);
-              node.style[delayStyle[0]] = delayStyle[1];
-            }
-
-            if (flags.applyAnimationDelay) {
-              timings.animationDelay = relativeDelay;
-              delayStyle = getCssDelayStyle(relativeDelay, true);
-              temporaryStyles.push(delayStyle);
-              node.style[delayStyle[0]] = delayStyle[1];
-            }
+            timings.animationDelay = relativeDelay;
+            delayStyle = getCssDelayStyle(relativeDelay, true);
+            temporaryStyles.push(delayStyle);
+            node.style[delayStyle[0]] = delayStyle[1];
           }
 
           maxDelayTime = maxDelay * ONE_SECOND;
@@ -49867,17 +50707,47 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
           }
 
           startTime = Date.now();
-          element.on(events.join(' '), onAnimationProgress);
-          $timeout(onAnimationExpired, maxDelayTime + CLOSING_TIME_BUFFER * maxDurationTime, false);
+          var timerTime = maxDelayTime + CLOSING_TIME_BUFFER * maxDurationTime;
+          var endTime = startTime + timerTime;
 
+          var animationsData = element.data(ANIMATE_TIMER_KEY) || [];
+          var setupFallbackTimer = true;
+          if (animationsData.length) {
+            var currentTimerData = animationsData[0];
+            setupFallbackTimer = endTime > currentTimerData.expectedEndTime;
+            if (setupFallbackTimer) {
+              $timeout.cancel(currentTimerData.timer);
+            } else {
+              animationsData.push(close);
+            }
+          }
+
+          if (setupFallbackTimer) {
+            var timer = $timeout(onAnimationExpired, timerTime, false);
+            animationsData[0] = {
+              timer: timer,
+              expectedEndTime: endTime
+            };
+            animationsData.push(close);
+            element.data(ANIMATE_TIMER_KEY, animationsData);
+          }
+
+          element.on(events.join(' '), onAnimationProgress);
           applyAnimationToStyles(element, options);
         }
 
         function onAnimationExpired() {
-          // although an expired animation is a failed animation, getting to
-          // this outcome is very easy if the CSS code screws up. Therefore we
-          // should still continue normally as if the animation completed correctly.
-          close();
+          var animationsData = element.data(ANIMATE_TIMER_KEY);
+
+          // this will be false in the event that the element was
+          // removed from the DOM (via a leave animation or something
+          // similar)
+          if (animationsData) {
+            for (var i = 1; i < animationsData.length; i++) {
+              animationsData[i]();
+            }
+            element.removeData(ANIMATE_TIMER_KEY);
+          }
         }
 
         function onAnimationProgress(event) {
@@ -49904,7 +50774,7 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
           }
         }
       }
-    }
+    };
   }];
 }];
 
@@ -49930,13 +50800,13 @@ var $$AnimateCssDriverProvider = ['$$animationProvider', function($$animationPro
 
     var applyAnimationClasses = applyAnimationClassesFactory($$jqLite);
 
-    return function initDriverFn(animationDetails, onBeforeClassesAppliedCb) {
+    return function initDriverFn(animationDetails) {
       return animationDetails.from && animationDetails.to
           ? prepareFromToAnchorAnimation(animationDetails.from,
                                          animationDetails.to,
                                          animationDetails.classes,
                                          animationDetails.anchors)
-          : prepareRegularAnimation(animationDetails, onBeforeClassesAppliedCb);
+          : prepareRegularAnimation(animationDetails);
     };
 
     function filterCssClasses(classes) {
@@ -50132,21 +51002,14 @@ var $$AnimateCssDriverProvider = ['$$animationProvider', function($$animationPro
       };
     }
 
-    function prepareRegularAnimation(animationDetails, onBeforeClassesAppliedCb) {
+    function prepareRegularAnimation(animationDetails) {
       var element = animationDetails.element;
       var options = animationDetails.options || {};
 
-      // since the ng-EVENT, class-ADD and class-REMOVE classes are applied inside
-      // of the animateQueue pre and postDigest stages then there is no need to add
-      // then them here as well.
-      options.$$skipPreparationClasses = true;
-
-      // during the pre/post digest stages inside of animateQueue we also performed
-      // the blocking (transition:-9999s) so there is no point in doing that again.
-      options.skipBlocking = true;
-
       if (animationDetails.structural) {
         options.event = animationDetails.event;
+        options.structural = true;
+        options.applyClassesEarly = true;
 
         // we special case the leave animation since we want to ensure that
         // the element is removed as soon as the animation is over. Otherwise
@@ -50155,11 +51018,6 @@ var $$AnimateCssDriverProvider = ['$$animationProvider', function($$animationPro
           options.onDone = options.domOperation;
         }
       }
-
-      // we apply the classes right away since the pre-digest took care of the
-      // preparation classes.
-      onBeforeClassesAppliedCb(element);
-      applyAnimationClasses(element, options);
 
       // We assign the preparationClasses as the actual animation event since
       // the internals of $animateCss will just suffix the event token values
@@ -50184,8 +51042,8 @@ var $$AnimateCssDriverProvider = ['$$animationProvider', function($$animationPro
 //  by the time...
 
 var $$AnimateJsProvider = ['$animateProvider', function($animateProvider) {
-  this.$get = ['$injector', '$$AnimateRunner', '$$rAFMutex', '$$jqLite',
-       function($injector,   $$AnimateRunner,   $$rAFMutex,   $$jqLite) {
+  this.$get = ['$injector', '$$AnimateRunner', '$$jqLite',
+       function($injector,   $$AnimateRunner,   $$jqLite) {
 
     var applyAnimationClasses = applyAnimationClassesFactory($$jqLite);
          // $animateJs(element, 'enter');
@@ -50880,9 +51738,6 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
         return runner;
       }
 
-      applyGeneratedPreparationClasses(element, isStructural ? event : null, options);
-      blockTransitions(node, SAFE_FAST_FORWARD_DURATION_VALUE);
-
       // the counter keeps track of cancelled animations
       var counter = (existingAnimation.counter || 0) + 1;
       newAnimation.counter = counter;
@@ -50941,10 +51796,7 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
             : animationDetails.event;
 
         markElementAnimationState(element, RUNNING_STATE);
-        var realRunner = $$animation(element, event, animationDetails.options, function(e) {
-          $$forceReflow();
-          blockTransitions(getDomNode(e), false);
-        });
+        var realRunner = $$animation(element, event, animationDetails.options);
 
         realRunner.done(function(status) {
           close(!status);
@@ -51089,19 +51941,34 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
   }];
 }];
 
-var $$rAFMutexFactory = ['$$rAF', function($$rAF) {
+var $$AnimateAsyncRunFactory = ['$$rAF', function($$rAF) {
+  var waitQueue = [];
+
+  function waitForTick(fn) {
+    waitQueue.push(fn);
+    if (waitQueue.length > 1) return;
+    $$rAF(function() {
+      for (var i = 0; i < waitQueue.length; i++) {
+        waitQueue[i]();
+      }
+      waitQueue = [];
+    });
+  }
+
   return function() {
     var passed = false;
-    $$rAF(function() {
+    waitForTick(function() {
       passed = true;
     });
-    return function(fn) {
-      passed ? fn() : $$rAF(fn);
+    return function(callback) {
+      passed ? callback() : waitForTick(callback);
     };
   };
 }];
 
-var $$AnimateRunnerFactory = ['$q', '$$rAFMutex', function($q, $$rAFMutex) {
+var $$AnimateRunnerFactory = ['$q', '$sniffer', '$$animateAsyncRun',
+                      function($q,   $sniffer,   $$animateAsyncRun) {
+
   var INITIAL_STATE = 0;
   var DONE_PENDING_STATE = 1;
   var DONE_COMPLETE_STATE = 2;
@@ -51146,7 +52013,7 @@ var $$AnimateRunnerFactory = ['$q', '$$rAFMutex', function($q, $$rAFMutex) {
     this.setHost(host);
 
     this._doneCallbacks = [];
-    this._runInAnimationFrame = $$rAFMutex();
+    this._runInAnimationFrame = $$animateAsyncRun();
     this._state = 0;
   }
 
@@ -51258,8 +52125,8 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
     return element.data(RUNNER_STORAGE_KEY);
   }
 
-  this.$get = ['$$jqLite', '$rootScope', '$injector', '$$AnimateRunner', '$$HashMap',
-       function($$jqLite,   $rootScope,   $injector,   $$AnimateRunner,   $$HashMap) {
+  this.$get = ['$$jqLite', '$rootScope', '$injector', '$$AnimateRunner', '$$HashMap', '$$rAFScheduler',
+       function($$jqLite,   $rootScope,   $injector,   $$AnimateRunner,   $$HashMap,   $$rAFScheduler) {
 
     var animationQueue = [];
     var applyAnimationClasses = applyAnimationClassesFactory($$jqLite);
@@ -51327,11 +52194,11 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
           if (remainingLevelEntries <= 0) {
             remainingLevelEntries = nextLevelEntries;
             nextLevelEntries = 0;
-            result = result.concat(row);
+            result.push(row);
             row = [];
           }
           row.push(entry.fn);
-          forEach(entry.children, function(childEntry) {
+          entry.children.forEach(function(childEntry) {
             nextLevelEntries++;
             queue.push(childEntry);
           });
@@ -51339,14 +52206,15 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
         }
 
         if (row.length) {
-          result = result.concat(row);
+          result.push(row);
         }
+
         return result;
       }
     }
 
     // TODO(matsko): document the signature in a better way
-    return function(element, event, options, onBeforeClassesAppliedCb) {
+    return function(element, event, options) {
       options = prepareAnimationOptions(options);
       var isStructural = ['enter', 'move', 'leave'].indexOf(event) >= 0;
 
@@ -51398,8 +52266,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
           // the element was destroyed early on which removed the runner
           // form its storage. This means we can't animate this element
           // at all and it already has been closed due to destruction.
-          var elm = entry.element;
-          if (getRunner(elm) && getDomNode(elm).parentNode) {
+          if (getRunner(entry.element)) {
             animations.push(entry);
           } else {
             entry.close();
@@ -51430,7 +52297,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
                   : animationEntry.element;
 
               if (getRunner(targetElement)) {
-                var operation = invokeFirstDriver(animationEntry, onBeforeClassesAppliedCb);
+                var operation = invokeFirstDriver(animationEntry);
                 if (operation) {
                   startAnimationFn = operation.start;
                 }
@@ -51450,11 +52317,9 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
         });
 
         // we need to sort each of the animations in order of parent to child
-        // relationships. This ensures that the parent to child classes are
-        // applied at the right time.
-        forEach(sortAnimations(toBeSortedAnimations), function(triggerAnimation) {
-          triggerAnimation();
-        });
+        // relationships. This ensures that the child classes are applied at the
+        // right time.
+        $$rAFScheduler(sortAnimations(toBeSortedAnimations));
       });
 
       return runner;
@@ -51524,7 +52389,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
           var lookupKey = from.animationID.toString();
           if (!anchorGroups[lookupKey]) {
             var group = anchorGroups[lookupKey] = {
-              // TODO(matsko): double-check this code
+              structural: true,
               beforeStart: function() {
                 fromAnimation.beforeStart();
                 toAnimation.beforeStart();
@@ -51578,7 +52443,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
         return matches.join(' ');
       }
 
-      function invokeFirstDriver(animationDetails, onBeforeClassesAppliedCb) {
+      function invokeFirstDriver(animationDetails) {
         // we loop in reverse order since the more general drivers (like CSS and JS)
         // may attempt more elements, but custom drivers are more particular
         for (var i = drivers.length - 1; i >= 0; i--) {
@@ -51586,7 +52451,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
           if (!$injector.has(driverName)) continue; // TODO(matsko): remove this check
 
           var factory = $injector.get(driverName);
-          var driver = factory(animationDetails, onBeforeClassesAppliedCb);
+          var driver = factory(animationDetails);
           if (driver) {
             return driver;
           }
@@ -51642,7 +52507,8 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
 /* global angularAnimateModule: true,
 
    $$BodyProvider,
-   $$rAFMutexFactory,
+   $$AnimateAsyncRunFactory,
+   $$rAFSchedulerFactory,
    $$AnimateChildrenDirective,
    $$AnimateRunnerFactory,
    $$AnimateQueueProvider,
@@ -51659,7 +52525,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
  * @description
  *
  * The `ngAnimate` module provides support for CSS-based animations (keyframes and transitions) as well as JavaScript-based animations via
- * callback hooks. Animations are not enabled by default, however, by including `ngAnimate` then the animation hooks are enabled for an Angular app.
+ * callback hooks. Animations are not enabled by default, however, by including `ngAnimate` the animation hooks are enabled for an Angular app.
  *
  * <div doc-module-components="ngAnimate"></div>
  *
@@ -51692,7 +52558,7 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
  * CSS-based animations with ngAnimate are unique since they require no JavaScript code at all. By using a CSS class that we reference between our HTML
  * and CSS code we can create an animation that will be picked up by Angular when an the underlying directive performs an operation.
  *
- * The example below shows how an `enter` animation can be made possible on a element using `ng-if`:
+ * The example below shows how an `enter` animation can be made possible on an element using `ng-if`:
  *
  * ```html
  * <div ng-if="bool" class="fade">
@@ -51827,8 +52693,8 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
  *   /&#42; this will have a 100ms delay between each successive leave animation &#42;/
  *   transition-delay: 0.1s;
  *
- *   /&#42; in case the stagger doesn't work then the duration value
- *    must be set to 0 to avoid an accidental CSS inheritance &#42;/
+ *   /&#42; As of 1.4.4, this must always be set: it signals ngAnimate
+ *     to not accidentally inherit a delay property from another CSS class &#42;/
  *   transition-duration: 0s;
  * }
  * .my-animation.ng-enter.ng-enter-active {
@@ -52377,16 +53243,16 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
  * @description
  * The ngAnimate `$animate` service documentation is the same for the core `$animate` service.
  *
- * Click here {@link ng.$animate $animate to learn more about animations with `$animate`}.
+ * Click here {@link ng.$animate to learn more about animations with `$animate`}.
  */
 angular.module('ngAnimate', [])
   .provider('$$body', $$BodyProvider)
 
   .directive('ngAnimateChildren', $$AnimateChildrenDirective)
-
-  .factory('$$rAFMutex', $$rAFMutexFactory)
+  .factory('$$rAFScheduler', $$rAFSchedulerFactory)
 
   .factory('$$AnimateRunner', $$AnimateRunnerFactory)
+  .factory('$$animateAsyncRun', $$AnimateAsyncRunFactory)
 
   .provider('$$animateQueue', $$AnimateQueueProvider)
   .provider('$$animation', $$AnimationProvider)
@@ -52404,17 +53270,16 @@ angular.module('ngAnimate', [])
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 0.13.3 - 2015-08-09
+ * Version: 0.13.4 - 2015-09-03
  * License: MIT
  */
 angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.bindHtml","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.dropdown","ui.bootstrap.modal","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.transition","ui.bootstrap.typeahead"]);
 angular.module("ui.bootstrap.tpls", ["template/accordion/accordion-group.html","template/accordion/accordion.html","template/alert/alert.html","template/carousel/carousel.html","template/carousel/slide.html","template/datepicker/datepicker.html","template/datepicker/day.html","template/datepicker/month.html","template/datepicker/popup.html","template/datepicker/year.html","template/modal/backdrop.html","template/modal/window.html","template/pagination/pager.html","template/pagination/pagination.html","template/tooltip/tooltip-html-popup.html","template/tooltip/tooltip-html-unsafe-popup.html","template/tooltip/tooltip-popup.html","template/tooltip/tooltip-template-popup.html","template/popover/popover-html.html","template/popover/popover-template.html","template/popover/popover.html","template/progressbar/bar.html","template/progressbar/progress.html","template/progressbar/progressbar.html","template/rating/rating.html","template/tabs/tab.html","template/tabs/tabset.html","template/timepicker/timepicker.html","template/typeahead/typeahead-match.html","template/typeahead/typeahead-popup.html"]);
 angular.module('ui.bootstrap.collapse', [])
 
-  .directive('collapse', ['$animate', function ($animate) {
-
+  .directive('collapse', ['$animate', function($animate) {
     return {
-      link: function (scope, element, attrs) {
+      link: function(scope, element, attrs) {
         function expand() {
           element.removeClass('collapse')
             .addClass('collapsing')
@@ -52432,7 +53297,7 @@ angular.module('ui.bootstrap.collapse', [])
         }
 
         function collapse() {
-          if(! element.hasClass('collapse') && ! element.hasClass('in')) {
+          if (!element.hasClass('collapse') && !element.hasClass('in')) {
             return collapseDone();
           }
 
@@ -52459,7 +53324,7 @@ angular.module('ui.bootstrap.collapse', [])
           element.addClass('collapse');
         }
 
-        scope.$watch(attrs.collapse, function (shouldCollapse) {
+        scope.$watch(attrs.collapse, function(shouldCollapse) {
           if (shouldCollapse) {
             collapse();
           } else {
@@ -52476,17 +53341,17 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
   closeOthers: true
 })
 
-.controller('AccordionController', ['$scope', '$attrs', 'accordionConfig', function ($scope, $attrs, accordionConfig) {
-
+.controller('AccordionController', ['$scope', '$attrs', 'accordionConfig', function($scope, $attrs, accordionConfig) {
   // This array keeps track of the accordion groups
   this.groups = [];
 
   // Ensure that all the groups in this accordion are closed, unless close-others explicitly says not to
   this.closeOthers = function(openGroup) {
-    var closeOthers = angular.isDefined($attrs.closeOthers) ? $scope.$eval($attrs.closeOthers) : accordionConfig.closeOthers;
-    if ( closeOthers ) {
-      angular.forEach(this.groups, function (group) {
-        if ( group !== openGroup ) {
+    var closeOthers = angular.isDefined($attrs.closeOthers) ?
+      $scope.$eval($attrs.closeOthers) : accordionConfig.closeOthers;
+    if (closeOthers) {
+      angular.forEach(this.groups, function(group) {
+        if (group !== openGroup) {
           group.isOpen = false;
         }
       });
@@ -52498,7 +53363,7 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
     var that = this;
     this.groups.push(groupScope);
 
-    groupScope.$on('$destroy', function (event) {
+    groupScope.$on('$destroy', function(event) {
       that.removeGroup(groupScope);
     });
   };
@@ -52506,7 +53371,7 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
   // This is called from the accordion-group directive when to remove itself
   this.removeGroup = function(group) {
     var index = this.groups.indexOf(group);
-    if ( index !== -1 ) {
+    if (index !== -1) {
       this.groups.splice(index, 1);
     }
   };
@@ -52515,7 +53380,7 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
 
 // The accordion directive simply sets up the directive controller
 // and adds an accordion CSS class to itself element.
-.directive('accordion', function () {
+.directive('accordion', function() {
   return {
     restrict: 'EA',
     controller: 'AccordionController',
@@ -52531,9 +53396,9 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
 // The accordion-group directive indicates a block of html that will expand and collapse in an accordion
 .directive('accordionGroup', function() {
   return {
-    require:'^accordion',         // We need this directive to be inside an accordion
-    restrict:'EA',
-    transclude:true,              // It transcludes the contents of the directive into the template
+    require: '^accordion',         // We need this directive to be inside an accordion
+    restrict: 'EA',
+    transclude: true,              // It transcludes the contents of the directive into the template
     replace: true,                // The element containing the directive will be replaced with the template
     templateUrl: function(element, attrs) {
       return attrs.templateUrl || 'template/accordion/accordion-group.html';
@@ -52551,15 +53416,20 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
     link: function(scope, element, attrs, accordionCtrl) {
       accordionCtrl.addGroup(scope);
 
+      scope.openClass = attrs.openClass || 'panel-open';
+      scope.panelClass = attrs.panelClass;
       scope.$watch('isOpen', function(value) {
-        if ( value ) {
+        element.toggleClass(scope.openClass, value);
+        if (value) {
           accordionCtrl.closeOthers(scope);
         }
       });
 
-      scope.toggleOpen = function() {
-        if ( !scope.isDisabled ) {
-          scope.isOpen = !scope.isOpen;
+      scope.toggleOpen = function($event) {
+        if (!scope.isDisabled) {
+          if (!$event || $event.which === 32) {
+            scope.isOpen = !scope.isOpen;
+          }
         }
       };
     }
@@ -52597,7 +53467,7 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
     require: '^accordionGroup',
     link: function(scope, element, attr, controller) {
       scope.$watch(function() { return controller[attr.accordionTransclude]; }, function(heading) {
-        if ( heading ) {
+        if (heading) {
           element.find('span').html('');
           element.find('span').append(heading);
         }
@@ -52610,14 +53480,13 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
 
 angular.module('ui.bootstrap.alert', [])
 
-.controller('AlertController', ['$scope', '$attrs', function ($scope, $attrs) {
+.controller('AlertController', ['$scope', '$attrs', function($scope, $attrs) {
   $scope.closeable = !!$attrs.close;
   this.close = $scope.close;
 }])
 
-.directive('alert', function () {
+.directive('alert', function() {
   return {
-    restrict: 'EA',
     controller: 'AlertController',
     controllerAs: 'alert',
     templateUrl: function(element, attrs) {
@@ -52636,7 +53505,7 @@ angular.module('ui.bootstrap.alert', [])
   return {
     require: 'alert',
     link: function(scope, element, attrs, alertCtrl) {
-      $timeout(function(){
+      $timeout(function() {
         alertCtrl.close();
       }, parseInt(attrs.dismissOnTimeout, 10));
     }
@@ -52670,21 +53539,23 @@ angular.module('ui.bootstrap.buttons', [])
   this.toggleEvent = buttonConfig.toggleEvent || 'click';
 }])
 
-.directive('btnRadio', function () {
+.directive('btnRadio', function() {
   return {
     require: ['btnRadio', 'ngModel'],
     controller: 'ButtonsController',
     controllerAs: 'buttons',
-    link: function (scope, element, attrs, ctrls) {
+    link: function(scope, element, attrs, ctrls) {
       var buttonsCtrl = ctrls[0], ngModelCtrl = ctrls[1];
 
+      element.find('input').css({display: 'none'});
+
       //model -> UI
-      ngModelCtrl.$render = function () {
+      ngModelCtrl.$render = function() {
         element.toggleClass(buttonsCtrl.activeClass, angular.equals(ngModelCtrl.$modelValue, scope.$eval(attrs.btnRadio)));
       };
 
       //ui->model
-      element.bind(buttonsCtrl.toggleEvent, function () {
+      element.bind(buttonsCtrl.toggleEvent, function() {
         if (attrs.disabled) {
           return;
         }
@@ -52692,7 +53563,7 @@ angular.module('ui.bootstrap.buttons', [])
         var isActive = element.hasClass(buttonsCtrl.activeClass);
 
         if (!isActive || angular.isDefined(attrs.uncheckable)) {
-          scope.$apply(function () {
+          scope.$apply(function() {
             ngModelCtrl.$setViewValue(isActive ? null : scope.$eval(attrs.btnRadio));
             ngModelCtrl.$render();
           });
@@ -52702,13 +53573,15 @@ angular.module('ui.bootstrap.buttons', [])
   };
 })
 
-.directive('btnCheckbox', function () {
+.directive('btnCheckbox', ['$document', function($document) {
   return {
     require: ['btnCheckbox', 'ngModel'],
     controller: 'ButtonsController',
     controllerAs: 'button',
-    link: function (scope, element, attrs, ctrls) {
+    link: function(scope, element, attrs, ctrls) {
       var buttonsCtrl = ctrls[0], ngModelCtrl = ctrls[1];
+
+      element.find('input').css({display: 'none'});
 
       function getTrueValue() {
         return getCheckboxValue(attrs.btnCheckboxTrue, true);
@@ -52724,24 +53597,36 @@ angular.module('ui.bootstrap.buttons', [])
       }
 
       //model -> UI
-      ngModelCtrl.$render = function () {
+      ngModelCtrl.$render = function() {
         element.toggleClass(buttonsCtrl.activeClass, angular.equals(ngModelCtrl.$modelValue, getTrueValue()));
       };
 
       //ui->model
-      element.bind(buttonsCtrl.toggleEvent, function () {
+      element.bind(buttonsCtrl.toggleEvent, function() {
         if (attrs.disabled) {
           return;
         }
 
-        scope.$apply(function () {
+        scope.$apply(function() {
+          ngModelCtrl.$setViewValue(element.hasClass(buttonsCtrl.activeClass) ? getFalseValue() : getTrueValue());
+          ngModelCtrl.$render();
+        });
+      });
+
+      //accessibility
+      element.on('keypress', function(e) {
+        if (attrs.disabled || e.which !== 32 || $document[0].activeElement !== element[0]) {
+          return;
+        }
+
+        scope.$apply(function() {
           ngModelCtrl.$setViewValue(element.hasClass(buttonsCtrl.activeClass) ? getFalseValue() : getTrueValue());
           ngModelCtrl.$render();
         });
       });
     }
   };
-});
+}]);
 
 /**
 * @ngdoc overview
@@ -53061,6 +53946,7 @@ function CarouselDemoCtrl($scope) {
     },
     scope: {
       active: '=?',
+      actual: '=?',
       index: '=?'
     },
     link: function (scope, element, attrs, carouselCtrl) {
@@ -53225,6 +54111,10 @@ angular.module('ui.bootstrap.dateparser', [])
       regex: '1?[0-9]|2[0-3]',
       apply: function(value) { this.hours = +value; }
     },
+    'h': {
+      regex: '[0-9]|1[0-2]',
+      apply: function(value) { this.hours = +value; }
+    },
     'mm': {
       regex: '[0-5][0-9]',
       apply: function(value) { this.minutes = +value; }
@@ -53287,14 +54177,14 @@ angular.module('ui.bootstrap.dateparser', [])
   }
 
   this.parse = function(input, format, baseDate) {
-    if ( !angular.isString(input) || !format ) {
+    if (!angular.isString(input) || !format) {
       return input;
     }
 
     format = $locale.DATETIME_FORMATS[format] || format;
     format = format.replace(SPECIAL_CHARACTERS_REGEXP, '\\$&');
 
-    if ( !this.parsers[format] ) {
+    if (!this.parsers[format]) {
       this.parsers[format] = createParser(format);
     }
 
@@ -53303,7 +54193,7 @@ angular.module('ui.bootstrap.dateparser', [])
         map = parser.map,
         results = input.match(regex);
 
-    if ( results && results.length ) {
+    if (results && results.length) {
       var fields, dt;
       if (angular.isDate(baseDate) && !isNaN(baseDate.getTime())) {
         fields = {
@@ -53322,15 +54212,16 @@ angular.module('ui.bootstrap.dateparser', [])
         fields = { year: 1900, month: 0, date: 1, hours: 0, minutes: 0, seconds: 0, milliseconds: 0 };
       }
 
-      for( var i = 1, n = results.length; i < n; i++ ) {
+      for (var i = 1, n = results.length; i < n; i++) {
         var mapper = map[i-1];
-        if ( mapper.apply ) {
+        if (mapper.apply) {
           mapper.apply.call(fields, results[i]);
         }
       }
 
-      if ( isValid(fields.year, fields.month, fields.date) ) {
-        dt = new Date(fields.year, fields.month, fields.date, fields.hours, fields.minutes, fields.seconds,
+      if (isValid(fields.year, fields.month, fields.date)) {
+        dt = new Date(fields.year, fields.month, fields.date,
+          fields.hours, fields.minutes, fields.seconds,
           fields.milliseconds || 0);
       }
 
@@ -53345,12 +54236,12 @@ angular.module('ui.bootstrap.dateparser', [])
       return false;
     }
 
-    if ( month === 1 && date > 28) {
-        return date === 29 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0);
+    if (month === 1 && date > 28) {
+      return date === 29 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0);
     }
 
-    if ( month === 3 || month === 5 || month === 8 || month === 10) {
-        return date < 31;
+    if (month === 3 || month === 5 || month === 8 || month === 10) {
+      return date < 31;
     }
 
     return true;
@@ -53365,8 +54256,7 @@ angular.module('ui.bootstrap.position', [])
  * relation to other, existing elements (this is the case for tooltips, popovers,
  * typeahead suggestions etc.).
  */
-  .factory('$position', ['$document', '$window', function ($document, $window) {
-
+  .factory('$position', ['$document', '$window', function($document, $window) {
     function getStyle(el, cssprop) {
       if (el.currentStyle) { //IE
         return el.currentStyle[cssprop];
@@ -53389,7 +54279,7 @@ angular.module('ui.bootstrap.position', [])
      * returns the closest, non-statically positioned parentOffset of a given element
      * @param element
      */
-    var parentOffsetEl = function (element) {
+    var parentOffsetEl = function(element) {
       var docDomEl = $document[0];
       var offsetParent = element.offsetParent || docDomEl;
       while (offsetParent && offsetParent !== docDomEl && isStaticPositioned(offsetParent) ) {
@@ -53403,7 +54293,7 @@ angular.module('ui.bootstrap.position', [])
        * Provides read-only equivalent of jQuery's position function:
        * http://api.jquery.com/position/
        */
-      position: function (element) {
+      position: function(element) {
         var elBCR = this.offset(element);
         var offsetParentBCR = { top: 0, left: 0 };
         var offsetParentEl = parentOffsetEl(element[0]);
@@ -53426,7 +54316,7 @@ angular.module('ui.bootstrap.position', [])
        * Provides read-only equivalent of jQuery's offset function:
        * http://api.jquery.com/offset/
        */
-      offset: function (element) {
+      offset: function(element) {
         var boundingClientRect = element[0].getBoundingClientRect();
         return {
           width: boundingClientRect.width || element.prop('offsetWidth'),
@@ -53439,8 +54329,7 @@ angular.module('ui.bootstrap.position', [])
       /**
        * Provides coordinates for the targetEl in relation to hostEl
        */
-      positionElements: function (hostEl, targetEl, positionStr, appendToBody) {
-
+      positionElements: function(hostEl, targetEl, positionStr, appendToBody) {
         var positionStrParts = positionStr.split('-');
         var pos0 = positionStrParts[0], pos1 = positionStrParts[1] || 'center';
 
@@ -53455,25 +54344,25 @@ angular.module('ui.bootstrap.position', [])
         targetElHeight = targetEl.prop('offsetHeight');
 
         var shiftWidth = {
-          center: function () {
+          center: function() {
             return hostElPos.left + hostElPos.width / 2 - targetElWidth / 2;
           },
-          left: function () {
+          left: function() {
             return hostElPos.left;
           },
-          right: function () {
+          right: function() {
             return hostElPos.left + hostElPos.width;
           }
         };
 
         var shiftHeight = {
-          center: function () {
+          center: function() {
             return hostElPos.top + hostElPos.height / 2 - targetElHeight / 2;
           },
-          top: function () {
+          top: function() {
             return hostElPos.top;
           },
-          bottom: function () {
+          bottom: function() {
             return hostElPos.top + hostElPos.height;
           }
         };
@@ -53541,13 +54430,13 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
 
   // Configuration attributes
   angular.forEach(['formatDay', 'formatMonth', 'formatYear', 'formatDayHeader', 'formatDayTitle', 'formatMonthTitle',
-                   'showWeeks', 'startingDay', 'yearRange', 'shortcutPropagation'], function( key, index ) {
+                   'showWeeks', 'startingDay', 'yearRange', 'shortcutPropagation'], function(key, index) {
     self[key] = angular.isDefined($attrs[key]) ? (index < 6 ? $interpolate($attrs[key])($scope.$parent) : $scope.$parent.$eval($attrs[key])) : datepickerConfig[key];
   });
 
   // Watchable date attributes
-  angular.forEach(['minDate', 'maxDate'], function( key ) {
-    if ( $attrs[key] ) {
+  angular.forEach(['minDate', 'maxDate'], function(key) {
+    if ($attrs[key]) {
       $scope.$parent.$watch($parse($attrs[key]), function(value) {
         self[key] = value ? new Date(value) : null;
         self.refreshView();
@@ -53557,12 +54446,12 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     }
   });
 
-  angular.forEach(['minMode', 'maxMode'], function( key ) {
-    if ( $attrs[key] ) {
+  angular.forEach(['minMode', 'maxMode'], function(key) {
+    if ($attrs[key]) {
       $scope.$parent.$watch($parse($attrs[key]), function(value) {
         self[key] = angular.isDefined(value) ? value : $attrs[key];
         $scope[key] = self[key];
-        if ((key == 'minMode' && self.modes.indexOf( $scope.datepickerMode ) < self.modes.indexOf( self[key] )) || (key == 'maxMode' && self.modes.indexOf( $scope.datepickerMode ) > self.modes.indexOf( self[key] ))) {
+        if ((key == 'minMode' && self.modes.indexOf($scope.datepickerMode) < self.modes.indexOf(self[key])) || (key == 'maxMode' && self.modes.indexOf($scope.datepickerMode) > self.modes.indexOf(self[key]))) {
           $scope.datepickerMode = self[key];
         }
       });
@@ -53575,16 +54464,16 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   $scope.datepickerMode = $scope.datepickerMode || datepickerConfig.datepickerMode;
   $scope.uniqueId = 'datepicker-' + $scope.$id + '-' + Math.floor(Math.random() * 10000);
 
-  if(angular.isDefined($attrs.initDate)) {
+  if (angular.isDefined($attrs.initDate)) {
     this.activeDate = $scope.$parent.$eval($attrs.initDate) || new Date();
-    $scope.$parent.$watch($attrs.initDate, function(initDate){
-      if(initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)){
+    $scope.$parent.$watch($attrs.initDate, function(initDate) {
+      if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
         self.activeDate = initDate;
         self.refreshView();
       }
     });
   } else {
-    this.activeDate =  new Date();
+    this.activeDate = new Date();
   }
 
   $scope.isActive = function(dateObject) {
@@ -53595,7 +54484,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     return false;
   };
 
-  this.init = function( ngModelCtrl_ ) {
+  this.init = function(ngModelCtrl_) {
     ngModelCtrl = ngModelCtrl_;
 
     ngModelCtrl.$render = function() {
@@ -53604,13 +54493,13 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   };
 
   this.render = function() {
-    if ( ngModelCtrl.$viewValue ) {
-      var date = new Date( ngModelCtrl.$viewValue ),
+    if (ngModelCtrl.$viewValue) {
+      var date = new Date(ngModelCtrl.$viewValue),
           isValid = !isNaN(date);
 
-      if ( isValid ) {
+      if (isValid) {
         this.activeDate = date;
-      } else if ( !$datepickerSuppressError ) {
+      } else if (!$datepickerSuppressError) {
         $log.error('Datepicker directive: "ng-model" value must be a Date object, a number of milliseconds since 01.01.1970 or a string representing an RFC2822 or ISO 8601 date.');
       }
     }
@@ -53618,7 +54507,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   };
 
   this.refreshView = function() {
-    if ( this.element ) {
+    if (this.element) {
       this._refreshView();
 
       var date = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : null;
@@ -53638,11 +54527,11 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     };
   };
 
-  this.isDisabled = function( date ) {
+  this.isDisabled = function(date) {
     return ((this.minDate && this.compare(date, this.minDate) < 0) || (this.maxDate && this.compare(date, this.maxDate) > 0) || ($attrs.dateDisabled && $scope.dateDisabled({date: date, mode: $scope.datepickerMode})));
   };
 
-  this.customClass = function( date ) {
+  this.customClass = function(date) {
     return $scope.customClass({date: date, mode: $scope.datepickerMode});
   };
 
@@ -53666,37 +54555,37 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     date.setHours(hours === 23 ? hours + 2 : 0);
   };
 
-  $scope.select = function( date ) {
-    if ( $scope.datepickerMode === self.minMode ) {
-      var dt = ngModelCtrl.$viewValue ? new Date( ngModelCtrl.$viewValue ) : new Date(0, 0, 0, 0, 0, 0, 0);
-      dt.setFullYear( date.getFullYear(), date.getMonth(), date.getDate() );
-      ngModelCtrl.$setViewValue( dt );
+  $scope.select = function(date) {
+    if ($scope.datepickerMode === self.minMode) {
+      var dt = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : new Date(0, 0, 0, 0, 0, 0, 0);
+      dt.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+      ngModelCtrl.$setViewValue(dt);
       ngModelCtrl.$render();
     } else {
       self.activeDate = date;
-      $scope.datepickerMode = self.modes[ self.modes.indexOf( $scope.datepickerMode ) - 1 ];
+      $scope.datepickerMode = self.modes[self.modes.indexOf($scope.datepickerMode) - 1];
     }
   };
 
-  $scope.move = function( direction ) {
+  $scope.move = function(direction) {
     var year = self.activeDate.getFullYear() + direction * (self.step.years || 0),
         month = self.activeDate.getMonth() + direction * (self.step.months || 0);
     self.activeDate.setFullYear(year, month, 1);
     self.refreshView();
   };
 
-  $scope.toggleMode = function( direction ) {
+  $scope.toggleMode = function(direction) {
     direction = direction || 1;
 
     if (($scope.datepickerMode === self.maxMode && direction === 1) || ($scope.datepickerMode === self.minMode && direction === -1)) {
       return;
     }
 
-    $scope.datepickerMode = self.modes[ self.modes.indexOf( $scope.datepickerMode ) + direction ];
+    $scope.datepickerMode = self.modes[self.modes.indexOf($scope.datepickerMode) + direction];
   };
 
   // Key event mapper
-  $scope.keys = { 13:'enter', 32:'space', 33:'pageup', 34:'pagedown', 35:'end', 36:'home', 37:'left', 38:'up', 39:'right', 40:'down' };
+  $scope.keys = { 13: 'enter', 32: 'space', 33: 'pageup', 34: 'pagedown', 35: 'end', 36: 'home', 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
 
   var focusElement = function() {
     self.element[0].focus();
@@ -53705,20 +54594,20 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   // Listen for focus requests from popup directive
   $scope.$on('datepicker.focus', focusElement);
 
-  $scope.keydown = function( evt ) {
+  $scope.keydown = function(evt) {
     var key = $scope.keys[evt.which];
 
-    if ( !key || evt.shiftKey || evt.altKey ) {
+    if (!key || evt.shiftKey || evt.altKey) {
       return;
     }
 
     evt.preventDefault();
-    if(!self.shortcutPropagation){
-        evt.stopPropagation();
+    if (!self.shortcutPropagation) {
+      evt.stopPropagation();
     }
 
     if (key === 'enter' || key === 'space') {
-      if ( self.isDisabled(self.activeDate)) {
+      if (self.isDisabled(self.activeDate)) {
         return; // do nothing
       }
       $scope.select(self.activeDate);
@@ -53733,7 +54622,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   };
 }])
 
-.directive( 'datepicker', function () {
+.directive('datepicker', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -53757,7 +54646,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   };
 })
 
-.directive('daypicker', ['dateFilter', function (dateFilter) {
+.directive('daypicker', ['dateFilter', function(dateFilter) {
   return {
     restrict: 'EA',
     replace: true,
@@ -53770,17 +54659,17 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
       ctrl.element = element;
 
       var DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-      function getDaysInMonth( year, month ) {
+      function getDaysInMonth(year, month) {
         return ((month === 1) && (year % 4 === 0) && ((year % 100 !== 0) || (year % 400 === 0))) ? 29 : DAYS_IN_MONTH[month];
       }
 
       function getDates(startDate, n) {
         var dates = new Array(n), current = new Date(startDate), i = 0, date;
-        while ( i < n ) {
+        while (i < n) {
           date = new Date(current);
           ctrl.fixTimeZone(date);
           dates[i++] = date;
-          current.setDate( current.getDate() + 1 );
+          current.setDate(current.getDate() + 1);
         }
         return dates;
       }
@@ -53793,8 +54682,8 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
           numDisplayedFromPreviousMonth = (difference > 0) ? 7 - difference : - difference,
           firstDate = new Date(firstDayOfMonth);
 
-        if ( numDisplayedFromPreviousMonth > 0 ) {
-          firstDate.setDate( - numDisplayedFromPreviousMonth + 1 );
+        if (numDisplayedFromPreviousMonth > 0) {
+          firstDate.setDate(-numDisplayedFromPreviousMonth + 1);
         }
 
         // 42 is the number of days on a six-month calendar
@@ -53817,19 +54706,19 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
         scope.title = dateFilter(ctrl.activeDate, ctrl.formatDayTitle);
         scope.rows = ctrl.split(days, 7);
 
-        if ( scope.showWeeks ) {
+        if (scope.showWeeks) {
           scope.weekNumbers = [];
           var thursdayIndex = (4 + 7 - ctrl.startingDay) % 7,
               numWeeks = scope.rows.length;
           for (var curWeek = 0; curWeek < numWeeks; curWeek++) {
             scope.weekNumbers.push(
-              getISO8601WeekNumber( scope.rows[curWeek][thursdayIndex].date ));
+              getISO8601WeekNumber(scope.rows[curWeek][thursdayIndex].date));
           }
         }
       };
 
       ctrl.compare = function(date1, date2) {
-        return (new Date( date1.getFullYear(), date1.getMonth(), date1.getDate() ) - new Date( date2.getFullYear(), date2.getMonth(), date2.getDate() ) );
+        return (new Date(date1.getFullYear(), date1.getMonth(), date1.getDate()) - new Date(date2.getFullYear(), date2.getMonth(), date2.getDate()));
       };
 
       function getISO8601WeekNumber(date) {
@@ -53841,7 +54730,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
         return Math.floor(Math.round((time - checkDate) / 86400000) / 7) + 1;
       }
 
-      ctrl.handleKeyDown = function( key, evt ) {
+      ctrl.handleKeyDown = function(key, evt) {
         var date = ctrl.activeDate.getDate();
 
         if (key === 'left') {
@@ -53869,7 +54758,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   };
 }])
 
-.directive('monthpicker', ['dateFilter', function (dateFilter) {
+.directive('monthpicker', ['dateFilter', function(dateFilter) {
   return {
     restrict: 'EA',
     replace: true,
@@ -53884,7 +54773,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
             year = ctrl.activeDate.getFullYear(),
             date;
 
-        for ( var i = 0; i < 12; i++ ) {
+        for (var i = 0; i < 12; i++) {
           date = new Date(year, i, 1);
           ctrl.fixTimeZone(date);
           months[i] = angular.extend(ctrl.createDateObject(date, ctrl.formatMonth), {
@@ -53897,10 +54786,10 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
       };
 
       ctrl.compare = function(date1, date2) {
-        return new Date( date1.getFullYear(), date1.getMonth() ) - new Date( date2.getFullYear(), date2.getMonth() );
+        return new Date(date1.getFullYear(), date1.getMonth()) - new Date(date2.getFullYear(), date2.getMonth());
       };
 
-      ctrl.handleKeyDown = function( key, evt ) {
+      ctrl.handleKeyDown = function(key, evt) {
         var date = ctrl.activeDate.getMonth();
 
         if (key === 'left') {
@@ -53927,7 +54816,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   };
 }])
 
-.directive('yearpicker', ['dateFilter', function (dateFilter) {
+.directive('yearpicker', ['dateFilter', function(dateFilter) {
   return {
     restrict: 'EA',
     replace: true,
@@ -53946,7 +54835,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
       ctrl._refreshView = function() {
         var years = new Array(range), date;
 
-        for ( var i = 0, start = getStartingYear(ctrl.activeDate.getFullYear()); i < range; i++ ) {
+        for (var i = 0, start = getStartingYear(ctrl.activeDate.getFullYear()); i < range; i++) {
           date = new Date(start + i, 0, 1);
           ctrl.fixTimeZone(date);
           years[i] = angular.extend(ctrl.createDateObject(date, ctrl.formatYear), {
@@ -53962,7 +54851,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
         return date1.getFullYear() - date2.getFullYear();
       };
 
-      ctrl.handleKeyDown = function( key, evt ) {
+      ctrl.handleKeyDown = function(key, evt) {
         var date = ctrl.activeDate.getFullYear();
 
         if (key === 'left') {
@@ -53976,9 +54865,9 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
         } else if (key === 'pageup' || key === 'pagedown') {
           date += (key === 'pageup' ? - 1 : 1) * ctrl.step.years;
         } else if (key === 'home') {
-          date = getStartingYear( ctrl.activeDate.getFullYear() );
+          date = getStartingYear(ctrl.activeDate.getFullYear());
         } else if (key === 'end') {
-          date = getStartingYear( ctrl.activeDate.getFullYear() ) + range - 1;
+          date = getStartingYear(ctrl.activeDate.getFullYear()) + range - 1;
         }
         ctrl.activeDate.setFullYear(date);
       };
@@ -54007,7 +54896,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
 })
 
 .directive('datepickerPopup', ['$compile', '$parse', '$document', '$rootScope', '$position', 'dateFilter', 'dateParser', 'datepickerPopupConfig', '$timeout',
-function ($compile, $parse, $document, $rootScope, $position, dateFilter, dateParser, datepickerPopupConfig, $timeout) {
+function($compile, $parse, $document, $rootScope, $position, dateFilter, dateParser, datepickerPopupConfig, $timeout) {
   return {
     restrict: 'EA',
     require: 'ngModel',
@@ -54025,12 +54914,26 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
           appendToBody = angular.isDefined(attrs.datepickerAppendToBody) ? scope.$parent.$eval(attrs.datepickerAppendToBody) : datepickerPopupConfig.appendToBody,
           onOpenFocus = angular.isDefined(attrs.onOpenFocus) ? scope.$parent.$eval(attrs.onOpenFocus) : datepickerPopupConfig.onOpenFocus,
           datepickerPopupTemplateUrl = angular.isDefined(attrs.datepickerPopupTemplateUrl) ? attrs.datepickerPopupTemplateUrl : datepickerPopupConfig.datepickerPopupTemplateUrl,
-          datepickerTemplateUrl = angular.isDefined(attrs.datepickerTemplateUrl) ? attrs.datepickerTemplateUrl : datepickerPopupConfig.datepickerTemplateUrl;
+          datepickerTemplateUrl = angular.isDefined(attrs.datepickerTemplateUrl) ? attrs.datepickerTemplateUrl : datepickerPopupConfig.datepickerTemplateUrl,
+          cache = {};
 
       scope.showButtonBar = angular.isDefined(attrs.showButtonBar) ? scope.$parent.$eval(attrs.showButtonBar) : datepickerPopupConfig.showButtonBar;
 
-      scope.getText = function( key ) {
+      scope.getText = function(key) {
         return scope[key + 'Text'] || datepickerPopupConfig[key + 'Text'];
+      };
+
+      scope.isDisabled = function(date) {
+        if (date === 'today') {
+          date = new Date();
+        }
+
+        return ((scope.watchData.minDate && scope.compare(date, cache.minDate) < 0) ||
+          (scope.watchData.maxDate && scope.compare(date, cache.maxDate) > 0));
+      };
+
+      scope.compare = function(date1, date2) {
+        return (new Date(date1.getFullYear(), date1.getMonth(), date1.getDate()) - new Date(date2.getFullYear(), date2.getMonth(), date2.getDate()));
       };
 
       var isHtml5DateInput = false;
@@ -54070,7 +54973,7 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
         'template-url': datepickerPopupTemplateUrl
       });
 
-      function cameltoDash( string ){
+      function cameltoDash(string) {
         return string.replace(/([A-Z])/g, function($1) { return '-' + $1.toLowerCase(); });
       }
 
@@ -54079,38 +54982,41 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
       datepickerEl.attr('template-url', datepickerTemplateUrl);
 
       if (isHtml5DateInput) {
-        if (attrs.type == 'month') {
+        if (attrs.type === 'month') {
           datepickerEl.attr('datepicker-mode', '"month"');
           datepickerEl.attr('min-mode', 'month');
         }
       }
 
-      if ( attrs.datepickerOptions ) {
+      if (attrs.datepickerOptions) {
         var options = scope.$parent.$eval(attrs.datepickerOptions);
-        if(options && options.initDate) {
+        if (options && options.initDate) {
           scope.initDate = options.initDate;
-          datepickerEl.attr( 'init-date', 'initDate' );
+          datepickerEl.attr('init-date', 'initDate');
           delete options.initDate;
         }
-        angular.forEach(options, function( value, option ) {
+        angular.forEach(options, function(value, option) {
           datepickerEl.attr( cameltoDash(option), value );
         });
       }
 
       scope.watchData = {};
-      angular.forEach(['minMode', 'maxMode', 'minDate', 'maxDate', 'datepickerMode', 'initDate', 'shortcutPropagation'], function( key ) {
-        if ( attrs[key] ) {
+      angular.forEach(['minMode', 'maxMode', 'minDate', 'maxDate', 'datepickerMode', 'initDate', 'shortcutPropagation'], function(key) {
+        if (attrs[key]) {
           var getAttribute = $parse(attrs[key]);
-          scope.$parent.$watch(getAttribute, function(value){
+          scope.$parent.$watch(getAttribute, function(value) {
             scope.watchData[key] = value;
+            if (key === 'minDate' || key === 'maxDate') {
+              cache[key] = new Date(value);
+            }
           });
           datepickerEl.attr(cameltoDash(key), 'watchData.' + key);
 
           // Propagate changes from datepicker to outside
-          if ( key === 'datepickerMode' ) {
+          if (key === 'datepickerMode') {
             var setAttribute = getAttribute.assign;
             scope.$watch('watchData.' + key, function(value, oldvalue) {
-              if ( angular.isFunction(setAttribute) && value !== oldvalue ) {
+              if (angular.isFunction(setAttribute) && value !== oldvalue) {
                 setAttribute(scope.$parent, value);
               }
             });
@@ -54125,7 +55031,7 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
         datepickerEl.attr('show-weeks', attrs.showWeeks);
       }
 
-      if (attrs.customClass){
+      if (attrs.customClass) {
         datepickerEl.attr('custom-class', 'customClass({ date: date, mode: mode })');
       }
 
@@ -54178,13 +55084,12 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
         ngModel.$$parserName = 'date';
         ngModel.$validators.date = validator;
         ngModel.$parsers.unshift(parseDate);
-        ngModel.$formatters.push(function (value) {
+        ngModel.$formatters.push(function(value) {
           scope.date = value;
           return ngModel.$isEmpty(value) ? value : dateFilter(value, dateFormat);
         });
-      }
-      else {
-        ngModel.$formatters.push(function (value) {
+      } else {
+        ngModel.$formatters.push(function(value) {
           scope.date = value;
           return value;
         });
@@ -54199,19 +55104,19 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
         element.val(date);
         ngModel.$setViewValue(date);
 
-        if ( closeOnDateSelection ) {
+        if (closeOnDateSelection) {
           scope.isOpen = false;
           element[0].focus();
         }
       };
 
       // Detect changes in the view from the text box
-      ngModel.$viewChangeListeners.push(function () {
+      ngModel.$viewChangeListeners.push(function() {
         scope.date = dateParser.parse(ngModel.$viewValue, dateFormat, scope.date);
       });
 
       var documentClickBind = function(event) {
-        if (scope.isOpen && !element[0].contains(event.target)) {
+        if (scope.isOpen && !(element[0].contains(event.target) || popupEl[0].contains(event.target))) {
           scope.$apply(function() {
             scope.isOpen = false;
           });
@@ -54259,7 +55164,7 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
         }
       });
 
-      scope.select = function( date ) {
+      scope.select = function(date) {
         if (date === 'today') {
           var today = new Date();
           if (angular.isDate(scope.date)) {
@@ -54269,7 +55174,7 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
             date = new Date(today.setHours(0, 0, 0, 0));
           }
         }
-        scope.dateSelection( date );
+        scope.dateSelection(date);
       };
 
       scope.close = function() {
@@ -54281,7 +55186,7 @@ function ($compile, $parse, $document, $rootScope, $position, dateFilter, datePa
       // Prevent jQuery cache memory leak (template is now redundant after linking)
       popupEl.remove();
 
-      if ( appendToBody ) {
+      if (appendToBody) {
         $document.find('body').append($popup);
       } else {
         element.after($popup);
@@ -54324,36 +55229,36 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
 .service('dropdownService', ['$document', '$rootScope', function($document, $rootScope) {
   var openScope = null;
 
-  this.open = function( dropdownScope ) {
-    if ( !openScope ) {
+  this.open = function(dropdownScope) {
+    if (!openScope) {
       $document.bind('click', closeDropdown);
       $document.bind('keydown', keybindFilter);
     }
 
-    if ( openScope && openScope !== dropdownScope ) {
+    if (openScope && openScope !== dropdownScope) {
       openScope.isOpen = false;
     }
 
     openScope = dropdownScope;
   };
 
-  this.close = function( dropdownScope ) {
-    if ( openScope === dropdownScope ) {
+  this.close = function(dropdownScope) {
+    if (openScope === dropdownScope) {
       openScope = null;
       $document.unbind('click', closeDropdown);
       $document.unbind('keydown', keybindFilter);
     }
   };
 
-  var closeDropdown = function( evt ) {
+  var closeDropdown = function(evt) {
     // This method may still be called during the same mouse event that
     // unbound this event handler. So check openScope before proceeding.
     if (!openScope) { return; }
 
-    if( evt && openScope.getAutoClose() === 'disabled' )  { return ; }
+    if (evt && openScope.getAutoClose() === 'disabled')  { return ; }
 
     var toggleElement = openScope.getToggleElement();
-    if ( evt && toggleElement && toggleElement[0].contains(evt.target) ) {
+    if (evt && toggleElement && toggleElement[0].contains(evt.target)) {
       return;
     }
 
@@ -54370,12 +55275,11 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     }
   };
 
-  var keybindFilter = function( evt ) {
-    if ( evt.which === 27 ) {
+  var keybindFilter = function(evt) {
+    if (evt.which === 27) {
       openScope.focusToggleElement();
       closeDropdown();
-    }
-    else if ( openScope.isKeynavEnabled() && /(38|40)/.test(evt.which) && openScope.isOpen ) {
+    } else if (openScope.isKeynavEnabled() && /(38|40)/.test(evt.which) && openScope.isOpen) {
       evt.preventDefault();
       evt.stopPropagation();
       openScope.focusDropdownEntry(evt.which);
@@ -54386,19 +55290,20 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
 .controller('DropdownController', ['$scope', '$attrs', '$parse', 'dropdownConfig', 'dropdownService', '$animate', '$position', '$document', '$compile', '$templateRequest', function($scope, $attrs, $parse, dropdownConfig, dropdownService, $animate, $position, $document, $compile, $templateRequest) {
   var self = this,
     scope = $scope.$new(), // create a child scope so we are not polluting original one
-	templateScope,
+    templateScope,
     openClass = dropdownConfig.openClass,
     getIsOpen,
     setIsOpen = angular.noop,
     toggleInvoker = $attrs.onToggle ? $parse($attrs.onToggle) : angular.noop,
     appendToBody = false,
-    keynavEnabled =false,
-    selectedOption = null;
+    keynavEnabled = false,
+    selectedOption = null,
+    body = $document.find('body');
 
-  this.init = function( element ) {
+  this.init = function(element) {
     self.$element = element;
 
-    if ( $attrs.isOpen ) {
+    if ($attrs.isOpen) {
       getIsOpen = $parse($attrs.isOpen);
       setIsOpen = getIsOpen.assign;
 
@@ -54410,15 +55315,16 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     appendToBody = angular.isDefined($attrs.dropdownAppendToBody);
     keynavEnabled = angular.isDefined($attrs.keyboardNav);
 
-    if ( appendToBody && self.dropdownMenu ) {
-      $document.find('body').append( self.dropdownMenu );
+    if (appendToBody && self.dropdownMenu) {
+      body.append(self.dropdownMenu);
+      body.addClass('dropdown');
       element.on('$destroy', function handleDestroyEvent() {
         self.dropdownMenu.remove();
       });
     }
   };
 
-  this.toggle = function( open ) {
+  this.toggle = function(open) {
     return scope.isOpen = arguments.length ? !!open : !scope.isOpen;
   };
 
@@ -54450,7 +55356,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
 
     switch (keyCode) {
       case (40): {
-        if ( !angular.isNumber(self.selectedOption)) {
+        if (!angular.isNumber(self.selectedOption)) {
           self.selectedOption = 0;
         } else {
           self.selectedOption = (self.selectedOption === elems.length -1 ?
@@ -54460,12 +55366,11 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
         break;
       }
       case (38): {
-        if ( !angular.isNumber(self.selectedOption)) {
-          return;
+        if (!angular.isNumber(self.selectedOption)) {
+          self.selectedOption = elems.length - 1;
         } else {
-          self.selectedOption = (self.selectedOption === 0 ?
-            0 :
-            self.selectedOption - 1);
+          self.selectedOption = self.selectedOption === 0 ?
+            0 : self.selectedOption - 1;
         }
         break;
       }
@@ -54478,38 +55383,40 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   };
 
   scope.focusToggleElement = function() {
-    if ( self.toggleElement ) {
+    if (self.toggleElement) {
       self.toggleElement[0].focus();
     }
   };
 
-  scope.$watch('isOpen', function( isOpen, wasOpen ) {
+  scope.$watch('isOpen', function(isOpen, wasOpen) {
     if (appendToBody && self.dropdownMenu) {
-        var pos = $position.positionElements(self.$element, self.dropdownMenu, 'bottom-left', true);
-        var css = {
-            top: pos.top + 'px',
-            display: isOpen ? 'block' : 'none'
-        };
+      var pos = $position.positionElements(self.$element, self.dropdownMenu, 'bottom-left', true);
+      var css = {
+        top: pos.top + 'px',
+        display: isOpen ? 'block' : 'none'
+      };
 
-        var rightalign = self.dropdownMenu.hasClass('dropdown-menu-right');
-        if (!rightalign) {
-            css.left = pos.left + 'px';
-            css.right = 'auto';
-        } else {
-            css.left = 'auto';
-            css.right = (window.innerWidth - (pos.left + self.$element.prop('offsetWidth'))) + 'px';
-        }
+      var rightalign = self.dropdownMenu.hasClass('dropdown-menu-right');
+      if (!rightalign) {
+        css.left = pos.left + 'px';
+        css.right = 'auto';
+      } else {
+        css.left = 'auto';
+        css.right = (window.innerWidth - (pos.left + self.$element.prop('offsetWidth'))) + 'px';
+      }
 
-        self.dropdownMenu.css(css);
+      self.dropdownMenu.css(css);
     }
 
-    $animate[isOpen ? 'addClass' : 'removeClass'](self.$element, openClass).then(function() {
-        if (angular.isDefined(isOpen) && isOpen !== wasOpen) {
-           toggleInvoker($scope, { open: !!isOpen });
-        }
+    var openContainer = appendToBody ? body : self.$element;
+
+    $animate[isOpen ? 'addClass' : 'removeClass'](openContainer, openClass).then(function() {
+      if (angular.isDefined(isOpen) && isOpen !== wasOpen) {
+        toggleInvoker($scope, { open: !!isOpen });
+      }
     });
 
-    if ( isOpen ) {
+    if (isOpen) {
       if (self.dropdownMenuTemplateUrl) {
         $templateRequest(self.dropdownMenuTemplateUrl).then(function(tplContent) {
           templateScope = scope.$new();
@@ -54522,7 +55429,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
       }
 
       scope.focusToggleElement();
-      dropdownService.open( scope );
+      dropdownService.open(scope);
     } else {
       if (self.dropdownMenuTemplateUrl) {
         if (templateScope) {
@@ -54533,7 +55440,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
         self.dropdownMenu = newEl;
       }
 
-      dropdownService.close( scope );
+      dropdownService.close(scope);
       self.selectedOption = null;
     }
 
@@ -54548,9 +55455,10 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     }
   });
 
-  $scope.$on('$destroy', function() {
+  var offDestroy = $scope.$on('$destroy', function() {
     scope.$destroy();
   });
+  scope.$on('$destroy', offDestroy);
 }])
 
 .directive('dropdown', function() {
@@ -54589,9 +55497,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     link: function (scope, element, attrs, dropdownCtrl) {
 
       element.bind('keydown', function(e) {
-
         if ([38, 40].indexOf(e.which) !== -1) {
-
           e.preventDefault();
           e.stopPropagation();
 
@@ -54599,24 +55505,28 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
 
           switch (e.which) {
             case (40): { // Down
-              if ( !angular.isNumber(dropdownCtrl.selectedOption)) {
+              if (!angular.isNumber(dropdownCtrl.selectedOption)) {
                 dropdownCtrl.selectedOption = 0;
               } else {
-                dropdownCtrl.selectedOption = (dropdownCtrl.selectedOption === elems.length -1 ? dropdownCtrl.selectedOption : dropdownCtrl.selectedOption+1);
+                dropdownCtrl.selectedOption = dropdownCtrl.selectedOption === elems.length -1 ?
+                  dropdownCtrl.selectedOption : dropdownCtrl.selectedOption + 1;
               }
-
+              break;
             }
-            break;
             case (38): { // Up
-              dropdownCtrl.selectedOption = (dropdownCtrl.selectedOption === 0 ? 0 : dropdownCtrl.selectedOption-1);
+              if (!angular.isNumber(dropdownCtrl.selectedOption)) {
+                dropdownCtrl.selectedOption = elems.length - 1;
+              } else {
+                dropdownCtrl.selectedOption = dropdownCtrl.selectedOption === 0 ?
+                  0 : dropdownCtrl.selectedOption - 1;
+              }
+              break;
             }
-            break;
           }
           elems[dropdownCtrl.selectedOption].focus();
         }
       });
     }
-
   };
 })
 
@@ -54624,7 +55534,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   return {
     require: '?^dropdown',
     link: function(scope, element, attrs, dropdownCtrl) {
-      if ( !dropdownCtrl ) {
+      if (!dropdownCtrl) {
         return;
       }
 
@@ -54635,7 +55545,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
       var toggleDropdown = function(event) {
         event.preventDefault();
 
-        if ( !element.hasClass('disabled') && !attrs.disabled ) {
+        if (!element.hasClass('disabled') && !attrs.disabled) {
           scope.$apply(function() {
             dropdownCtrl.toggle();
           });
@@ -54663,19 +55573,19 @@ angular.module('ui.bootstrap.modal', [])
  * A helper, internal data structure that acts as a map but also allows getting / removing
  * elements in the LIFO order
  */
-  .factory('$$stackedMap', function () {
+  .factory('$$stackedMap', function() {
     return {
-      createNew: function () {
+      createNew: function() {
         var stack = [];
 
         return {
-          add: function (key, value) {
+          add: function(key, value) {
             stack.push({
               key: key,
               value: value
             });
           },
-          get: function (key) {
+          get: function(key) {
             for (var i = 0; i < stack.length; i++) {
               if (key == stack[i].key) {
                 return stack[i];
@@ -54689,10 +55599,10 @@ angular.module('ui.bootstrap.modal', [])
             }
             return keys;
           },
-          top: function () {
+          top: function() {
             return stack[stack.length - 1];
           },
-          remove: function (key) {
+          remove: function(key) {
             var idx = -1;
             for (var i = 0; i < stack.length; i++) {
               if (key == stack[i].key) {
@@ -54702,11 +55612,66 @@ angular.module('ui.bootstrap.modal', [])
             }
             return stack.splice(idx, 1)[0];
           },
-          removeTop: function () {
+          removeTop: function() {
             return stack.splice(stack.length - 1, 1)[0];
           },
-          length: function () {
+          length: function() {
             return stack.length;
+          }
+        };
+      }
+    };
+  })
+
+/**
+ * A helper, internal data structure that stores all references attached to key
+ */
+  .factory('$$multiMap', function() {
+    return {
+      createNew: function() {
+        var map = {};
+
+        return {
+          entries: function() {
+            return Object.keys(map).map(function(key) {
+              return {
+                key: key,
+                value: map[key]
+              };
+            });
+          },
+          get: function(key) {
+            return map[key];
+          },
+          hasKey: function(key) {
+            return !!map[key];
+          },
+          keys: function() {
+            return Object.keys(map);
+          },
+          put: function(key, value) {
+            if (!map[key]) {
+              map[key] = [];
+            }
+
+            map[key].push(value);
+          },
+          remove: function(key, value) {
+            var values = map[key];
+
+            if (!values) {
+              return;
+            }
+
+            var idx = values.indexOf(value);
+
+            if (idx !== -1) {
+              values.splice(idx, 1);
+            }
+
+            if (!values.length) {
+              delete map[key];
+            }
           }
         };
       }
@@ -54718,7 +55683,7 @@ angular.module('ui.bootstrap.modal', [])
  */
   .directive('modalBackdrop', [
            '$animate', '$injector', '$modalStack',
-  function ($animate ,  $injector,   $modalStack) {
+  function($animate ,  $injector,   $modalStack) {
     var $animateCss = null;
 
     if ($injector.has('$animateCss')) {
@@ -54729,7 +55694,7 @@ angular.module('ui.bootstrap.modal', [])
       restrict: 'EA',
       replace: true,
       templateUrl: 'template/modal/backdrop.html',
-      compile: function (tElement, tAttrs) {
+      compile: function(tElement, tAttrs) {
         tElement.addClass(tAttrs.backdropClass);
         return linkFn;
       }
@@ -54745,7 +55710,7 @@ angular.module('ui.bootstrap.modal', [])
           $animate.addClass(element, attrs.modalInClass);
         }
 
-        scope.$on($modalStack.NOW_CLOSING_EVENT, function (e, setIsAsync) {
+        scope.$on($modalStack.NOW_CLOSING_EVENT, function(e, setIsAsync) {
           var done = setIsAsync();
           if ($animateCss) {
             $animateCss(element, {
@@ -54761,7 +55726,7 @@ angular.module('ui.bootstrap.modal', [])
 
   .directive('modalWindow', [
            '$modalStack', '$q', '$animate', '$injector',
-  function ($modalStack ,  $q ,  $animate,   $injector) {
+  function($modalStack ,  $q ,  $animate,   $injector) {
     var $animateCss = null;
 
     if ($injector.has('$animateCss')) {
@@ -54778,13 +55743,13 @@ angular.module('ui.bootstrap.modal', [])
       templateUrl: function(tElement, tAttrs) {
         return tAttrs.templateUrl || 'template/modal/window.html';
       },
-      link: function (scope, element, attrs) {
+      link: function(scope, element, attrs) {
         element.addClass(attrs.windowClass || '');
         scope.size = attrs.size;
 
-        scope.close = function (evt) {
+        scope.close = function(evt) {
           var modal = $modalStack.getTop();
-          if (modal && modal.value.backdrop && modal.value.backdrop != 'static' && (evt.target === evt.currentTarget)) {
+          if (modal && modal.value.backdrop && modal.value.backdrop !== 'static' && (evt.target === evt.currentTarget)) {
             evt.preventDefault();
             evt.stopPropagation();
             $modalStack.dismiss(modal.key, 'backdrop click');
@@ -54800,23 +55765,25 @@ angular.module('ui.bootstrap.modal', [])
         var modalRenderDeferObj = $q.defer();
         // Observe function will be called on next digest cycle after compilation, ensuring that the DOM is ready.
         // In order to use this way of finding whether DOM is ready, we need to observe a scope property used in modal's template.
-        attrs.$observe('modalRender', function (value) {
+        attrs.$observe('modalRender', function(value) {
           if (value == 'true') {
             modalRenderDeferObj.resolve();
           }
         });
 
-        modalRenderDeferObj.promise.then(function () {
+        modalRenderDeferObj.promise.then(function() {
+          var animationPromise = null;
+
           if (attrs.modalInClass) {
             if ($animateCss) {
-              $animateCss(element, {
+              animationPromise = $animateCss(element, {
                 addClass: attrs.modalInClass
               }).start();
             } else {
-              $animate.addClass(element, attrs.modalInClass);
+              animationPromise = $animate.addClass(element, attrs.modalInClass);
             }
 
-            scope.$on($modalStack.NOW_CLOSING_EVENT, function (e, setIsAsync) {
+            scope.$on($modalStack.NOW_CLOSING_EVENT, function(e, setIsAsync) {
               var done = setIsAsync();
               if ($animateCss) {
                 $animateCss(element, {
@@ -54828,20 +55795,23 @@ angular.module('ui.bootstrap.modal', [])
             });
           }
 
-          var inputsWithAutofocus = element[0].querySelectorAll('[autofocus]');
-          /**
-           * Auto-focusing of a freshly-opened modal element causes any child elements
-           * with the autofocus attribute to lose focus. This is an issue on touch
-           * based devices which will show and then hide the onscreen keyboard.
-           * Attempts to refocus the autofocus element via JavaScript will not reopen
-           * the onscreen keyboard. Fixed by updated the focusing logic to only autofocus
-           * the modal element if the modal does not contain an autofocus element.
-           */
-          if (inputsWithAutofocus.length) {
-            inputsWithAutofocus[0].focus();
-          } else {
-            element[0].focus();
-          }
+
+          $q.when(animationPromise).then(function() {
+            var inputsWithAutofocus = element[0].querySelectorAll('[autofocus]');
+            /**
+             * Auto-focusing of a freshly-opened modal element causes any child elements
+             * with the autofocus attribute to lose focus. This is an issue on touch
+             * based devices which will show and then hide the onscreen keyboard.
+             * Attempts to refocus the autofocus element via JavaScript will not reopen
+             * the onscreen keyboard. Fixed by updated the focusing logic to only autofocus
+             * the modal element if the modal does not contain an autofocus element.
+             */
+            if (inputsWithAutofocus.length) {
+              inputsWithAutofocus[0].focus();
+            } else {
+              element[0].focus();
+            }
+          });
 
           // Notify {@link $modalStack} that modal is rendered.
           var modal = $modalStack.getTop();
@@ -54856,7 +55826,7 @@ angular.module('ui.bootstrap.modal', [])
   .directive('modalAnimationClass', [
     function () {
       return {
-        compile: function (tElement, tAttrs) {
+        compile: function(tElement, tAttrs) {
           if (tAttrs.modalAnimation) {
             tElement.addClass(tAttrs.modalAnimationClass);
           }
@@ -54864,7 +55834,7 @@ angular.module('ui.bootstrap.modal', [])
       };
     }])
 
-  .directive('modalTransclude', function () {
+  .directive('modalTransclude', function() {
     return {
       link: function($scope, $element, $attrs, controller, $transclude) {
         $transclude($scope.$parent, function(clone) {
@@ -54879,10 +55849,12 @@ angular.module('ui.bootstrap.modal', [])
              '$animate', '$timeout', '$document', '$compile', '$rootScope',
              '$q',
              '$injector',
+             '$$multiMap',
              '$$stackedMap',
-    function ($animate ,  $timeout ,  $document ,  $compile ,  $rootScope ,
+    function($animate ,  $timeout ,  $document ,  $compile ,  $rootScope ,
               $q,
               $injector,
+              $$multiMap,
               $$stackedMap) {
       var $animateCss = null;
 
@@ -54894,6 +55866,7 @@ angular.module('ui.bootstrap.modal', [])
 
       var backdropDomEl, backdropScope;
       var openedWindows = $$stackedMap.createNew();
+      var openedClasses = $$multiMap.createNew();
       var $modalStack = {
         NOW_CLOSING_EVENT: 'modal.stack.now-closing'
       };
@@ -54923,7 +55896,6 @@ angular.module('ui.bootstrap.modal', [])
       });
 
       function removeModalWindow(modalInstance, elementToReceiveFocus) {
-
         var body = $document.find('body').eq(0);
         var modalWindow = openedWindows.get(modalInstance).value;
 
@@ -54931,7 +55903,9 @@ angular.module('ui.bootstrap.modal', [])
         openedWindows.remove(modalInstance);
 
         removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, function() {
-          body.toggleClass(modalInstance.openedClass || OPENED_MODAL_CLASS, openedWindows.length() > 0);
+          var modalBodyClass = modalWindow.openedClass || OPENED_MODAL_CLASS;
+          openedClasses.remove(modalBodyClass, modalInstance);
+          body.toggleClass(modalBodyClass, openedClasses.hasKey(modalBodyClass));
         });
         checkRemoveBackdrop();
 
@@ -54947,7 +55921,7 @@ angular.module('ui.bootstrap.modal', [])
           //remove backdrop if no longer needed
           if (backdropDomEl && backdropIndex() == -1) {
             var backdropScopeRef = backdropScope;
-            removeAfterAnimate(backdropDomEl, backdropScope, function () {
+            removeAfterAnimate(backdropDomEl, backdropScope, function() {
               backdropScopeRef = null;
             });
             backdropDomEl = undefined;
@@ -54958,7 +55932,7 @@ angular.module('ui.bootstrap.modal', [])
       function removeAfterAnimate(domEl, scope, done) {
         var asyncDeferred;
         var asyncPromise = null;
-        var setIsAsync = function () {
+        var setIsAsync = function() {
           if (!asyncDeferred) {
             asyncDeferred = $q.defer();
             asyncPromise = asyncDeferred.promise;
@@ -54997,7 +55971,7 @@ angular.module('ui.bootstrap.modal', [])
         }
       }
 
-      $document.bind('keydown', function (evt) {
+      $document.bind('keydown', function(evt) {
         if (evt.isDefaultPrevented()) {
           return evt;
         }
@@ -55007,7 +55981,7 @@ angular.module('ui.bootstrap.modal', [])
           switch (evt.which){
             case 27: {
               evt.preventDefault();
-              $rootScope.$apply(function () {
+              $rootScope.$apply(function() {
                 $modalStack.dismiss(modal.key, 'escape key press');
               });
               break;
@@ -55035,9 +56009,9 @@ angular.module('ui.bootstrap.modal', [])
         }
       });
 
-      $modalStack.open = function (modalInstance, modal) {
-
-        var modalOpener = $document[0].activeElement;
+      $modalStack.open = function(modalInstance, modal) {
+        var modalOpener = $document[0].activeElement,
+          modalBodyClass = modal.openedClass || OPENED_MODAL_CLASS;
 
         openedWindows.add(modalInstance, {
           deferred: modal.deferred,
@@ -55047,6 +56021,8 @@ angular.module('ui.bootstrap.modal', [])
           keyboard: modal.keyboard,
           openedClass: modal.openedClass
         });
+
+        openedClasses.put(modalBodyClass, modalInstance);
 
         var body = $document.find('body').eq(0),
             currBackdropIndex = backdropIndex();
@@ -55079,7 +56055,8 @@ angular.module('ui.bootstrap.modal', [])
         openedWindows.top().value.modalDomEl = modalDomEl;
         openedWindows.top().value.modalOpener = modalOpener;
         body.append(modalDomEl);
-        body.addClass(modal.openedClass || OPENED_MODAL_CLASS);
+        body.addClass(modalBodyClass);
+
         $modalStack.clearFocusListCache();
       };
 
@@ -55087,7 +56064,7 @@ angular.module('ui.bootstrap.modal', [])
           return !modalWindow.value.modalScope.$broadcast('modal.closing', resultOrReason, closing).defaultPrevented;
       }
 
-      $modalStack.close = function (modalInstance, result) {
+      $modalStack.close = function(modalInstance, result) {
         var modalWindow = openedWindows.get(modalInstance);
         if (modalWindow && broadcastClosing(modalWindow, result, true)) {
           modalWindow.value.modalScope.$$uibDestructionScheduled = true;
@@ -55098,7 +56075,7 @@ angular.module('ui.bootstrap.modal', [])
         return !modalWindow;
       };
 
-      $modalStack.dismiss = function (modalInstance, reason) {
+      $modalStack.dismiss = function(modalInstance, reason) {
         var modalWindow = openedWindows.get(modalInstance);
         if (modalWindow && broadcastClosing(modalWindow, reason, false)) {
           modalWindow.value.modalScope.$$uibDestructionScheduled = true;
@@ -55109,18 +56086,18 @@ angular.module('ui.bootstrap.modal', [])
         return !modalWindow;
       };
 
-      $modalStack.dismissAll = function (reason) {
+      $modalStack.dismissAll = function(reason) {
         var topModal = this.getTop();
         while (topModal && this.dismiss(topModal.key, reason)) {
           topModal = this.getTop();
         }
       };
 
-      $modalStack.getTop = function () {
+      $modalStack.getTop = function() {
         return openedWindows.top();
       };
 
-      $modalStack.modalRendered = function (modalInstance) {
+      $modalStack.modalRendered = function(modalInstance) {
         var modalWindow = openedWindows.get(modalInstance);
         if (modalWindow) {
           modalWindow.value.renderDeferred.resolve();
@@ -55175,8 +56152,7 @@ angular.module('ui.bootstrap.modal', [])
       return $modalStack;
     }])
 
-  .provider('$modal', function () {
-
+  .provider('$modal', function() {
     var $modalProvider = {
       options: {
         animation: true,
@@ -55185,7 +56161,6 @@ angular.module('ui.bootstrap.modal', [])
       },
       $get: ['$injector', '$rootScope', '$q', '$templateRequest', '$controller', '$modalStack',
         function ($injector, $rootScope, $q, $templateRequest, $controller, $modalStack) {
-
           var $modal = {};
 
           function getTemplatePromise(options) {
@@ -55195,15 +56170,22 @@ angular.module('ui.bootstrap.modal', [])
 
           function getResolvePromises(resolves) {
             var promisesArr = [];
-            angular.forEach(resolves, function (value) {
+            angular.forEach(resolves, function(value) {
               if (angular.isFunction(value) || angular.isArray(value)) {
                 promisesArr.push($q.when($injector.invoke(value)));
               } else if (angular.isString(value)) {
                 promisesArr.push($q.when($injector.get(value)));
+              } else {
+                promisesArr.push($q.when(value));
               }
             });
             return promisesArr;
           }
+
+          var promiseChain = null;
+          $modal.getPromiseChain = function() {
+            return promiseChain;
+          };
 
           $modal.open = function (modalOptions) {
 
@@ -55236,63 +56218,70 @@ angular.module('ui.bootstrap.modal', [])
             var templateAndResolvePromise =
               $q.all([getTemplatePromise(modalOptions)].concat(getResolvePromises(modalOptions.resolve)));
 
+            // Wait for the resolution of the existing promise chain.
+            // Then switch to our own combined promise dependency (regardless of how the previous modal fared).
+            // Then add to $modalStack and resolve opened.
+            // Finally clean up the chain variable if no subsequent modal has overwritten it.
+            var samePromise;
+            samePromise = promiseChain = $q.all([promiseChain])
+              .then(function() { return templateAndResolvePromise; }, function() { return templateAndResolvePromise; })
+              .then(function resolveSuccess(tplAndVars) {
 
-            templateAndResolvePromise.then(function resolveSuccess(tplAndVars) {
+                var modalScope = (modalOptions.scope || $rootScope).$new();
+                modalScope.$close = modalInstance.close;
+                modalScope.$dismiss = modalInstance.dismiss;
 
-              var modalScope = (modalOptions.scope || $rootScope).$new();
-              modalScope.$close = modalInstance.close;
-              modalScope.$dismiss = modalInstance.dismiss;
-
-              modalScope.$on('$destroy', function() {
-                if (!modalScope.$$uibDestructionScheduled) {
-                  modalScope.$dismiss('$uibUnscheduledDestruction');
-                }
-              });
-
-              var ctrlInstance, ctrlLocals = {};
-              var resolveIter = 1;
-
-              //controllers
-              if (modalOptions.controller) {
-                ctrlLocals.$scope = modalScope;
-                ctrlLocals.$modalInstance = modalInstance;
-                angular.forEach(modalOptions.resolve, function (value, key) {
-                  ctrlLocals[key] = tplAndVars[resolveIter++];
+                modalScope.$on('$destroy', function() {
+                  if (!modalScope.$$uibDestructionScheduled) {
+                    modalScope.$dismiss('$uibUnscheduledDestruction');
+                  }
                 });
 
-                ctrlInstance = $controller(modalOptions.controller, ctrlLocals);
-                if (modalOptions.controllerAs) {
-                  if (modalOptions.bindToController) {
-                    angular.extend(ctrlInstance, modalScope);
+                var ctrlInstance, ctrlLocals = {};
+                var resolveIter = 1;
+
+                //controllers
+                if (modalOptions.controller) {
+                  ctrlLocals.$scope = modalScope;
+                  ctrlLocals.$modalInstance = modalInstance;
+                  angular.forEach(modalOptions.resolve, function(value, key) {
+                    ctrlLocals[key] = tplAndVars[resolveIter++];
+                  });
+
+                  ctrlInstance = $controller(modalOptions.controller, ctrlLocals);
+                  if (modalOptions.controllerAs) {
+                    if (modalOptions.bindToController) {
+                      angular.extend(ctrlInstance, modalScope);
+                    }
+
+                    modalScope[modalOptions.controllerAs] = ctrlInstance;
                   }
-
-                  modalScope[modalOptions.controllerAs] = ctrlInstance;
                 }
-              }
 
-              $modalStack.open(modalInstance, {
-                scope: modalScope,
-                deferred: modalResultDeferred,
-                renderDeferred: modalRenderDeferred,
-                content: tplAndVars[0],
-                animation: modalOptions.animation,
-                backdrop: modalOptions.backdrop,
-                keyboard: modalOptions.keyboard,
-                backdropClass: modalOptions.backdropClass,
-                windowClass: modalOptions.windowClass,
-                windowTemplateUrl: modalOptions.windowTemplateUrl,
-                size: modalOptions.size,
-                openedClass: modalOptions.openedClass
-              });
+                $modalStack.open(modalInstance, {
+                  scope: modalScope,
+                  deferred: modalResultDeferred,
+                  renderDeferred: modalRenderDeferred,
+                  content: tplAndVars[0],
+                  animation: modalOptions.animation,
+                  backdrop: modalOptions.backdrop,
+                  keyboard: modalOptions.keyboard,
+                  backdropClass: modalOptions.backdropClass,
+                  windowClass: modalOptions.windowClass,
+                  windowTemplateUrl: modalOptions.windowTemplateUrl,
+                  size: modalOptions.size,
+                  openedClass: modalOptions.openedClass
+                });
+                modalOpenedDeferred.resolve(true);
 
             }, function resolveError(reason) {
-              modalResultDeferred.reject(reason);
-            });
-
-            templateAndResolvePromise.then(function () {
-              modalOpenedDeferred.resolve(true);
-            }, function (reason) {
               modalOpenedDeferred.reject(reason);
+              modalResultDeferred.reject(reason);
+            })
+            .finally(function() {
+              if (promiseChain === samePromise) {
+                promiseChain = null;
+              }
             });
 
             return modalInstance;
@@ -55306,7 +56295,7 @@ angular.module('ui.bootstrap.modal', [])
   });
 
 angular.module('ui.bootstrap.pagination', [])
-.controller('PaginationController', ['$scope', '$attrs', '$parse', function ($scope, $attrs, $parse) {
+.controller('PaginationController', ['$scope', '$attrs', '$parse', function($scope, $attrs, $parse) {
   var self = this,
       ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl
       setNumPages = $attrs.numPages ? $parse($attrs.numPages).assign : angular.noop;
@@ -55367,12 +56356,14 @@ angular.module('ui.bootstrap.pagination', [])
     }
   };
 
-  $scope.getText = function( key ) {
+  $scope.getText = function(key) {
     return $scope[key + 'Text'] || self.config[key + 'Text'];
   };
+
   $scope.noPrevious = function() {
     return $scope.page === 1;
   };
+
   $scope.noNext = function() {
     return $scope.page === $scope.totalPages;
   };
@@ -55443,11 +56434,11 @@ angular.module('ui.bootstrap.pagination', [])
 
         // Default page limits
         var startPage = 1, endPage = totalPages;
-        var isMaxSized = ( angular.isDefined(maxSize) && maxSize < totalPages );
+        var isMaxSized = angular.isDefined(maxSize) && maxSize < totalPages;
 
         // recompute if maxSize
-        if ( isMaxSized ) {
-          if ( rotate ) {
+        if (isMaxSized) {
+          if (rotate) {
             // Current page is displayed in the middle of the visible ones
             startPage = Math.max(currentPage - Math.floor(maxSize/2), 1);
             endPage   = startPage + maxSize - 1;
@@ -55473,13 +56464,13 @@ angular.module('ui.bootstrap.pagination', [])
         }
 
         // Add links to move between page sets
-        if ( isMaxSized && ! rotate ) {
-          if ( startPage > 1 ) {
+        if (isMaxSized && ! rotate) {
+          if (startPage > 1) {
             var previousPageSet = makePage(startPage - 1, '...', false);
             pages.unshift(previousPageSet);
           }
 
-          if ( endPage < totalPages ) {
+          if (endPage < totalPages) {
             var nextPageSet = makePage(endPage + 1, '...', false);
             pages.push(nextPageSet);
           }
@@ -55512,11 +56503,15 @@ angular.module('ui.bootstrap.pagination', [])
     scope: {
       totalItems: '=',
       previousText: '@',
-      nextText: '@'
+      nextText: '@',
+      ngDisabled: '='
     },
     require: ['pager', '?ngModel'],
     controller: 'PaginationController',
-    templateUrl: 'template/pagination/pager.html',
+    controllerAs: 'pagination',
+    templateUrl: function(element, attrs) {
+      return attrs.templateUrl || 'template/pagination/pager.html';
+    },
     replace: true,
     link: function(scope, element, attrs, ctrls) {
       var paginationCtrl = ctrls[0], ngModelCtrl = ctrls[1];
@@ -55536,13 +56531,13 @@ angular.module('ui.bootstrap.pagination', [])
  * function, placement as a function, inside, support for more triggers than
  * just mouse enter/leave, html tooltips, and selector delegation.
  */
-angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap.bindHtml' ] )
+angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.bindHtml'])
 
 /**
  * The $tooltip service creates tooltip- and popover-like directives as well as
  * houses global options for them.
  */
-.provider( '$tooltip', function () {
+.provider('$tooltip', function() {
   // The default options tooltip and popover.
   var defaultOptions = {
     placement: 'top',
@@ -55555,7 +56550,8 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
   var triggerMap = {
     'mouseenter': 'mouseleave',
     'click': 'click',
-    'focus': 'blur'
+    'focus': 'blur',
+    'none': ''
   };
 
   // The options specified to the provider globally.
@@ -55570,8 +56566,8 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
    *     $tooltipProvider.options( { placement: 'left' } );
    *   });
    */
-	this.options = function( value ) {
-		angular.extend( globalOptions, value );
+	this.options = function(value) {
+		angular.extend(globalOptions, value);
 	};
 
   /**
@@ -55579,14 +56575,14 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
    *
    *   $tooltipProvider.setTriggers( 'openTrigger': 'closeTrigger' );
    */
-  this.setTriggers = function setTriggers ( triggers ) {
-    angular.extend( triggerMap, triggers );
+  this.setTriggers = function setTriggers(triggers) {
+    angular.extend(triggerMap, triggers);
   };
 
   /**
    * This is a helper function for translating camel-case to snake-case.
    */
-  function snake_case(name){
+  function snake_case(name) {
     var regexp = /[A-Z]/g;
     var separator = '-';
     return name.replace(regexp, function(letter, pos) {
@@ -55598,9 +56594,9 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
    * Returns the actual instance of the $tooltip service.
    * TODO support multiple triggers
    */
-  this.$get = [ '$window', '$compile', '$timeout', '$document', '$position', '$interpolate', '$rootScope', function ( $window, $compile, $timeout, $document, $position, $interpolate, $rootScope ) {
-    return function $tooltip ( type, prefix, defaultTriggerShow, options ) {
-      options = angular.extend( {}, defaultOptions, globalOptions, options );
+  this.$get = ['$window', '$compile', '$timeout', '$document', '$position', '$interpolate', '$rootScope', '$parse', function($window, $compile, $timeout, $document, $position, $interpolate, $rootScope, $parse) {
+    return function $tooltip(type, prefix, defaultTriggerShow, options) {
+      options = angular.extend({}, defaultOptions, globalOptions, options);
 
       /**
        * Returns an object of show and hide triggers.
@@ -55616,7 +56612,7 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
        * undefined; otherwise, it uses the `triggerMap` value of the show
        * trigger; else it will just use the show trigger.
        */
-      function getTriggers ( trigger ) {
+      function getTriggers(trigger) {
         var show = (trigger || options.trigger || defaultTriggerShow).split(' ');
         var hide = show.map(function(trigger) {
           return triggerMap[trigger] || trigger;
@@ -55627,7 +56623,7 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
         };
       }
 
-      var directiveName = snake_case( type );
+      var directiveName = snake_case(type);
 
       var startSym = $interpolate.startSymbol();
       var endSym = $interpolate.endSymbol();
@@ -55647,33 +56643,45 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
 
       return {
         restrict: 'EA',
-        compile: function (tElem, tAttrs) {
+        compile: function(tElem, tAttrs) {
           var tooltipLinker = $compile( template );
 
-          return function link ( scope, element, attrs, tooltipCtrl ) {
+          return function link(scope, element, attrs, tooltipCtrl) {
             var tooltip;
             var tooltipLinkedScope;
             var transitionTimeout;
             var popupTimeout;
-            var appendToBody = angular.isDefined( options.appendToBody ) ? options.appendToBody : false;
-            var triggers = getTriggers( undefined );
-            var hasEnableExp = angular.isDefined(attrs[prefix+'Enable']);
+            var positionTimeout;
+            var appendToBody = angular.isDefined(options.appendToBody) ? options.appendToBody : false;
+            var triggers = getTriggers(undefined);
+            var hasEnableExp = angular.isDefined(attrs[prefix + 'Enable']);
             var ttScope = scope.$new(true);
             var repositionScheduled = false;
+            var isOpenExp = angular.isDefined(attrs[prefix + 'IsOpen']) ? $parse(attrs[prefix + 'IsOpen']) : false;
 
-            var positionTooltip = function () {
+            var positionTooltip = function() {
               if (!tooltip) { return; }
 
-              var ttPosition = $position.positionElements(element, tooltip, ttScope.placement, appendToBody);
-              ttPosition.top += 'px';
-              ttPosition.left += 'px';
+              if (!positionTimeout) {
+                positionTimeout = $timeout(function() {
+                  // Reset the positioning and box size for correct width and height values.
+                  tooltip.css({ top: 0, left: 0, width: 'auto', height: 'auto' });
 
-              // Now set the calculated positioning.
-              tooltip.css( ttPosition );
-            };
+                  var ttBox = $position.position(tooltip);
+                  var ttCss = $position.positionElements(element, tooltip, ttScope.placement, appendToBody);
+                  ttCss.top += 'px';
+                  ttCss.left += 'px';
 
-            var positionTooltipAsync = function () {
-              $timeout(positionTooltip, 0, false);
+                  ttCss.width = ttBox.width + 'px';
+                  ttCss.height = ttBox.height + 'px';
+
+                  // Now set the calculated positioning and size.
+                  tooltip.css(ttCss);
+
+                  positionTimeout = null;
+
+                }, 0, false);
+              }
             };
 
             // Set up the correct scope to allow transclusion later
@@ -55683,8 +56691,8 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
             // TODO add ability to start tooltip opened
             ttScope.isOpen = false;
 
-            function toggleTooltipBind () {
-              if ( ! ttScope.isOpen ) {
+            function toggleTooltipBind() {
+              if (!ttScope.isOpen) {
                 showTooltipBind();
               } else {
                 hideTooltipBind();
@@ -55693,21 +56701,20 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
 
             // Show the tooltip with delay if specified, otherwise show it immediately
             function showTooltipBind() {
-              if(hasEnableExp && !scope.$eval(attrs[prefix+'Enable'])) {
+              if (hasEnableExp && !scope.$eval(attrs[prefix + 'Enable'])) {
                 return;
               }
 
               prepareTooltip();
 
-              if ( ttScope.popupDelay ) {
+              if (ttScope.popupDelay) {
                 // Do nothing if the tooltip was already scheduled to pop-up.
                 // This happens if show is triggered multiple times before any hide is triggered.
                 if (!popupTimeout) {
-                  popupTimeout = $timeout( show, ttScope.popupDelay, false );
-                  popupTimeout.then(function(reposition){reposition();});
+                  popupTimeout = $timeout(show, ttScope.popupDelay, false);
                 }
               } else {
-                show()();
+                show();
               }
             }
 
@@ -55720,50 +56727,56 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
 
             // Show the tooltip popup element.
             function show() {
-
               popupTimeout = null;
 
               // If there is a pending remove transition, we must cancel it, lest the
               // tooltip be mysteriously removed.
-              if ( transitionTimeout ) {
-                $timeout.cancel( transitionTimeout );
+              if (transitionTimeout) {
+                $timeout.cancel(transitionTimeout);
                 transitionTimeout = null;
               }
 
               // Don't show empty tooltips.
-              if ( !(options.useContentExp ? ttScope.contentExp() : ttScope.content) ) {
+              if (!(options.useContentExp ? ttScope.contentExp() : ttScope.content)) {
                 return angular.noop;
               }
 
               createTooltip();
 
-              // Set the initial positioning.
-              tooltip.css({ top: 0, left: 0, display: 'block' });
-
-              positionTooltip();
-
               // And show the tooltip.
               ttScope.isOpen = true;
-              ttScope.$apply(); // digest required as $apply is not called
+              if (isOpenExp) {
+                isOpenExp.assign(ttScope.origScope, ttScope.isOpen);
+              }
 
-              // Return positioning function as promise callback for correct
-              // positioning after draw.
-              return positionTooltip;
+              if (!$rootScope.$$phase) {
+                ttScope.$apply(); // digest required as $apply is not called
+              }
+
+              tooltip.css({ display: 'block' });
+
+              positionTooltip();
             }
 
             // Hide the tooltip popup element.
             function hide() {
               // First things first: we don't show it anymore.
               ttScope.isOpen = false;
+              if (isOpenExp) {
+                isOpenExp.assign(ttScope.origScope, ttScope.isOpen);
+              }
 
               //if tooltip is going to be shown after delay, we must cancel this
-              $timeout.cancel( popupTimeout );
+              $timeout.cancel(popupTimeout);
               popupTimeout = null;
+
+              $timeout.cancel(positionTimeout);
+              positionTimeout = null;
 
               // And now we remove it from the DOM. However, if we have animation, we
               // need to wait for it to expire beforehand.
               // FIXME: this is a placeholder for a port of the transitions library.
-              if ( ttScope.animation ) {
+              if (ttScope.animation) {
                 if (!transitionTimeout) {
                   transitionTimeout = $timeout(removeTooltip, 500);
                 }
@@ -55778,31 +56791,33 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
                 removeTooltip();
               }
               tooltipLinkedScope = ttScope.$new();
-              tooltip = tooltipLinker(tooltipLinkedScope, function (tooltip) {
-                if ( appendToBody ) {
-                  $document.find( 'body' ).append( tooltip );
+              tooltip = tooltipLinker(tooltipLinkedScope, function(tooltip) {
+                if (appendToBody) {
+                  $document.find('body').append(tooltip);
                 } else {
-                  element.after( tooltip );
+                  element.after(tooltip);
                 }
               });
 
               if (options.useContentExp) {
-                tooltipLinkedScope.$watch('contentExp()', function (val) {
+                tooltipLinkedScope.$watch('contentExp()', function(val) {
                   if (!val && ttScope.isOpen) {
                     hide();
                   }
                 });
-                
+
                 tooltipLinkedScope.$watch(function() {
                   if (!repositionScheduled) {
                     repositionScheduled = true;
                     tooltipLinkedScope.$$postDigest(function() {
                       repositionScheduled = false;
-                      positionTooltipAsync();
+                      if (ttScope.isOpen) {
+                        positionTooltip();
+                      }
                     });
                   }
                 });
-                
+
               }
             }
 
@@ -55824,7 +56839,7 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
               prepPopupDelay();
             }
 
-            ttScope.contentExp = function () {
+            ttScope.contentExp = function() {
               return scope.$eval(attrs[type]);
             };
 
@@ -55832,57 +56847,64 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
              * Observe the relevant attributes.
              */
             if (!options.useContentExp) {
-              attrs.$observe( type, function ( val ) {
+              attrs.$observe(type, function(val) {
                 ttScope.content = val;
 
                 if (!val && ttScope.isOpen) {
                   hide();
                 } else {
-                  positionTooltipAsync();
+                  positionTooltip();
                 }
               });
             }
 
-            attrs.$observe( 'disabled', function ( val ) {
+            attrs.$observe('disabled', function(val) {
               if (popupTimeout && val) {
                 $timeout.cancel(popupTimeout);
+                popupTimeout = null;
               }
 
-              if (val && ttScope.isOpen ) {
+              if (val && ttScope.isOpen) {
                 hide();
               }
             });
 
-            attrs.$observe( prefix+'Title', function ( val ) {
+            attrs.$observe(prefix + 'Title', function(val) {
               ttScope.title = val;
-              positionTooltipAsync();
+              positionTooltip();
             });
 
-            attrs.$observe( prefix + 'Placement', function () {
+            attrs.$observe(prefix + 'Placement', function() {
               if (ttScope.isOpen) {
-                $timeout(function () {
-                  prepPlacement();
-                  show()();
-                }, 0, false);
+                prepPlacement();
+                positionTooltip();
               }
             });
+
+            if (isOpenExp) {
+              scope.$watch(isOpenExp, function(val) {
+                if (val !== ttScope.isOpen) {
+                  toggleTooltipBind();
+                }
+              });
+            }
 
             function prepPopupClass() {
               ttScope.popupClass = attrs[prefix + 'Class'];
             }
 
             function prepPlacement() {
-              var val = attrs[ prefix + 'Placement' ];
-              ttScope.placement = angular.isDefined( val ) ? val : options.placement;
+              var val = attrs[prefix + 'Placement'];
+              ttScope.placement = angular.isDefined(val) ? val : options.placement;
             }
 
             function prepPopupDelay() {
-              var val = attrs[ prefix + 'PopupDelay' ];
-              var delay = parseInt( val, 10 );
-              ttScope.popupDelay = ! isNaN(delay) ? delay : options.popupDelay;
+              var val = attrs[prefix + 'PopupDelay'];
+              var delay = parseInt(val, 10);
+              ttScope.popupDelay = !isNaN(delay) ? delay : options.popupDelay;
             }
 
-            var unregisterTriggers = function () {
+            var unregisterTriggers = function() {
               triggers.show.forEach(function(trigger) {
                 element.unbind(trigger, showTooltipBind);
               });
@@ -55892,19 +56914,22 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
             };
 
             function prepTriggers() {
-              var val = attrs[ prefix + 'Trigger' ];
+              var val = attrs[prefix + 'Trigger'];
               unregisterTriggers();
 
-              triggers = getTriggers( val );
+              triggers = getTriggers(val);
 
-              triggers.show.forEach(function(trigger, idx) {
-                if (trigger === triggers.hide[idx]) {
-                  element.bind(trigger, toggleTooltipBind);
-                } else if (trigger) {
-                  element.bind(trigger, showTooltipBind);
-                  element.bind(triggers.hide[idx], hideTooltipBind);
-                }
-              });
+              if (triggers.show !== 'none') {
+                triggers.show.forEach(function(trigger, idx) {
+                  // Using raw addEventListener due to jqLite/jQuery bug - #4060
+                  if (trigger === triggers.hide[idx]) {
+                    element[0].addEventListener(trigger, toggleTooltipBind);
+                  } else if (trigger) {
+                    element[0].addEventListener(trigger, showTooltipBind);
+                    element[0].addEventListener(triggers.hide[idx], hideTooltipBind);
+                  }
+                });
+              }
             }
             prepTriggers();
 
@@ -55917,18 +56942,19 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
             // if a tooltip is attached to <body> we need to remove it on
             // location change as its parent scope will probably not be destroyed
             // by the change.
-            if ( appendToBody ) {
-              scope.$on('$locationChangeSuccess', function closeTooltipOnLocationChangeSuccess () {
-              if ( ttScope.isOpen ) {
-                hide();
-              }
-            });
+            if (appendToBody) {
+              scope.$on('$locationChangeSuccess', function closeTooltipOnLocationChangeSuccess() {
+                if (ttScope.isOpen) {
+                  hide();
+                }
+              });
             }
 
             // Make sure tooltip is destroyed and removed.
             scope.$on('$destroy', function onDestroyTooltip() {
-              $timeout.cancel( transitionTimeout );
-              $timeout.cancel( popupTimeout );
+              $timeout.cancel(transitionTimeout);
+              $timeout.cancel(popupTimeout);
+              $timeout.cancel(positionTimeout);
               unregisterTriggers();
               removeTooltip();
               ttScope = null;
@@ -55941,11 +56967,11 @@ angular.module( 'ui.bootstrap.tooltip', [ 'ui.bootstrap.position', 'ui.bootstrap
 })
 
 // This is mostly ngInclude code but with a custom scope
-.directive( 'tooltipTemplateTransclude', [
+.directive('tooltipTemplateTransclude', [
          '$animate', '$sce', '$compile', '$templateRequest',
 function ($animate ,  $sce ,  $compile ,  $templateRequest) {
   return {
-    link: function ( scope, elem, attrs ) {
+    link: function(scope, elem, attrs) {
       var origScope = scope.$eval(attrs.tooltipTemplateTranscludeScope);
 
       var changeCounter = 0,
@@ -55971,7 +56997,7 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
         }
       };
 
-      scope.$watch($sce.parseAsResourceUrl(attrs.tooltipTemplateTransclude), function (src) {
+      scope.$watch($sce.parseAsResourceUrl(attrs.tooltipTemplateTransclude), function(src) {
         var thisChangeId = ++changeCounter;
 
         if (src) {
@@ -56013,10 +57039,10 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
  * They must not be animated as they're expected to be present on the tooltip on
  * initialization.
  */
-.directive('tooltipClasses', function () {
+.directive('tooltipClasses', function() {
   return {
     restrict: 'A',
-    link: function (scope, element, attrs) {
+    link: function(scope, element, attrs) {
       if (scope.placement) {
         element.addClass(scope.placement);
       }
@@ -56030,7 +57056,7 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
   };
 })
 
-.directive( 'tooltipPopup', function () {
+.directive('tooltipPopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56039,11 +57065,11 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
   };
 })
 
-.directive( 'tooltip', [ '$tooltip', function ( $tooltip ) {
-  return $tooltip( 'tooltip', 'tooltip', 'mouseenter' );
+.directive('tooltip', [ '$tooltip', function($tooltip) {
+  return $tooltip('tooltip', 'tooltip', 'mouseenter');
 }])
 
-.directive( 'tooltipTemplatePopup', function () {
+.directive('tooltipTemplatePopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56053,13 +57079,13 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
   };
 })
 
-.directive( 'tooltipTemplate', [ '$tooltip', function ( $tooltip ) {
+.directive('tooltipTemplate', ['$tooltip', function($tooltip) {
   return $tooltip('tooltipTemplate', 'tooltip', 'mouseenter', {
     useContentExp: true
   });
 }])
 
-.directive( 'tooltipHtmlPopup', function () {
+.directive('tooltipHtmlPopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56068,7 +57094,7 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
   };
 })
 
-.directive( 'tooltipHtml', [ '$tooltip', function ( $tooltip ) {
+.directive('tooltipHtml', ['$tooltip', function($tooltip) {
   return $tooltip('tooltipHtml', 'tooltip', 'mouseenter', {
     useContentExp: true
   });
@@ -56077,7 +57103,7 @@ function ($animate ,  $sce ,  $compile ,  $templateRequest) {
 /*
 Deprecated
 */
-.directive( 'tooltipHtmlUnsafePopup', function () {
+.directive('tooltipHtmlUnsafePopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56087,13 +57113,13 @@ Deprecated
 })
 
 .value('tooltipHtmlUnsafeSuppressDeprecated', false)
-.directive( 'tooltipHtmlUnsafe', [
+.directive('tooltipHtmlUnsafe', [
           '$tooltip', 'tooltipHtmlUnsafeSuppressDeprecated', '$log',
-function ( $tooltip ,  tooltipHtmlUnsafeSuppressDeprecated ,  $log) {
+function($tooltip ,  tooltipHtmlUnsafeSuppressDeprecated ,  $log) {
   if (!tooltipHtmlUnsafeSuppressDeprecated) {
     $log.warn('tooltip-html-unsafe is now deprecated. Use tooltip-html or tooltip-template instead.');
   }
-  return $tooltip( 'tooltipHtmlUnsafe', 'tooltip', 'mouseenter' );
+  return $tooltip('tooltipHtmlUnsafe', 'tooltip', 'mouseenter');
 }]);
 
 /**
@@ -56101,9 +57127,9 @@ function ( $tooltip ,  tooltipHtmlUnsafeSuppressDeprecated ,  $log) {
  * function, placement as a function, inside, support for more triggers than
  * just mouse enter/leave, and selector delegatation.
  */
-angular.module( 'ui.bootstrap.popover', [ 'ui.bootstrap.tooltip' ] )
+angular.module( 'ui.bootstrap.popover', ['ui.bootstrap.tooltip'])
 
-.directive( 'popoverTemplatePopup', function () {
+.directive('popoverTemplatePopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56113,13 +57139,13 @@ angular.module( 'ui.bootstrap.popover', [ 'ui.bootstrap.tooltip' ] )
   };
 })
 
-.directive( 'popoverTemplate', [ '$tooltip', function ( $tooltip ) {
-  return $tooltip( 'popoverTemplate', 'popover', 'click', {
+.directive('popoverTemplate', ['$tooltip', function($tooltip) {
+  return $tooltip('popoverTemplate', 'popover', 'click', {
     useContentExp: true
-  } );
+  });
 }])
 
-.directive( 'popoverHtmlPopup', function () {
+.directive('popoverHtmlPopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56128,13 +57154,13 @@ angular.module( 'ui.bootstrap.popover', [ 'ui.bootstrap.tooltip' ] )
   };
 })
 
-.directive( 'popoverHtml', [ '$tooltip', function ( $tooltip ) {
+.directive('popoverHtml', ['$tooltip', function($tooltip) {
   return $tooltip( 'popoverHtml', 'popover', 'click', {
     useContentExp: true
   });
 }])
 
-.directive( 'popoverPopup', function () {
+.directive('popoverPopup', function() {
   return {
     restrict: 'EA',
     replace: true,
@@ -56143,7 +57169,7 @@ angular.module( 'ui.bootstrap.popover', [ 'ui.bootstrap.tooltip' ] )
   };
 })
 
-.directive( 'popover', [ '$tooltip', function ( $tooltip ) {
+.directive('popover', ['$tooltip', function($tooltip) {
   return $tooltip( 'popover', 'popover', 'click' );
 }]);
 
@@ -56154,104 +57180,144 @@ angular.module('ui.bootstrap.progressbar', [])
   max: 100
 })
 
+.value('$progressSuppressWarning', false)
+
 .controller('ProgressController', ['$scope', '$attrs', 'progressConfig', function($scope, $attrs, progressConfig) {
-    var self = this,
-        animate = angular.isDefined($attrs.animate) ? $scope.$parent.$eval($attrs.animate) : progressConfig.animate;
+  var self = this,
+      animate = angular.isDefined($attrs.animate) ? $scope.$parent.$eval($attrs.animate) : progressConfig.animate;
 
-    this.bars = [];
-    $scope.max = angular.isDefined($scope.max) ? $scope.max : progressConfig.max;
+  this.bars = [];
+  $scope.max = angular.isDefined($scope.max) ? $scope.max : progressConfig.max;
 
-    this.addBar = function(bar, element) {
-        if ( !animate ) {
-            element.css({'transition': 'none'});
-        }
+  this.addBar = function(bar, element) {
+    if (!animate) {
+      element.css({'transition': 'none'});
+    }
 
-        this.bars.push(bar);
+    this.bars.push(bar);
 
-        bar.max = $scope.max;
+    bar.max = $scope.max;
 
-        bar.$watch('value', function( value ) {
-            bar.recalculatePercentage();
-        });
-
-        bar.recalculatePercentage = function() {
-            bar.percent = +(100 * bar.value / bar.max).toFixed(2);
-			
-            var totalPercentage = 0;
-            self.bars.forEach(function (bar) {
-                totalPercentage += bar.percent;
-            });
-
-            if (totalPercentage > 100) {
-                bar.percent -= totalPercentage - 100;
-            }
-        };
-
-        bar.$on('$destroy', function() {
-            element = null;
-            self.removeBar(bar);
-        });
-    };
-
-    this.removeBar = function(bar) {
-        this.bars.splice(this.bars.indexOf(bar), 1);
-    };
-
-    $scope.$watch('max', function(max) {
-        self.bars.forEach(function (bar) {
-            bar.max = $scope.max;
-            bar.recalculatePercentage();
-        });
+    bar.$watch('value', function(value) {
+      bar.recalculatePercentage();
     });
+
+    bar.recalculatePercentage = function() {
+      bar.percent = +(100 * bar.value / bar.max).toFixed(2);
+
+      var totalPercentage = self.bars.reduce(function(total, bar) {
+        return total + bar.percent;
+      }, 0);
+
+      if (totalPercentage > 100) {
+        bar.percent -= totalPercentage - 100;
+      }
+    };
+
+    bar.$on('$destroy', function() {
+      element = null;
+      self.removeBar(bar);
+    });
+  };
+
+  this.removeBar = function(bar) {
+      this.bars.splice(this.bars.indexOf(bar), 1);
+  };
+
+  $scope.$watch('max', function(max) {
+    self.bars.forEach(function(bar) {
+      bar.max = $scope.max;
+      bar.recalculatePercentage();
+    });
+  });
 }])
 
-.directive('progress', function() {
-    return {
-        restrict: 'EA',
-        replace: true,
-        transclude: true,
-        controller: 'ProgressController',
-        require: 'progress',
-        scope: {
-          max: '=?'
-        },
-        templateUrl: 'template/progressbar/progress.html'
-    };
+.directive('uibProgress', function() {
+  return {
+    restrict: 'EA',
+    replace: true,
+    transclude: true,
+    controller: 'ProgressController',
+    require: 'uibProgress',
+    scope: {
+      max: '=?'
+    },
+    templateUrl: 'template/progressbar/progress.html'
+  };
 })
 
-.directive('bar', function() {
-    return {
-        restrict: 'EA',
-        replace: true,
-        transclude: true,
-        require: '^progress',
-        scope: {
-            value: '=',
-            type: '@'
-        },
-        templateUrl: 'template/progressbar/bar.html',
-        link: function(scope, element, attrs, progressCtrl) {
-            progressCtrl.addBar(scope, element);
-        }
-    };
+.directive('progress', ['$log', '$progressSuppressWarning', function($log, $progressSuppressWarning) {
+  return {
+    restrict: 'EA',
+    replace: true,
+    transclude: true,
+    controller: 'ProgressController',
+    require: 'progress',
+    scope: {
+      max: '=?'
+    },
+    templateUrl: 'template/progressbar/progress.html',
+    link: function() {
+      if ($progressSuppressWarning) {
+        $log.warn('progress is now deprecated. Use uib-progress instead');
+      }
+    }
+  };
+}])
+
+.directive('uibBar', function() {
+  return {
+    restrict: 'EA',
+    replace: true,
+    transclude: true,
+    require: '^uibProgress',
+    scope: {
+      value: '=',
+      type: '@'
+    },
+    templateUrl: 'template/progressbar/bar.html',
+    link: function(scope, element, attrs, progressCtrl) {
+      progressCtrl.addBar(scope, element);
+    }
+  };
 })
+
+.directive('bar', ['$log', '$progressSuppressWarning', function($log, $progressSuppressWarning) {
+  return {
+    restrict: 'EA',
+    replace: true,
+    transclude: true,
+    require: '^progress',
+    scope: {
+      value: '=',
+      type: '@'
+    },
+    templateUrl: 'template/progressbar/bar.html',
+    link: function(scope, element, attrs, progressCtrl) {
+      if ($progressSuppressWarning) {
+        $log.warn('bar is now deprecated. Use uib-bar instead');
+      }
+      progressCtrl.addBar(scope, element);
+    }
+  };
+}])
 
 .directive('progressbar', function() {
-    return {
-        restrict: 'EA',
-        replace: true,
-        transclude: true,
-        controller: 'ProgressController',
-        scope: {
-            value: '=',
-            max: '=?',
-            type: '@'
-        },
-        templateUrl: 'template/progressbar/progressbar.html',
-        link: function(scope, element, attrs, progressCtrl) {
-            progressCtrl.addBar(scope, angular.element(element.children()[0]));
-        }
-    };
+  return {
+    restrict: 'EA',
+    replace: true,
+    transclude: true,
+    controller: 'ProgressController',
+    scope: {
+      value: '=',
+      max: '=?',
+      type: '@'
+    },
+    templateUrl: 'template/progressbar/progressbar.html',
+    link: function(scope, element, attrs, progressCtrl) {
+      progressCtrl.addBar(scope, angular.element(element.children()[0]));
+    }
+  };
 });
 
 angular.module('ui.bootstrap.rating', [])
@@ -56283,8 +57349,9 @@ angular.module('ui.bootstrap.rating', [])
     this.titles = angular.isArray(tmpTitles) && tmpTitles.length > 0 ?
       tmpTitles : ratingConfig.titles;
     
-    var ratingStates = angular.isDefined($attrs.ratingStates) ? $scope.$parent.$eval($attrs.ratingStates) :
-                        new Array( angular.isDefined($attrs.max) ? $scope.$parent.$eval($attrs.max) : ratingConfig.max );
+    var ratingStates = angular.isDefined($attrs.ratingStates) ?
+      $scope.$parent.$eval($attrs.ratingStates) :
+      new Array(angular.isDefined($attrs.max) ? $scope.$parent.$eval($attrs.max) : ratingConfig.max);
     $scope.range = this.buildTemplateObjects(ratingStates);
   };
 
@@ -56304,14 +57371,14 @@ angular.module('ui.bootstrap.rating', [])
   };
   
   $scope.rate = function(value) {
-    if ( !$scope.readonly && value >= 0 && value <= $scope.range.length ) {
+    if (!$scope.readonly && value >= 0 && value <= $scope.range.length) {
       ngModelCtrl.$setViewValue(ngModelCtrl.$viewValue === value ? 0 : value);
       ngModelCtrl.$render();
     }
   };
 
   $scope.enter = function(value) {
-    if ( !$scope.readonly ) {
+    if (!$scope.readonly) {
       $scope.value = value;
     }
     $scope.onHover({value: value});
@@ -56326,7 +57393,7 @@ angular.module('ui.bootstrap.rating', [])
     if (/(37|38|39|40)/.test(evt.which)) {
       evt.preventDefault();
       evt.stopPropagation();
-      $scope.rate( $scope.value + (evt.which === 38 || evt.which === 39 ? 1 : -1) );
+      $scope.rate($scope.value + (evt.which === 38 || evt.which === 39 ? 1 : -1));
     }
   };
 
@@ -56374,10 +57441,15 @@ angular.module('ui.bootstrap.tabs', [])
       if (tab.active && tab !== selectedTab) {
         tab.active = false;
         tab.onDeselect();
+        selectedTab.selectCalled = false;
       }
     });
     selectedTab.active = true;
-    selectedTab.onSelect();
+    // only call select if it has not already been called
+    if (!selectedTab.selectCalled) {
+      selectedTab.onSelect();
+      selectedTab.selectCalled = true;
+    }
   };
 
   ctrl.addTab = function addTab(tab) {
@@ -56388,8 +57460,7 @@ angular.module('ui.bootstrap.tabs', [])
       tab.active = true;
     } else if (tab.active) {
       ctrl.select(tab);
-    }
-    else {
+    } else {
       tab.active = false;
     }
   };
@@ -56563,7 +57634,7 @@ angular.module('ui.bootstrap.tabs', [])
       });
 
       scope.disabled = false;
-      if ( attrs.disable ) {
+      if (attrs.disable) {
         scope.$parent.$watch($parse(attrs.disable), function(value) {
           scope.disabled = !! value;
         });
@@ -56573,7 +57644,7 @@ angular.module('ui.bootstrap.tabs', [])
       // fix(tab): IE9 disabled attr renders grey text on enabled tab #2677
       // This code is duplicated from the lines above to make it easy to remove once
       // the feature has been completely deprecated
-      if ( attrs.disabled ) {
+      if (attrs.disabled) {
         $log.warn('Use of "disabled" attribute has been deprecated, please use "disable"');
         scope.$parent.$watch($parse(attrs.disabled), function(value) {
           scope.disabled = !! value;
@@ -56581,7 +57652,7 @@ angular.module('ui.bootstrap.tabs', [])
       }
 
       scope.select = function() {
-        if ( !scope.disabled ) {
+        if (!scope.disabled) {
           scope.active = true;
         }
       };
@@ -56598,7 +57669,7 @@ angular.module('ui.bootstrap.tabs', [])
   };
 }])
 
-.directive('tabHeadingTransclude', [function() {
+.directive('tabHeadingTransclude', function() {
   return {
     restrict: 'A',
     require: '^tab',
@@ -56611,7 +57682,7 @@ angular.module('ui.bootstrap.tabs', [])
       });
     }
   };
-}])
+})
 
 .directive('tabContentTransclude', function() {
   return {
@@ -56634,17 +57705,18 @@ angular.module('ui.bootstrap.tabs', [])
       });
     }
   };
+
   function isTabHeading(node) {
-    return node.tagName &&  (
+    return node.tagName && (
       node.hasAttribute('tab-heading') ||
       node.hasAttribute('data-tab-heading') ||
+      node.hasAttribute('x-tab-heading') ||
       node.tagName.toLowerCase() === 'tab-heading' ||
-      node.tagName.toLowerCase() === 'data-tab-heading'
+      node.tagName.toLowerCase() === 'data-tab-heading' ||
+      node.tagName.toLowerCase() === 'x-tab-heading'
     );
   }
-})
-
-;
+});
 
 angular.module('ui.bootstrap.timepicker', [])
 
@@ -56664,29 +57736,29 @@ angular.module('ui.bootstrap.timepicker', [])
       ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl
       meridians = angular.isDefined($attrs.meridians) ? $scope.$parent.$eval($attrs.meridians) : timepickerConfig.meridians || $locale.DATETIME_FORMATS.AMPMS;
 
-  this.init = function( ngModelCtrl_, inputs ) {
+  this.init = function(ngModelCtrl_, inputs) {
     ngModelCtrl = ngModelCtrl_;
     ngModelCtrl.$render = this.render;
 
-    ngModelCtrl.$formatters.unshift(function (modelValue) {
-      return modelValue ? new Date( modelValue ) : null;
+    ngModelCtrl.$formatters.unshift(function(modelValue) {
+      return modelValue ? new Date(modelValue) : null;
     });
 
     var hoursInputEl = inputs.eq(0),
         minutesInputEl = inputs.eq(1);
 
     var mousewheel = angular.isDefined($attrs.mousewheel) ? $scope.$parent.$eval($attrs.mousewheel) : timepickerConfig.mousewheel;
-    if ( mousewheel ) {
-      this.setupMousewheelEvents( hoursInputEl, minutesInputEl );
+    if (mousewheel) {
+      this.setupMousewheelEvents(hoursInputEl, minutesInputEl);
     }
 
     var arrowkeys = angular.isDefined($attrs.arrowkeys) ? $scope.$parent.$eval($attrs.arrowkeys) : timepickerConfig.arrowkeys;
     if (arrowkeys) {
-      this.setupArrowkeyEvents( hoursInputEl, minutesInputEl );
+      this.setupArrowkeyEvents(hoursInputEl, minutesInputEl);
     }
 
     $scope.readonlyInput = angular.isDefined($attrs.readonlyInput) ? $scope.$parent.$eval($attrs.readonlyInput) : timepickerConfig.readonlyInput;
-    this.setupInputEvents( hoursInputEl, minutesInputEl );
+    this.setupInputEvents(hoursInputEl, minutesInputEl);
   };
 
   var hourStep = timepickerConfig.hourStep;
@@ -56722,7 +57794,7 @@ angular.module('ui.bootstrap.timepicker', [])
   };
 
   $scope.noDecrementHours = function() {
-    var decrementedSelected = addMinutes(selected, - hourStep * 60);
+    var decrementedSelected = addMinutes(selected, -hourStep * 60);
     return decrementedSelected < min ||
       (decrementedSelected > selected && decrementedSelected > max);
   };
@@ -56734,7 +57806,7 @@ angular.module('ui.bootstrap.timepicker', [])
   };
 
   $scope.noDecrementMinutes = function() {
-    var decrementedSelected = addMinutes(selected, - minuteStep);
+    var decrementedSelected = addMinutes(selected, -minuteStep);
     return decrementedSelected < min ||
       (decrementedSelected > selected && decrementedSelected > max);
   };
@@ -56743,7 +57815,7 @@ angular.module('ui.bootstrap.timepicker', [])
     if (selected.getHours() < 13) {
       return addMinutes(selected, 12 * 60) > max;
     } else {
-      return addMinutes(selected, - 12 * 60) < min;
+      return addMinutes(selected, -12 * 60) < min;
     }
   };
 
@@ -56753,11 +57825,11 @@ angular.module('ui.bootstrap.timepicker', [])
     $scope.$parent.$watch($parse($attrs.showMeridian), function(value) {
       $scope.showMeridian = !!value;
 
-      if ( ngModelCtrl.$error.time ) {
+      if (ngModelCtrl.$error.time) {
         // Evaluate from template
         var hours = getHoursFromTemplate(), minutes = getMinutesFromTemplate();
-        if (angular.isDefined( hours ) && angular.isDefined( minutes )) {
-          selected.setHours( hours );
+        if (angular.isDefined(hours) && angular.isDefined(minutes)) {
+          selected.setHours(hours);
           refresh();
         }
       } else {
@@ -56767,18 +57839,18 @@ angular.module('ui.bootstrap.timepicker', [])
   }
 
   // Get $scope.hours in 24H mode if valid
-  function getHoursFromTemplate ( ) {
-    var hours = parseInt( $scope.hours, 10 );
-    var valid = ( $scope.showMeridian ) ? (hours > 0 && hours < 13) : (hours >= 0 && hours < 24);
-    if ( !valid ) {
+  function getHoursFromTemplate() {
+    var hours = parseInt($scope.hours, 10);
+    var valid = $scope.showMeridian ? (hours > 0 && hours < 13) : (hours >= 0 && hours < 24);
+    if (!valid) {
       return undefined;
     }
 
-    if ( $scope.showMeridian ) {
-      if ( hours === 12 ) {
+    if ($scope.showMeridian) {
+      if (hours === 12) {
         hours = 0;
       }
-      if ( $scope.meridian === meridians[1] ) {
+      if ($scope.meridian === meridians[1]) {
         hours = hours + 12;
       }
     }
@@ -56787,15 +57859,15 @@ angular.module('ui.bootstrap.timepicker', [])
 
   function getMinutesFromTemplate() {
     var minutes = parseInt($scope.minutes, 10);
-    return ( minutes >= 0 && minutes < 60 ) ? minutes : undefined;
+    return (minutes >= 0 && minutes < 60) ? minutes : undefined;
   }
 
-  function pad( value ) {
-    return ( angular.isDefined(value) && value.toString().length < 2 ) ? '0' + value : value.toString();
+  function pad(value) {
+    return (angular.isDefined(value) && value.toString().length < 2) ? '0' + value : value.toString();
   }
 
   // Respond on mousewheel spin
-  this.setupMousewheelEvents = function( hoursInputEl, minutesInputEl ) {
+  this.setupMousewheelEvents = function(hoursInputEl, minutesInputEl) {
     var isScrollingUp = function(e) {
       if (e.originalEvent) {
         e = e.originalEvent;
@@ -56806,26 +57878,25 @@ angular.module('ui.bootstrap.timepicker', [])
     };
 
     hoursInputEl.bind('mousewheel wheel', function(e) {
-      $scope.$apply( (isScrollingUp(e)) ? $scope.incrementHours() : $scope.decrementHours() );
+      $scope.$apply(isScrollingUp(e) ? $scope.incrementHours() : $scope.decrementHours());
       e.preventDefault();
     });
 
     minutesInputEl.bind('mousewheel wheel', function(e) {
-      $scope.$apply( (isScrollingUp(e)) ? $scope.incrementMinutes() : $scope.decrementMinutes() );
+      $scope.$apply(isScrollingUp(e) ? $scope.incrementMinutes() : $scope.decrementMinutes());
       e.preventDefault();
     });
 
   };
 
   // Respond on up/down arrowkeys
-  this.setupArrowkeyEvents = function( hoursInputEl, minutesInputEl ) {
+  this.setupArrowkeyEvents = function(hoursInputEl, minutesInputEl) {
     hoursInputEl.bind('keydown', function(e) {
-      if ( e.which === 38 ) { // up
+      if (e.which === 38) { // up
         e.preventDefault();
         $scope.incrementHours();
         $scope.$apply();
-      }
-      else if ( e.which === 40 ) { // down
+      } else if (e.which === 40) { // down
         e.preventDefault();
         $scope.decrementHours();
         $scope.$apply();
@@ -56833,12 +57904,11 @@ angular.module('ui.bootstrap.timepicker', [])
     });
 
     minutesInputEl.bind('keydown', function(e) {
-      if ( e.which === 38 ) { // up
+      if (e.which === 38) { // up
         e.preventDefault();
         $scope.incrementMinutes();
         $scope.$apply();
-      }
-      else if ( e.which === 40 ) { // down
+      } else if (e.which === 40) { // down
         e.preventDefault();
         $scope.decrementMinutes();
         $scope.$apply();
@@ -56846,15 +57916,15 @@ angular.module('ui.bootstrap.timepicker', [])
     });
   };
 
-  this.setupInputEvents = function( hoursInputEl, minutesInputEl ) {
-    if ( $scope.readonlyInput ) {
+  this.setupInputEvents = function(hoursInputEl, minutesInputEl) {
+    if ($scope.readonlyInput) {
       $scope.updateHours = angular.noop;
       $scope.updateMinutes = angular.noop;
       return;
     }
 
     var invalidate = function(invalidHours, invalidMinutes) {
-      ngModelCtrl.$setViewValue( null );
+      ngModelCtrl.$setViewValue(null);
       ngModelCtrl.$setValidity('time', false);
       if (angular.isDefined(invalidHours)) {
         $scope.invalidHours = invalidHours;
@@ -56865,14 +57935,15 @@ angular.module('ui.bootstrap.timepicker', [])
     };
 
     $scope.updateHours = function() {
-      var hours = getHoursFromTemplate();
+      var hours = getHoursFromTemplate(),
+        minutes = getMinutesFromTemplate();
 
-      if ( angular.isDefined(hours) ) {
-        selected.setHours( hours );
+      if (angular.isDefined(hours) && angular.isDefined(minutes)) {
+        selected.setHours(hours);
         if (selected < min || selected > max) {
           invalidate(true);
         } else {
-          refresh( 'h' );
+          refresh('h');
         }
       } else {
         invalidate(true);
@@ -56880,22 +57951,23 @@ angular.module('ui.bootstrap.timepicker', [])
     };
 
     hoursInputEl.bind('blur', function(e) {
-      if ( !$scope.invalidHours && $scope.hours < 10) {
-        $scope.$apply( function() {
-          $scope.hours = pad( $scope.hours );
+      if (!$scope.invalidHours && $scope.hours < 10) {
+        $scope.$apply(function() {
+          $scope.hours = pad($scope.hours);
         });
       }
     });
 
     $scope.updateMinutes = function() {
-      var minutes = getMinutesFromTemplate();
+      var minutes = getMinutesFromTemplate(),
+        hours = getHoursFromTemplate();
 
-      if ( angular.isDefined(minutes) ) {
-        selected.setMinutes( minutes );
+      if (angular.isDefined(minutes) && angular.isDefined(hours)) {
+        selected.setMinutes(minutes);
         if (selected < min || selected > max) {
           invalidate(undefined, true);
         } else {
-          refresh( 'm' );
+          refresh('m');
         }
       } else {
         invalidate(undefined, true);
@@ -56903,9 +57975,9 @@ angular.module('ui.bootstrap.timepicker', [])
     };
 
     minutesInputEl.bind('blur', function(e) {
-      if ( !$scope.invalidMinutes && $scope.minutes < 10 ) {
-        $scope.$apply( function() {
-          $scope.minutes = pad( $scope.minutes );
+      if (!$scope.invalidMinutes && $scope.minutes < 10) {
+        $scope.$apply(function() {
+          $scope.minutes = pad($scope.minutes);
         });
       }
     });
@@ -56915,11 +57987,11 @@ angular.module('ui.bootstrap.timepicker', [])
   this.render = function() {
     var date = ngModelCtrl.$viewValue;
 
-    if ( isNaN(date) ) {
+    if (isNaN(date)) {
       ngModelCtrl.$setValidity('time', false);
       $log.error('Timepicker directive: "ng-model" value must be a Date object, a number of milliseconds since 01.01.1970 or a string representing an RFC2822 or ISO 8601 date.');
     } else {
-      if ( date ) {
+      if (date) {
         selected = date;
       }
 
@@ -56935,10 +58007,10 @@ angular.module('ui.bootstrap.timepicker', [])
   };
 
   // Call internally when we know that model is valid.
-  function refresh( keyboardChange ) {
+  function refresh(keyboardChange) {
     makeValid();
-    ngModelCtrl.$setViewValue( new Date(selected) );
-    updateTemplate( keyboardChange );
+    ngModelCtrl.$setViewValue(new Date(selected));
+    updateTemplate(keyboardChange);
   }
 
   function makeValid() {
@@ -56947,11 +58019,11 @@ angular.module('ui.bootstrap.timepicker', [])
     $scope.invalidMinutes = false;
   }
 
-  function updateTemplate( keyboardChange ) {
+  function updateTemplate(keyboardChange) {
     var hours = selected.getHours(), minutes = selected.getMinutes();
 
-    if ( $scope.showMeridian ) {
-      hours = ( hours === 0 || hours === 12 ) ? 12 : hours % 12; // Convert 24 to 12 hour system
+    if ($scope.showMeridian) {
+      hours = (hours === 0 || hours === 12) ? 12 : hours % 12; // Convert 24 to 12 hour system
     }
 
     $scope.hours = keyboardChange === 'h' ? hours : pad(hours);
@@ -56961,41 +58033,45 @@ angular.module('ui.bootstrap.timepicker', [])
     $scope.meridian = selected.getHours() < 12 ? meridians[0] : meridians[1];
   }
 
-  function addMinutes(date,  minutes) {
+  function addMinutes(date, minutes) {
     var dt = new Date(date.getTime() + minutes * 60000);
     var newDate = new Date(date);
     newDate.setHours(dt.getHours(), dt.getMinutes());
     return newDate;
   }
 
-  function addMinutesToSelected( minutes ) {
-    selected = addMinutes( selected, minutes );
+  function addMinutesToSelected(minutes) {
+    selected = addMinutes(selected, minutes);
     refresh();
   }
-  
+
   $scope.showSpinners = angular.isDefined($attrs.showSpinners) ?
     $scope.$parent.$eval($attrs.showSpinners) : timepickerConfig.showSpinners;
-  
+
   $scope.incrementHours = function() {
     if (!$scope.noIncrementHours()) {
       addMinutesToSelected(hourStep * 60);
     }
   };
+
   $scope.decrementHours = function() {
     if (!$scope.noDecrementHours()) {
       addMinutesToSelected(-hourStep * 60);
     }
   };
+
   $scope.incrementMinutes = function() {
     if (!$scope.noIncrementMinutes()) {
       addMinutesToSelected(minuteStep);
     }
   };
+
   $scope.decrementMinutes = function() {
     if (!$scope.noDecrementMinutes()) {
       addMinutesToSelected(-minuteStep);
     }
   };
+
   $scope.toggleMeridian = function() {
     if (!$scope.noToggleMeridian()) {
       addMinutesToSelected(12 * 60 * (selected.getHours() < 12 ? 1 : -1));
@@ -57003,19 +58079,22 @@ angular.module('ui.bootstrap.timepicker', [])
   };
 }])
 
-.directive('timepicker', function () {
+.directive('timepicker', function() {
   return {
     restrict: 'EA',
     require: ['timepicker', '?^ngModel'],
     controller:'TimepickerController',
+    controllerAs: 'timepicker',
     replace: true,
     scope: {},
-    templateUrl: 'template/timepicker/timepicker.html',
+    templateUrl: function(element, attrs) {
+      return attrs.templateUrl || 'template/timepicker/timepicker.html';
+    },
     link: function(scope, element, attrs, ctrls) {
       var timepickerCtrl = ctrls[0], ngModelCtrl = ctrls[1];
 
-      if ( ngModelCtrl ) {
-        timepickerCtrl.init( ngModelCtrl, element.find('input') );
+      if (ngModelCtrl) {
+        timepickerCtrl.init(ngModelCtrl, element.find('input'));
       }
     }
   };
@@ -57111,20 +58190,19 @@ function($q ,  $timeout ,  $rootScope ,  $log ,  $transitionSuppressDeprecated) 
   return $transition;
 }]);
 
-angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap.bindHtml'])
+angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
 
 /**
  * A helper service that can parse typeahead's syntax (string provided by users)
  * Extracted to a separate service for ease of unit testing
  */
-  .factory('typeaheadParser', ['$parse', function ($parse) {
+  .factory('typeaheadParser', ['$parse', function($parse) {
 
   //                      00000111000000000000022200000000000000003333333333333330000000000044000
   var TYPEAHEAD_REGEXP = /^\s*([\s\S]+?)(?:\s+as\s+([\s\S]+?))?\s+for\s+(?:([\$\w][\$\w\d]*))\s+in\s+([\s\S]+?)$/;
 
   return {
-    parse:function (input) {
-
+    parse: function(input) {
       var match = input.match(TYPEAHEAD_REGEXP);
       if (!match) {
         throw new Error(
@@ -57143,461 +58221,469 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
 }])
 
   .directive('typeahead', ['$compile', '$parse', '$q', '$timeout', '$document', '$window', '$rootScope', '$position', 'typeaheadParser',
-       function ($compile, $parse, $q, $timeout, $document, $window, $rootScope, $position, typeaheadParser) {
+    function($compile, $parse, $q, $timeout, $document, $window, $rootScope, $position, typeaheadParser) {
+    var HOT_KEYS = [9, 13, 27, 38, 40];
+    var eventDebounceTime = 200;
 
-  var HOT_KEYS = [9, 13, 27, 38, 40];
-  var eventDebounceTime = 200;
+    return {
+      require: ['ngModel', '^?ngModelOptions'],
+      link: function(originalScope, element, attrs, ctrls) {
+        var modelCtrl = ctrls[0];
+        var ngModelOptions = ctrls[1];
+        //SUPPORTED ATTRIBUTES (OPTIONS)
 
-  return {
-    require:'ngModel',
-    link:function (originalScope, element, attrs, modelCtrl) {
-
-      //SUPPORTED ATTRIBUTES (OPTIONS)
-
-      //minimal no of characters that needs to be entered before typeahead kicks-in
-      var minLength = originalScope.$eval(attrs.typeaheadMinLength);
-      if (!minLength && minLength !== 0) {
-        minLength = 1;
-      }
-
-      //minimal wait time after last character typed before typeahead kicks-in
-      var waitTime = originalScope.$eval(attrs.typeaheadWaitMs) || 0;
-
-      //should it restrict model values to the ones selected from the popup only?
-      var isEditable = originalScope.$eval(attrs.typeaheadEditable) !== false;
-
-      //binding to a variable that indicates if matches are being retrieved asynchronously
-      var isLoadingSetter = $parse(attrs.typeaheadLoading).assign || angular.noop;
-
-      //a callback executed when a match is selected
-      var onSelectCallback = $parse(attrs.typeaheadOnSelect);
-
-      //should it select highlighted popup value when losing focus?
-      var isSelectOnBlur = angular.isDefined(attrs.typeaheadSelectOnBlur) ? originalScope.$eval(attrs.typeaheadSelectOnBlur) : false;
-
-      //binding to a variable that indicates if there were no results after the query is completed
-      var isNoResultsSetter = $parse(attrs.typeaheadNoResults).assign || angular.noop;
-
-      var inputFormatter = attrs.typeaheadInputFormatter ? $parse(attrs.typeaheadInputFormatter) : undefined;
-
-      var appendToBody =  attrs.typeaheadAppendToBody ? originalScope.$eval(attrs.typeaheadAppendToBody) : false;
-
-      var focusFirst = originalScope.$eval(attrs.typeaheadFocusFirst) !== false;
-
-      //If input matches an item of the list exactly, select it automatically
-      var selectOnExact = attrs.typeaheadSelectOnExact ? originalScope.$eval(attrs.typeaheadSelectOnExact) : false;
-
-      //INTERNAL VARIABLES
-
-      //model setter executed upon match selection
-      var $setModelValue = $parse(attrs.ngModel).assign;
-
-      //expressions used by typeahead
-      var parserResult = typeaheadParser.parse(attrs.typeahead);
-
-      var hasFocus;
-
-      //Used to avoid bug in iOS webview where iOS keyboard does not fire
-      //mousedown & mouseup events
-      //Issue #3699
-      var selected;
-
-      //create a child scope for the typeahead directive so we are not polluting original scope
-      //with typeahead-specific data (matches, query etc.)
-      var scope = originalScope.$new();
-      originalScope.$on('$destroy', function(){
-        scope.$destroy();
-      });
-
-      // WAI-ARIA
-      var popupId = 'typeahead-' + scope.$id + '-' + Math.floor(Math.random() * 10000);
-      element.attr({
-        'aria-autocomplete': 'list',
-        'aria-expanded': false,
-        'aria-owns': popupId
-      });
-
-      //pop-up element used to display matches
-      var popUpEl = angular.element('<div typeahead-popup></div>');
-      popUpEl.attr({
-        id: popupId,
-        matches: 'matches',
-        active: 'activeIdx',
-        select: 'select(activeIdx)',
-        'move-in-progress': 'moveInProgress',
-        query: 'query',
-        position: 'position'
-      });
-      //custom item template
-      if (angular.isDefined(attrs.typeaheadTemplateUrl)) {
-        popUpEl.attr('template-url', attrs.typeaheadTemplateUrl);
-      }
-
-      var resetMatches = function() {
-        scope.matches = [];
-        scope.activeIdx = -1;
-        element.attr('aria-expanded', false);
-      };
-
-      var getMatchId = function(index) {
-        return popupId + '-option-' + index;
-      };
-
-      // Indicate that the specified match is the active (pre-selected) item in the list owned by this typeahead.
-      // This attribute is added or removed automatically when the `activeIdx` changes.
-      scope.$watch('activeIdx', function(index) {
-        if (index < 0) {
-          element.removeAttr('aria-activedescendant');
-        } else {
-          element.attr('aria-activedescendant', getMatchId(index));
-        }
-      });
-
-      var inputIsExactMatch = function(inputValue, index) {
-
-        if (scope.matches.length > index && inputValue) {
-          return inputValue.toUpperCase() === scope.matches[index].label.toUpperCase();
+        //minimal no of characters that needs to be entered before typeahead kicks-in
+        var minLength = originalScope.$eval(attrs.typeaheadMinLength);
+        if (!minLength && minLength !== 0) {
+          minLength = 1;
         }
 
-        return false;
-      };
+        //minimal wait time after last character typed before typeahead kicks-in
+        var waitTime = originalScope.$eval(attrs.typeaheadWaitMs) || 0;
 
-      var getMatchesAsync = function(inputValue) {
+        //should it restrict model values to the ones selected from the popup only?
+        var isEditable = originalScope.$eval(attrs.typeaheadEditable) !== false;
 
-        var locals = {$viewValue: inputValue};
-        isLoadingSetter(originalScope, true);
-        isNoResultsSetter(originalScope, false);
-        $q.when(parserResult.source(originalScope, locals)).then(function(matches) {
+        //binding to a variable that indicates if matches are being retrieved asynchronously
+        var isLoadingSetter = $parse(attrs.typeaheadLoading).assign || angular.noop;
 
-          //it might happen that several async queries were in progress if a user were typing fast
-          //but we are interested only in responses that correspond to the current view value
-          var onCurrentRequest = (inputValue === modelCtrl.$viewValue);
-          if (onCurrentRequest && hasFocus) {
-            if (matches && matches.length > 0) {
+        //a callback executed when a match is selected
+        var onSelectCallback = $parse(attrs.typeaheadOnSelect);
 
-              scope.activeIdx = focusFirst ? 0 : -1;
-              isNoResultsSetter(originalScope, false);
-              scope.matches.length = 0;
+        //should it select highlighted popup value when losing focus?
+        var isSelectOnBlur = angular.isDefined(attrs.typeaheadSelectOnBlur) ? originalScope.$eval(attrs.typeaheadSelectOnBlur) : false;
 
-              //transform labels
-              for(var i=0; i<matches.length; i++) {
-                locals[parserResult.itemName] = matches[i];
-                scope.matches.push({
-                  id: getMatchId(i),
-                  label: parserResult.viewMapper(scope, locals),
-                  model: matches[i]
-                });
+        //binding to a variable that indicates if there were no results after the query is completed
+        var isNoResultsSetter = $parse(attrs.typeaheadNoResults).assign || angular.noop;
+
+        var inputFormatter = attrs.typeaheadInputFormatter ? $parse(attrs.typeaheadInputFormatter) : undefined;
+
+        var appendToBody =  attrs.typeaheadAppendToBody ? originalScope.$eval(attrs.typeaheadAppendToBody) : false;
+
+        var focusFirst = originalScope.$eval(attrs.typeaheadFocusFirst) !== false;
+
+        //If input matches an item of the list exactly, select it automatically
+        var selectOnExact = attrs.typeaheadSelectOnExact ? originalScope.$eval(attrs.typeaheadSelectOnExact) : false;
+
+        //INTERNAL VARIABLES
+
+        //model setter executed upon match selection
+        var parsedModel = $parse(attrs.ngModel);
+        var invokeModelSetter = $parse(attrs.ngModel + '($$$p)');
+        var $setModelValue = function(scope, newValue) {
+          if (angular.isFunction(parsedModel(originalScope)) &&
+            ngModelOptions && ngModelOptions.$options && ngModelOptions.$options.getterSetter) {
+            return invokeModelSetter(scope, {$$$p: newValue});
+          } else {
+            return parsedModel.assign(scope, newValue);
+          }
+        };
+
+        //expressions used by typeahead
+        var parserResult = typeaheadParser.parse(attrs.typeahead);
+
+        var hasFocus;
+
+        //Used to avoid bug in iOS webview where iOS keyboard does not fire
+        //mousedown & mouseup events
+        //Issue #3699
+        var selected;
+
+        //create a child scope for the typeahead directive so we are not polluting original scope
+        //with typeahead-specific data (matches, query etc.)
+        var scope = originalScope.$new();
+        var offDestroy = originalScope.$on('$destroy', function() {
+			    scope.$destroy();
+        });
+        scope.$on('$destroy', offDestroy);
+
+        // WAI-ARIA
+        var popupId = 'typeahead-' + scope.$id + '-' + Math.floor(Math.random() * 10000);
+        element.attr({
+          'aria-autocomplete': 'list',
+          'aria-expanded': false,
+          'aria-owns': popupId
+        });
+
+        //pop-up element used to display matches
+        var popUpEl = angular.element('<div typeahead-popup></div>');
+        popUpEl.attr({
+          id: popupId,
+          matches: 'matches',
+          active: 'activeIdx',
+          select: 'select(activeIdx)',
+          'move-in-progress': 'moveInProgress',
+          query: 'query',
+          position: 'position'
+        });
+        //custom item template
+        if (angular.isDefined(attrs.typeaheadTemplateUrl)) {
+          popUpEl.attr('template-url', attrs.typeaheadTemplateUrl);
+        }
+
+        if (angular.isDefined(attrs.typeaheadPopupTemplateUrl)) {
+          popUpEl.attr('popup-template-url', attrs.typeaheadPopupTemplateUrl);
+        }
+
+        var resetMatches = function() {
+          scope.matches = [];
+          scope.activeIdx = -1;
+          element.attr('aria-expanded', false);
+        };
+
+        var getMatchId = function(index) {
+          return popupId + '-option-' + index;
+        };
+
+        // Indicate that the specified match is the active (pre-selected) item in the list owned by this typeahead.
+        // This attribute is added or removed automatically when the `activeIdx` changes.
+        scope.$watch('activeIdx', function(index) {
+          if (index < 0) {
+            element.removeAttr('aria-activedescendant');
+          } else {
+            element.attr('aria-activedescendant', getMatchId(index));
+          }
+        });
+
+        var inputIsExactMatch = function(inputValue, index) {
+          if (scope.matches.length > index && inputValue) {
+            return inputValue.toUpperCase() === scope.matches[index].label.toUpperCase();
+          }
+
+          return false;
+        };
+
+        var getMatchesAsync = function(inputValue) {
+          var locals = {$viewValue: inputValue};
+          isLoadingSetter(originalScope, true);
+          isNoResultsSetter(originalScope, false);
+          $q.when(parserResult.source(originalScope, locals)).then(function(matches) {
+            //it might happen that several async queries were in progress if a user were typing fast
+            //but we are interested only in responses that correspond to the current view value
+            var onCurrentRequest = (inputValue === modelCtrl.$viewValue);
+            if (onCurrentRequest && hasFocus) {
+              if (matches && matches.length > 0) {
+
+                scope.activeIdx = focusFirst ? 0 : -1;
+                isNoResultsSetter(originalScope, false);
+                scope.matches.length = 0;
+
+                //transform labels
+                for (var i = 0; i < matches.length; i++) {
+                  locals[parserResult.itemName] = matches[i];
+                  scope.matches.push({
+                    id: getMatchId(i),
+                    label: parserResult.viewMapper(scope, locals),
+                    model: matches[i]
+                  });
+                }
+
+                scope.query = inputValue;
+                //position pop-up with matches - we need to re-calculate its position each time we are opening a window
+                //with matches as a pop-up might be absolute-positioned and position of an input might have changed on a page
+                //due to other elements being rendered
+                recalculatePosition();
+
+                element.attr('aria-expanded', true);
+
+                //Select the single remaining option if user input matches
+                if (selectOnExact && scope.matches.length === 1 && inputIsExactMatch(inputValue, 0)) {
+                  scope.select(0);
+                }
+              } else {
+                resetMatches();
+                isNoResultsSetter(originalScope, true);
               }
-
-              scope.query = inputValue;
-              //position pop-up with matches - we need to re-calculate its position each time we are opening a window
-              //with matches as a pop-up might be absolute-positioned and position of an input might have changed on a page
-              //due to other elements being rendered
-              recalculatePosition();
-
-              element.attr('aria-expanded', true);
-
-              //Select the single remaining option if user input matches
-              if (selectOnExact && scope.matches.length === 1 && inputIsExactMatch(inputValue, 0)) {
-                scope.select(0);
-              }
-            } else {
-              resetMatches();
-              isNoResultsSetter(originalScope, true);
             }
-          }
-          if (onCurrentRequest) {
+            if (onCurrentRequest) {
+              isLoadingSetter(originalScope, false);
+            }
+          }, function() {
+            resetMatches();
             isLoadingSetter(originalScope, false);
-          }
-        }, function(){
-          resetMatches();
-          isLoadingSetter(originalScope, false);
-          isNoResultsSetter(originalScope, true);
-        });
-      };
+            isNoResultsSetter(originalScope, true);
+          });
+        };
 
-      // bind events only if appendToBody params exist - performance feature
-      if (appendToBody) {
-        angular.element($window).bind('resize', fireRecalculating);
-        $document.find('body').bind('scroll', fireRecalculating);
-      }
-
-      // Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
-      var timeoutEventPromise;
-
-      // Default progress type
-      scope.moveInProgress = false;
-
-      function fireRecalculating() {
-        if(!scope.moveInProgress){
-          scope.moveInProgress = true;
-          scope.$digest();
+        // bind events only if appendToBody params exist - performance feature
+        if (appendToBody) {
+          angular.element($window).bind('resize', fireRecalculating);
+          $document.find('body').bind('scroll', fireRecalculating);
         }
 
-        // Cancel previous timeout
-        if (timeoutEventPromise) {
-          $timeout.cancel(timeoutEventPromise);
-        }
+        // Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
+        var timeoutEventPromise;
 
-        // Debounced executing recalculate after events fired
-        timeoutEventPromise = $timeout(function () {
-          // if popup is visible
-          if (scope.matches.length) {
-            recalculatePosition();
+        // Default progress type
+        scope.moveInProgress = false;
+
+        function fireRecalculating() {
+          if (!scope.moveInProgress) {
+            scope.moveInProgress = true;
+            scope.$digest();
           }
 
-          scope.moveInProgress = false;
-          scope.$digest();
-        }, eventDebounceTime);
-      }
-
-      // recalculate actual position and set new values to scope
-      // after digest loop is popup in right position
-      function recalculatePosition() {
-        scope.position = appendToBody ? $position.offset(element) : $position.position(element);
-        scope.position.top += element.prop('offsetHeight');
-      }
-
-      resetMatches();
-
-      //we need to propagate user's query so we can higlight matches
-      scope.query = undefined;
-
-      //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
-      var timeoutPromise;
-
-      var scheduleSearchWithTimeout = function(inputValue) {
-        timeoutPromise = $timeout(function () {
-          getMatchesAsync(inputValue);
-        }, waitTime);
-      };
-
-      var cancelPreviousTimeout = function() {
-        if (timeoutPromise) {
-          $timeout.cancel(timeoutPromise);
-        }
-      };
-
-      //plug into $parsers pipeline to open a typeahead on view changes initiated from DOM
-      //$parsers kick-in on all the changes coming from the view as well as manually triggered by $setViewValue
-      modelCtrl.$parsers.unshift(function (inputValue) {
-
-        hasFocus = true;
-
-        if (minLength === 0 || inputValue && inputValue.length >= minLength) {
-          if (waitTime > 0) {
-            cancelPreviousTimeout();
-            scheduleSearchWithTimeout(inputValue);
-          } else {
-            getMatchesAsync(inputValue);
+          // Cancel previous timeout
+          if (timeoutEventPromise) {
+            $timeout.cancel(timeoutEventPromise);
           }
-        } else {
-          isLoadingSetter(originalScope, false);
-          cancelPreviousTimeout();
-          resetMatches();
+
+          // Debounced executing recalculate after events fired
+          timeoutEventPromise = $timeout(function() {
+            // if popup is visible
+            if (scope.matches.length) {
+              recalculatePosition();
+            }
+
+            scope.moveInProgress = false;
+            scope.$digest();
+          }, eventDebounceTime);
         }
 
-        if (isEditable) {
-          return inputValue;
-        } else {
-          if (!inputValue) {
-            // Reset in case user had typed something previously.
-            modelCtrl.$setValidity('editable', true);
-            return null;
-          } else {
-            modelCtrl.$setValidity('editable', false);
-            return undefined;
-          }
+        // recalculate actual position and set new values to scope
+        // after digest loop is popup in right position
+        function recalculatePosition() {
+          scope.position = appendToBody ? $position.offset(element) : $position.position(element);
+          scope.position.top += element.prop('offsetHeight');
         }
-      });
-
-      modelCtrl.$formatters.push(function (modelValue) {
-
-        var candidateViewValue, emptyViewValue;
-        var locals = {};
-
-        // The validity may be set to false via $parsers (see above) if
-        // the model is restricted to selected values. If the model
-        // is set manually it is considered to be valid.
-        if (!isEditable) {
-          modelCtrl.$setValidity('editable', true);
-        }
-
-        if (inputFormatter) {
-
-          locals.$model = modelValue;
-          return inputFormatter(originalScope, locals);
-
-        } else {
-
-          //it might happen that we don't have enough info to properly render input value
-          //we need to check for this situation and simply return model value if we can't apply custom formatting
-          locals[parserResult.itemName] = modelValue;
-          candidateViewValue = parserResult.viewMapper(originalScope, locals);
-          locals[parserResult.itemName] = undefined;
-          emptyViewValue = parserResult.viewMapper(originalScope, locals);
-
-          return candidateViewValue!== emptyViewValue ? candidateViewValue : modelValue;
-        }
-      });
-
-      scope.select = function (activeIdx) {
-        //called from within the $digest() cycle
-        var locals = {};
-        var model, item;
-
-        selected = true;
-        locals[parserResult.itemName] = item = scope.matches[activeIdx].model;
-        model = parserResult.modelMapper(originalScope, locals);
-        $setModelValue(originalScope, model);
-        modelCtrl.$setValidity('editable', true);
-        modelCtrl.$setValidity('parse', true);
-
-        onSelectCallback(originalScope, {
-          $item: item,
-          $model: model,
-          $label: parserResult.viewMapper(originalScope, locals)
-        });
 
         resetMatches();
 
-        //return focus to the input element if a match was selected via a mouse click event
-        // use timeout to avoid $rootScope:inprog error
-        $timeout(function() { element[0].focus(); }, 0, false);
-      };
+        //we need to propagate user's query so we can higlight matches
+        scope.query = undefined;
 
-      //bind keyboard events: arrows up(38) / down(40), enter(13) and tab(9), esc(27)
-      element.bind('keydown', function (evt) {
+        //Declare the timeout promise var outside the function scope so that stacked calls can be cancelled later
+        var timeoutPromise;
 
-        //typeahead is open and an "interesting" key was pressed
-        if (scope.matches.length === 0 || HOT_KEYS.indexOf(evt.which) === -1) {
-          return;
-        }
+        var scheduleSearchWithTimeout = function(inputValue) {
+          timeoutPromise = $timeout(function() {
+            getMatchesAsync(inputValue);
+          }, waitTime);
+        };
 
-        // if there's nothing selected (i.e. focusFirst) and enter or tab is hit, clear the results
-        if (scope.activeIdx === -1 && (evt.which === 9 || evt.which === 13)) {
-          resetMatches();
-          scope.$digest();
-          return;
-        }
+        var cancelPreviousTimeout = function() {
+          if (timeoutPromise) {
+            $timeout.cancel(timeoutPromise);
+          }
+        };
 
-        evt.preventDefault();
+        //plug into $parsers pipeline to open a typeahead on view changes initiated from DOM
+        //$parsers kick-in on all the changes coming from the view as well as manually triggered by $setViewValue
+        modelCtrl.$parsers.unshift(function(inputValue) {
+          hasFocus = true;
 
-        if (evt.which === 40) {
-          scope.activeIdx = (scope.activeIdx + 1) % scope.matches.length;
-          scope.$digest();
+          if (minLength === 0 || inputValue && inputValue.length >= minLength) {
+            if (waitTime > 0) {
+              cancelPreviousTimeout();
+              scheduleSearchWithTimeout(inputValue);
+            } else {
+              getMatchesAsync(inputValue);
+            }
+          } else {
+            isLoadingSetter(originalScope, false);
+            cancelPreviousTimeout();
+            resetMatches();
+          }
 
-        } else if (evt.which === 38) {
-          scope.activeIdx = (scope.activeIdx > 0 ? scope.activeIdx : scope.matches.length) - 1;
-          scope.$digest();
+          if (isEditable) {
+            return inputValue;
+          } else {
+            if (!inputValue) {
+              // Reset in case user had typed something previously.
+              modelCtrl.$setValidity('editable', true);
+              return null;
+            } else {
+              modelCtrl.$setValidity('editable', false);
+              return undefined;
+            }
+          }
+        });
 
-        } else if (evt.which === 13 || evt.which === 9) {
-          scope.$apply(function () {
-            scope.select(scope.activeIdx);
-          });
+        modelCtrl.$formatters.push(function(modelValue) {
+          var candidateViewValue, emptyViewValue;
+          var locals = {};
 
-        } else if (evt.which === 27) {
-          evt.stopPropagation();
+          // The validity may be set to false via $parsers (see above) if
+          // the model is restricted to selected values. If the model
+          // is set manually it is considered to be valid.
+          if (!isEditable) {
+            modelCtrl.$setValidity('editable', true);
+          }
 
-          resetMatches();
-          scope.$digest();
-        }
-      });
+          if (inputFormatter) {
+            locals.$model = modelValue;
+            return inputFormatter(originalScope, locals);
+          } else {
+            //it might happen that we don't have enough info to properly render input value
+            //we need to check for this situation and simply return model value if we can't apply custom formatting
+            locals[parserResult.itemName] = modelValue;
+            candidateViewValue = parserResult.viewMapper(originalScope, locals);
+            locals[parserResult.itemName] = undefined;
+            emptyViewValue = parserResult.viewMapper(originalScope, locals);
 
-      element.bind('blur', function () {
-        if (isSelectOnBlur && scope.matches.length && scope.activeIdx !== -1 && !selected) {
+            return candidateViewValue!== emptyViewValue ? candidateViewValue : modelValue;
+          }
+        });
+
+        scope.select = function(activeIdx) {
+          //called from within the $digest() cycle
+          var locals = {};
+          var model, item;
+
           selected = true;
-          scope.$apply(function () {
-            scope.select(scope.activeIdx);
-          });
-        }
-        hasFocus = false;
-        selected = false;
-      });
+          locals[parserResult.itemName] = item = scope.matches[activeIdx].model;
+          model = parserResult.modelMapper(originalScope, locals);
+          $setModelValue(originalScope, model);
+          modelCtrl.$setValidity('editable', true);
+          modelCtrl.$setValidity('parse', true);
 
-      // Keep reference to click handler to unbind it.
-      var dismissClickHandler = function (evt) {
-        // Issue #3973
-        // Firefox treats right click as a click on document
-        if (element[0] !== evt.target && evt.which !== 3 && scope.matches.length !== 0) {
+          onSelectCallback(originalScope, {
+            $item: item,
+            $model: model,
+            $label: parserResult.viewMapper(originalScope, locals)
+          });
+
           resetMatches();
-          if (!$rootScope.$$phase) {
+
+          //return focus to the input element if a match was selected via a mouse click event
+          // use timeout to avoid $rootScope:inprog error
+          if (scope.$eval(attrs.typeaheadFocusOnSelect) !== false) {
+            $timeout(function() { element[0].focus(); }, 0, false);
+          }
+        };
+
+        //bind keyboard events: arrows up(38) / down(40), enter(13) and tab(9), esc(27)
+        element.bind('keydown', function(evt) {
+          //typeahead is open and an "interesting" key was pressed
+          if (scope.matches.length === 0 || HOT_KEYS.indexOf(evt.which) === -1) {
+            return;
+          }
+
+          // if there's nothing selected (i.e. focusFirst) and enter or tab is hit, clear the results
+          if (scope.activeIdx === -1 && (evt.which === 9 || evt.which === 13)) {
+            resetMatches();
+            scope.$digest();
+            return;
+          }
+
+          evt.preventDefault();
+
+          if (evt.which === 40) {
+            scope.activeIdx = (scope.activeIdx + 1) % scope.matches.length;
+            scope.$digest();
+
+          } else if (evt.which === 38) {
+            scope.activeIdx = (scope.activeIdx > 0 ? scope.activeIdx : scope.matches.length) - 1;
+            scope.$digest();
+
+          } else if (evt.which === 13 || evt.which === 9) {
+            scope.$apply(function () {
+              scope.select(scope.activeIdx);
+            });
+
+          } else if (evt.which === 27) {
+            evt.stopPropagation();
+
+            resetMatches();
             scope.$digest();
           }
-        }
-      };
+        });
 
-      $document.bind('click', dismissClickHandler);
+        element.bind('blur', function() {
+          if (isSelectOnBlur && scope.matches.length && scope.activeIdx !== -1 && !selected) {
+            selected = true;
+            scope.$apply(function() {
+              scope.select(scope.activeIdx);
+            });
+          }
+          hasFocus = false;
+          selected = false;
+        });
 
-      originalScope.$on('$destroy', function(){
-        $document.unbind('click', dismissClickHandler);
+        // Keep reference to click handler to unbind it.
+        var dismissClickHandler = function(evt) {
+          // Issue #3973
+          // Firefox treats right click as a click on document
+          if (element[0] !== evt.target && evt.which !== 3 && scope.matches.length !== 0) {
+            resetMatches();
+            if (!$rootScope.$$phase) {
+              scope.$digest();
+            }
+          }
+        };
+
+        $document.bind('click', dismissClickHandler);
+
+        originalScope.$on('$destroy', function() {
+          $document.unbind('click', dismissClickHandler);
+          if (appendToBody) {
+            $popup.remove();
+          }
+          // Prevent jQuery cache memory leak
+          popUpEl.remove();
+        });
+
+        var $popup = $compile(popUpEl)(scope);
+
         if (appendToBody) {
-          $popup.remove();
+          $document.find('body').append($popup);
+        } else {
+          element.after($popup);
         }
-        // Prevent jQuery cache memory leak
-        popUpEl.remove();
-      });
-
-      var $popup = $compile(popUpEl)(scope);
-
-      if (appendToBody) {
-        $document.find('body').append($popup);
-      } else {
-        element.after($popup);
       }
-    }
-  };
+    };
 
-}])
+  }])
 
-  .directive('typeaheadPopup', function () {
+  .directive('typeaheadPopup', function() {
     return {
-      restrict:'EA',
-      scope:{
-        matches:'=',
-        query:'=',
-        active:'=',
-        position:'&',
-        moveInProgress:'=',
-        select:'&'
+      restrict: 'EA',
+      scope: {
+        matches: '=',
+        query: '=',
+        active: '=',
+        position: '&',
+        moveInProgress: '=',
+        select: '&'
       },
-      replace:true,
-      templateUrl:'template/typeahead/typeahead-popup.html',
-      link:function (scope, element, attrs) {
-
+      replace: true,
+      templateUrl: function(element, attrs) {
+        return attrs.popupTemplateUrl || 'template/typeahead/typeahead-popup.html';
+      },
+      link: function(scope, element, attrs) {
         scope.templateUrl = attrs.templateUrl;
 
-        scope.isOpen = function () {
+        scope.isOpen = function() {
           return scope.matches.length > 0;
         };
 
-        scope.isActive = function (matchIdx) {
+        scope.isActive = function(matchIdx) {
           return scope.active == matchIdx;
         };
 
-        scope.selectActive = function (matchIdx) {
+        scope.selectActive = function(matchIdx) {
           scope.active = matchIdx;
         };
 
-        scope.selectMatch = function (activeIdx) {
+        scope.selectMatch = function(activeIdx) {
           scope.select({activeIdx:activeIdx});
         };
       }
     };
   })
 
-  .directive('typeaheadMatch', ['$templateRequest', '$compile', '$parse', function ($templateRequest, $compile, $parse) {
+  .directive('typeaheadMatch', ['$templateRequest', '$compile', '$parse', function($templateRequest, $compile, $parse) {
     return {
-      restrict:'EA',
-      scope:{
-        index:'=',
-        match:'=',
-        query:'='
+      restrict: 'EA',
+      scope: {
+        index: '=',
+        match: '=',
+        query: '='
       },
-      link:function (scope, element, attrs) {
+      link:function(scope, element, attrs) {
         var tplUrl = $parse(attrs.templateUrl)(scope.$parent) || 'template/typeahead/typeahead-match.html';
         $templateRequest(tplUrl).then(function(tplContent) {
-          $compile(tplContent.trim())(scope, function(clonedElement){
+          $compile(tplContent.trim())(scope, function(clonedElement) {
             element.replaceWith(clonedElement);
           });
         });
@@ -57605,21 +58691,36 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position', 'ui.bootstrap
     };
   }])
 
-  .filter('typeaheadHighlight', function() {
+  .filter('typeaheadHighlight', ['$sce', '$injector', '$log', function($sce, $injector, $log) {
+    var isSanitizePresent;
+    isSanitizePresent = $injector.has('$sanitize');
 
     function escapeRegexp(queryToEscape) {
+      // Regex: capture the whole query string and replace it with the string that will be used to match
+      // the results, for example if the capture is "a" the result will be \a
       return queryToEscape.replace(/([.?*+^$[\]\\(){}|-])/g, '\\$1');
     }
 
+    function containsHtml(matchItem) {
+      return /<.*>/g.test(matchItem);
+    }
+
     return function(matchItem, query) {
-      return query ? ('' + matchItem).replace(new RegExp(escapeRegexp(query), 'gi'), '<strong>$&</strong>') : matchItem;
+      if (!isSanitizePresent && containsHtml(matchItem)) {
+        $log.warn('Unsafe use of typeahead please use ngSanitize'); // Warn the user about the danger
+      }
+      matchItem = query? ('' + matchItem).replace(new RegExp(escapeRegexp(query), 'gi'), '<strong>$&</strong>') : matchItem; // Replaces the capture string with a the same string inside of a "strong" tag
+      if (!isSanitizePresent) {
+        matchItem = $sce.trustAsHtml(matchItem); // If $sanitize is not present we pack the string in a $sce object for the ng-bind-html directive
+      }
+      return matchItem;
     };
-  });
+  }]);
 
 angular.module("template/accordion/accordion-group.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("template/accordion/accordion-group.html",
-    "<div class=\"panel panel-default\" ng-class=\"{'panel-open': isOpen}\">\n" +
-    "  <div class=\"panel-heading\">\n" +
+    "<div class=\"panel {{panelClass || 'panel-default'}}\">\n" +
+    "  <div class=\"panel-heading\" ng-keypress=\"toggleOpen($event)\">\n" +
     "    <h4 class=\"panel-title\">\n" +
     "      <a href tabindex=\"0\" class=\"accordion-toggle\" ng-click=\"toggleOpen()\" accordion-transclude=\"heading\"><span ng-class=\"{'text-muted': isDisabled}\">{{heading}}</span></a>\n" +
     "    </h4>\n" +
@@ -57731,7 +58832,7 @@ angular.module("template/datepicker/popup.html", []).run(["$templateCache", func
     "	<li ng-transclude></li>\n" +
     "	<li ng-if=\"showButtonBar\" style=\"padding:10px 9px 2px\">\n" +
     "		<span class=\"btn-group pull-left\">\n" +
-    "			<button type=\"button\" class=\"btn btn-sm btn-info\" ng-click=\"select('today')\">{{ getText('current') }}</button>\n" +
+    "			<button type=\"button\" class=\"btn btn-sm btn-info\" ng-click=\"select('today')\" ng-disabled=\"isDisabled('today')\">{{ getText('current') }}</button>\n" +
     "			<button type=\"button\" class=\"btn btn-sm btn-danger\" ng-click=\"select(null)\">{{ getText('clear') }}</button>\n" +
     "		</span>\n" +
     "		<button type=\"button\" class=\"btn btn-sm btn-success pull-right\" ng-click=\"close()\">{{ getText('close') }}</button>\n" +
@@ -57785,9 +58886,10 @@ angular.module("template/modal/window.html", []).run(["$templateCache", function
 angular.module("template/pagination/pager.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("template/pagination/pager.html",
     "<ul class=\"pager\">\n" +
-    "  <li ng-class=\"{disabled: noPrevious(), previous: align}\"><a href ng-click=\"selectPage(page - 1, $event)\">{{::getText('previous')}}</a></li>\n" +
-    "  <li ng-class=\"{disabled: noNext(), next: align}\"><a href ng-click=\"selectPage(page + 1, $event)\">{{::getText('next')}}</a></li>\n" +
-    "</ul>");
+    "  <li ng-class=\"{disabled: noPrevious()||ngDisabled, previous: align}\"><a href ng-click=\"selectPage(page - 1, $event)\">{{::getText('previous')}}</a></li>\n" +
+    "  <li ng-class=\"{disabled: noNext()||ngDisabled, next: align}\"><a href ng-click=\"selectPage(page + 1, $event)\">{{::getText('next')}}</a></li>\n" +
+    "</ul>\n" +
+    "");
 }]);
 
 angular.module("template/pagination/pagination.html", []).run(["$templateCache", function($templateCache) {
@@ -57986,7 +59088,7 @@ angular.module("template/timepicker/timepicker.html", []).run(["$templateCache",
 
 angular.module("template/typeahead/typeahead-match.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("template/typeahead/typeahead-match.html",
-    "<a href tabindex=\"-1\" bind-html-unsafe=\"match.label | typeaheadHighlight:query\"></a>\n" +
+    "<a href tabindex=\"-1\" ng-bind-html=\"match.label | typeaheadHighlight:query\"></a>\n" +
     "");
 }]);
 
@@ -58004,7 +59106,7 @@ angular.module("dialogs.default-translations",["pascalprecht.translate"]).config
 !function(){"use strict";var a=angular.module("translate.sub",[]);a.provider("$translate",[function(){var a=[],n="en-US";this.translations=function(e,s){angular.isDefined(e)&&angular.isDefined(s)&&(a[e]=angular.copy(s),n=e)},this.$get=[function(){return{instant:function(e){return angular.isDefined(e)&&angular.isDefined(a[n][e])?a[n][e]:""}}}]}]),a.filter("translate",["$translate",function(a){return function(n){return a.instant(n)}}]);var n;try{angular.module("pascalprecht.translate"),n=angular.module("dialogs.controllers",["ui.bootstrap.modal","pascalprecht.translate"])}catch(e){n=angular.module("dialogs.controllers",["ui.bootstrap.modal","translate.sub"])}n.controller("errorDialogCtrl",["$scope","$modalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_ERROR"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_ERROR_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-warning":"glyphicon glyphicon-warning-sign",a.close=function(){n.close(),a.$destroy()}}]),n.controller("waitDialogCtrl",["$scope","$modalInstance","$translate","$timeout","data",function(a,n,e,s,t){a.header=angular.isDefined(t.header)?t.header:e.instant("DIALOGS_PLEASE_WAIT_ELIPS"),a.msg=angular.isDefined(t.msg)?t.msg:e.instant("DIALOGS_PLEASE_WAIT_MSG"),a.progress=angular.isDefined(t.progress)?t.progress:100,a.icon=angular.isDefined(t.fa)&&angular.equals(t.fa,!0)?"fa fa-clock-o":"glyphicon glyphicon-time",a.$on("dialogs.wait.complete",function(){s(function(){n.close(),a.$destroy()})}),a.$on("dialogs.wait.message",function(n,e){a.msg=angular.isDefined(e.msg)?e.msg:a.msg}),a.$on("dialogs.wait.progress",function(n,e){a.msg=angular.isDefined(e.msg)?e.msg:a.msg,a.progress=angular.isDefined(e.progress)?e.progress:a.progress}),a.getProgress=function(){return{width:a.progress+"%"}}}]),n.controller("notifyDialogCtrl",["$scope","$modalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_NOTIFICATION"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_NOTIFICATION_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-info":"glyphicon glyphicon-info-sign",a.close=function(){n.close(),a.$destroy()}}]),n.controller("confirmDialogCtrl",["$scope","$modalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_CONFIRMATION"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_CONFIRMATION_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-check":"glyphicon glyphicon-check",a.no=function(){n.dismiss("no")},a.yes=function(){n.close("yes")}}]),angular.module("dialogs.services",["ui.bootstrap.modal","dialogs.controllers"]).provider("dialogs",[function(){var a=!0,n=!0,e="dialogs-default",s="dialogs-backdrop-default",t=!0,o=null,l="lg",r=!1,i=!1,d=function(t){var o={};return t=t||{},o.kb=angular.isDefined(t.keyboard)?!!t.keyboard:n,o.bd=angular.isDefined(t.backdrop)?t.backdrop:a,o.bdc=angular.isDefined(t.backdropClass)?t.backdropClass:s,o.ws=!angular.isDefined(t.size)||"sm"!==t.size&&"lg"!==t.size&&"md"!==t.size?l:t.size,o.wc=angular.isDefined(t.windowClass)?t.windowClass:e,o.anim=angular.isDefined(t.animation)?!!t.animation:r,o};this.useBackdrop=function(n){angular.isDefined(n)&&(a=n)},this.useEscClose=function(a){angular.isDefined(a)&&(n=angular.equals(a,0)||angular.equals(a,"false")||angular.equals(a,"no")||angular.equals(a,null)||angular.equals(a,!1)?!1:!0)},this.useClass=function(a){angular.isDefined(a)&&(e=a)},this.useCopy=function(a){angular.isDefined(a)&&(t=angular.equals(a,0)||angular.equals(a,"false")||angular.equals(a,"no")||angular.equals(a,null)||angular.equals(a,!1)?!1:!0)},this.setWindowTmpl=function(a){angular.isDefined(a)&&(o=a)},this.setSize=function(a){angular.isDefined(a)&&(l=angular.equals(a,"sm")||angular.equals(a,"lg")||angular.equals(a,"md")?a:l)},this.useAnimation=function(){r=!0},this.useFontAwesome=function(){i=!0},this.$get=["$modal",function(a){return{error:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/error.html",controller:"errorDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},wait:function(n,e,s,t){return t=d(t),a.open({templateUrl:"/dialogs/wait.html",controller:"waitDialogCtrl",backdrop:t.bd,backdropClass:t.bdc,keyboard:t.kb,windowClass:t.wc,size:t.ws,animation:t.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),progress:angular.copy(s),fa:i}}}})},notify:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/notify.html",controller:"notifyDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},confirm:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/confirm.html",controller:"confirmDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},create:function(n,e,s,o){var l=o&&angular.isDefined(o.copy)?o.copy:t;return o=d(o),a.open({templateUrl:n,controller:e,keyboard:o.kb,backdrop:o.bd,backdropClass:o.bdc,windowClass:o.wc,size:o.ws,animation:o.anim,resolve:{data:function(){return l?angular.copy(s):s}}})}}}]}]),angular.module("dialogs.main",["dialogs.services","ngSanitize"]).config(["$translateProvider","dialogsProvider",function(a,n){try{angular.module("pascalprecht.translate")}catch(e){a.translations("en-US",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"An unknown error has occurred.",DIALOGS_CLOSE:"Close",DIALOGS_PLEASE_WAIT:"Please Wait",DIALOGS_PLEASE_WAIT_ELIPS:"Please Wait...",DIALOGS_PLEASE_WAIT_MSG:"Waiting on operation to complete.",DIALOGS_PERCENT_COMPLETE:"% Complete",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Unknown application notification.",DIALOGS_CONFIRMATION:"Confirmation",DIALOGS_CONFIRMATION_MSG:"Confirmation required.",DIALOGS_OK:"OK",DIALOGS_YES:"Yes",DIALOGS_NO:"No"})}try{var s=document.styleSheets;a:for(var t=s.length-1;t>=0;t--){var o=null,l=null;if(!s[t].disabled){if(null!==s[t].href&&(o=s[t].href.match(/font\-*awesome/i)),angular.isArray(o)){n.useFontAwesome();break}l=s[t].cssRules;for(var r=l.length-1;r>=0;r--)if(".fa"==l[r].selectorText.toLowerCase()){n.useFontAwesome();break a}}}}catch(e){}}]).run(["$templateCache","$interpolate",function(a,n){var e=n.startSymbol(),s=n.endSymbol();a.put("/dialogs/error.html",'<div class="modal-header dialog-header-error"><button type="button" class="close" ng-click="close()">&times;</button><h4 class="modal-title text-danger"><span class="'+e+"icon"+s+'"></span> <span ng-bind-html="header"></span></h4></div><div class="modal-body text-danger" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-default" ng-click="close()">'+e+'"DIALOGS_CLOSE" | translate'+s+"</button></div>"),a.put("/dialogs/wait.html",'<div class="modal-header dialog-header-wait"><h4 class="modal-title"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body"><p ng-bind-html="msg"></p><div class="progress progress-striped active"><div class="progress-bar progress-bar-info" ng-style="getProgress()"></div><span class="sr-only">'+e+"progress"+s+e+'"DIALOGS_PERCENT_COMPLETE" | translate'+s+"</span></div></div>"),a.put("/dialogs/notify.html",'<div class="modal-header dialog-header-notify"><button type="button" class="close" ng-click="close()" class="pull-right">&times;</button><h4 class="modal-title text-info"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body text-info" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-primary" ng-click="close()">'+e+'"DIALOGS_OK" | translate'+s+"</button></div>"),a.put("/dialogs/confirm.html",'<div class="modal-header dialog-header-confirm"><button type="button" class="close" ng-click="no()">&times;</button><h4 class="modal-title"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-default" ng-click="yes()">'+e+'"DIALOGS_YES" | translate'+s+'</button><button type="button" class="btn btn-primary" ng-click="no()">'+e+'"DIALOGS_NO" | translate'+s+"</button></div>")}])}();
 /**
  * Bunch of useful filters for angularJS(with no external dependencies!)
- * @version v0.5.5 - 2015-08-07 * @link https://github.com/a8m/angular-filter
+ * @version v0.5.6 - 2015-09-23 * @link https://github.com/a8m/angular-filter
  * @author Ariel Mashraki <ariel@mashraki.co.il>
  * @license MIT License, http://www.opensource.org/licenses/MIT
  */
@@ -58420,32 +59522,38 @@ angular.module('a8m.before', [])
  * Collect data into fixed-length chunks or blocks
  */
 
-angular.module('a8m.chunk-by', [])
-  .filter('chunkBy', [function () {
-    /**
-     * @description
-     * Get array with size `n` in `val` inside it.
-     * @param n
-     * @param val
-     * @returns {Array}
-     */
-    function fill(n, val) {
-      var ret = [];
-      while(n--) ret[n] = val;
-      return ret;
-    }
+angular.module('a8m.chunk-by', ['a8m.filter-watcher'])
+    .filter('chunkBy', ['filterWatcher', function (filterWatcher) {
+      return function (array, n, fillVal) {
 
-    return function (array, n, fillVal) {
-      if (!isArray(array)) return array;
-      return array.map(function(el, i, self) {
-        i = i * n;
-        el = self.slice(i, i + n);
-        return !isUndefined(fillVal) && el.length < n
-          ? el.concat(fill(n - el.length, fillVal))
-          : el;
-      }).slice(0, Math.ceil(array.length / n));
-    }
-  }]);
+        return filterWatcher.isMemoized('chunkBy', arguments) ||
+            filterWatcher.memoize('chunkBy', arguments, this,
+                _chunkBy(array, n, fillVal));
+        /**
+         * @description
+         * Get array with size `n` in `val` inside it.
+         * @param n
+         * @param val
+         * @returns {Array}
+         */
+        function fill(n, val) {
+          var ret = [];
+          while (n--) ret[n] = val;
+          return ret;
+        }
+
+        function _chunkBy(array, n, fillVal) {
+          if (!isArray(array)) return array;
+          return array.map(function (el, i, self) {
+            i = i * n;
+            el = self.slice(i, i + n);
+            return !isUndefined(fillVal) && el.length < n
+                ? el.concat(fill(n - el.length, fillVal))
+                : el;
+          }).slice(0, Math.ceil(array.length / n));
+        }
+      }
+    }]);
 
 /**
  * @ngdoc filter
@@ -58854,11 +59962,9 @@ angular.module('a8m.group-by', [ 'a8m.filter-watcher' ])
         return collection;
       }
 
-      var getterFn = $parse(property);
-
       return filterWatcher.isMemoized('groupBy', arguments) ||
         filterWatcher.memoize('groupBy', arguments, this,
-          _groupBy(collection, getterFn));
+          _groupBy(collection, $parse(property)));
 
       /**
        * groupBy function
@@ -60130,7 +61236,7 @@ angular.module('a8m.filter-watcher', [])
         $$timeout(function() {
           if(!$rootScope.$$phase)
             $$cache = {};
-        });
+        }, 2000);
       }
 
       /**
@@ -60759,7 +61865,7 @@ angular.module('md5', []).constant('md5', (function() {
 }).call(this);
 
 /*! 
- * angular-hotkeys v1.5.0
+ * angular-hotkeys v1.6.0
  * https://chieffancypants.github.io/angular-hotkeys
  * Copyright (c) 2015 Wes Cruver
  * License: MIT
@@ -60917,7 +62023,7 @@ angular.module('md5', []).constant('md5', (function() {
        *
        */
       Hotkey.prototype.format = function() {
-        if(this._formated === null) {
+        if (this._formated === null) {
           // Don't show all the possible key combos, just the first one.  Not sure
           // of usecase here, so open a ticket if my assumptions are wrong
           var combo = this.combo[0];
@@ -61101,6 +62207,9 @@ angular.module('md5', []).constant('md5', (function() {
           combo       = combo.combo;
         }
 
+        // no duplicates please
+        _del(combo);
+
         // description is optional:
         if (description instanceof Function) {
           action = callback;
@@ -61143,18 +62252,23 @@ angular.module('md5', []).constant('md5', (function() {
           // create the new wrapper callback
           callback = function(event) {
             var shouldExecute = true;
-            var target = event.target || event.srcElement; // srcElement is IE only
-            var nodeName = target.nodeName.toUpperCase();
 
-            // check if the input has a mousetrap class, and skip checking preventIn if so
-            if ((' ' + target.className + ' ').indexOf(' mousetrap ') > -1) {
-              shouldExecute = true;
-            } else {
-              // don't execute callback if the event was fired from inside an element listed in preventIn
-              for (var i=0; i<preventIn.length; i++) {
-                if (preventIn[i] === nodeName) {
-                  shouldExecute = false;
-                  break;
+            // if the callback is executed directly `hotkey.get('w').callback()`
+            // there will be no event, so just execute the callback.
+            if (event) {
+              var target = event.target || event.srcElement; // srcElement is IE only
+              var nodeName = target.nodeName.toUpperCase();
+
+              // check if the input has a mousetrap class, and skip checking preventIn if so
+              if ((' ' + target.className + ' ').indexOf(' mousetrap ') > -1) {
+                shouldExecute = true;
+              } else {
+                // don't execute callback if the event was fired from inside an element listed in preventIn
+                for (var i=0; i<preventIn.length; i++) {
+                  if (preventIn[i] === nodeName) {
+                    shouldExecute = false;
+                    break;
+                  }
                 }
               }
             }
@@ -61202,6 +62316,15 @@ angular.module('md5', []).constant('md5', (function() {
             if (scope.hotkeys[index].combo.length > 1) {
               scope.hotkeys[index].combo.splice(scope.hotkeys[index].combo.indexOf(combo), 1);
             } else {
+
+              // remove hotkey from bound scopes
+              angular.forEach(boundScopes, function (boundScope) {
+                var scopeIndex = boundScope.indexOf(scope.hotkeys[index]);
+                if (scopeIndex !== -1) {
+                    boundScope.splice(scopeIndex, 1);
+                }
+              });
+
               scope.hotkeys.splice(index, 1);
             }
             return true;
@@ -63748,7 +64871,7 @@ angular.module('cfp.loadingBar', [])
 });
 
 /**
- * @license AngularJS v1.4.4
+ * @license AngularJS v1.4.6
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -65240,7 +66363,7 @@ angular.module('angularPayments', []);angular.module('angularPayments')
 }]);
 
 /**
- * @license AngularJS v1.4.4
+ * @license AngularJS v1.4.6
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -65263,7 +66386,7 @@ function lookupDottedPath(obj, path) {
     throw $resourceMinErr('badmember', 'Dotted member path "@{0}" is invalid.', path);
   }
   var keys = path.split('.');
-  for (var i = 0, ii = keys.length; i < ii && obj !== undefined; i++) {
+  for (var i = 0, ii = keys.length; i < ii && angular.isDefined(obj); i++) {
     var key = keys[i];
     obj = (obj !== null) ? obj[key] : undefined;
   }
@@ -65594,6 +66717,7 @@ function shallowClearAndCopy(src, dst) {
  */
 angular.module('ngResource', ['ng']).
   provider('$resource', function() {
+    var PROTOCOL_AND_DOMAIN_REGEX = /^https?:\/\/[^\/]*/;
     var provider = this;
 
     this.defaults = {
@@ -65668,7 +66792,8 @@ angular.module('ngResource', ['ng']).
           var self = this,
             url = actionUrl || self.template,
             val,
-            encodedVal;
+            encodedVal,
+            protocolAndDomain = '';
 
           var urlParams = self.urlParams = {};
           forEach(url.split(/\W/), function(param) {
@@ -65681,6 +66806,10 @@ angular.module('ngResource', ['ng']).
             }
           });
           url = url.replace(/\\:/g, ':');
+          url = url.replace(PROTOCOL_AND_DOMAIN_REGEX, function(match) {
+            protocolAndDomain = match;
+            return '';
+          });
 
           params = params || {};
           forEach(self.urlParams, function(_, urlParam) {
@@ -65711,7 +66840,7 @@ angular.module('ngResource', ['ng']).
           // E.g. `http://url.com/id./format?q=x` becomes `http://url.com/id.format?q=x`
           url = url.replace(/\/\.(?=\w+($|\?))/, '.');
           // replace escaped `/\.` with `/.`
-          config.url = url.replace(/\/\\\./, '/.');
+          config.url = protocolAndDomain + url.replace(/\/\\\./, '/.');
 
 
           // set params - delegate param encoding to $http
@@ -65910,7 +67039,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.4.5
+ * @license AngularJS v1.4.6
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -66781,9 +67910,9 @@ function verifyQ (assertQConstructor) {
 },{"./provider":5,"angular-assert-q-constructor":1}]},{},[7])(7)
 });
 /*!
- * angular-translate - v2.7.2 - 2015-06-01
- * http://github.com/angular-translate/angular-translate
- * Copyright (c) 2015 ; Licensed MIT
+ * angular-translate - v2.8.0 - 2015-09-18
+ * 
+ * Copyright (c) 2015 The angular-translate team, Pascal Precht; Licensed MIT
  */
 (function (root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -66987,12 +68116,24 @@ function $translateSanitizationProvider () {
    */
   this.$get = ['$injector', '$log', function ($injector, $log) {
 
+    var cachedStrategyMap = {};
+
     var applyStrategies = function (value, mode, selectedStrategies) {
       angular.forEach(selectedStrategies, function (selectedStrategy) {
         if (angular.isFunction(selectedStrategy)) {
           value = selectedStrategy(value, mode);
         } else if (angular.isFunction(strategies[selectedStrategy])) {
           value = strategies[selectedStrategy](value, mode);
+        } else if (angular.isString(strategies[selectedStrategy])) {
+          if (!cachedStrategyMap[strategies[selectedStrategy]]) {
+            try {
+              cachedStrategyMap[strategies[selectedStrategy]] = $injector.get(strategies[selectedStrategy]);
+            } catch (e) {
+              cachedStrategyMap[strategies[selectedStrategy]] = function() {};
+              throw new Error('pascalprecht.translate.$translateSanitization: Unknown sanitization strategy: \'' + selectedStrategy + '\'');
+            }
+          }
+          value = cachedStrategyMap[strategies[selectedStrategy]](value, mode);
         } else {
           throw new Error('pascalprecht.translate.$translateSanitization: Unknown sanitization strategy: \'' + selectedStrategy + '\'');
         }
@@ -67129,7 +68270,8 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       $notFoundIndicatorRight,
       $postCompilingEnabled = false,
       $forceAsyncReloadEnabled = false,
-      NESTED_OBJECT_DELIMITER = '.',
+      $nestedObjectDelimeter = '.',
+      $isReady = false,
       loaderCache,
       directivePriority = 0,
       statefulFilter = true,
@@ -67150,7 +68292,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         }
       };
 
-  var version = '2.7.2';
+  var version = '2.8.0';
 
   // tries to determine the browsers language
   var getFirstBrowserLanguage = function () {
@@ -67355,6 +68497,26 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
   };
 
   /**
+   * @ngdoc function
+   * @name pascalprecht.translate.$translateProvider#nestedObjectDelimeter
+   * @methodOf pascalprecht.translate.$translateProvider
+   *
+   * @description
+   *
+   * Let's you change the delimiter for namespaced translations.
+   * Default delimiter is `.`.
+   *
+   * @param {string} delimiter namespace separator
+   */
+  this.nestedObjectDelimeter = function (delimiter) {
+    if (!delimiter) {
+      return $nestedObjectDelimeter;
+    }
+    $nestedObjectDelimeter = delimiter;
+    return this;
+  };
+
+  /**
    * @name flatObject
    * @private
    *
@@ -67379,10 +68541,10 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       if (angular.isObject(val)) {
         flatObject(val, path.concat(key), result, key);
       } else {
-        keyWithPath = path.length ? ('' + path.join(NESTED_OBJECT_DELIMITER) + NESTED_OBJECT_DELIMITER + key) : key;
+        keyWithPath = path.length ? ('' + path.join($nestedObjectDelimeter) + $nestedObjectDelimeter + key) : key;
         if(path.length && key === prevKey){
           // Create shortcut path (foo.bar == foo.bar.bar)
-          keyWithShortPath = '' + path.join(NESTED_OBJECT_DELIMITER);
+          keyWithShortPath = '' + path.join($nestedObjectDelimeter);
           // Link it to original path
           result[keyWithShortPath] = '@:' + keyWithPath;
         }
@@ -67464,12 +68626,13 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
    * only that it says which language to **prefer**.
    *
    * @param {string} langKey A language key.
-   *
    */
   this.preferredLanguage = function(langKey) {
-    setupPreferredLanguage(langKey);
-    return this;
-
+    if (langKey) {
+      setupPreferredLanguage(langKey);
+      return this;
+    }
+    return $preferredLanguage;
   };
   var setupPreferredLanguage = function (langKey) {
     if (langKey) {
@@ -67948,7 +69111,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
    *
    * @description
    * Registers a cache for internal $http based loaders.
-   * {@link pascalprecht.translate.$translateProvider#determinePreferredLanguage determinePreferredLanguage}.
+   * {@link pascalprecht.translate.$translationCache $translationCache}.
    * When false the cache will be disabled (default). When true or undefined
    * the cache will be a default (see $cacheFactory). When an object it will
    * be treat as a cache object itself: the usage is $http({cache: cache})
@@ -68058,7 +69221,8 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           interpolatorHashMap = {},
           langPromises = {},
           fallbackIndex,
-          startFallbackIteration;
+          startFallbackIteration,
+          abortLoader;
 
       var $translate = function (translationId, interpolateParams, interpolationId, defaultTranslationText) {
 
@@ -68185,11 +69349,14 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
        */
       var useLanguage = function (key) {
         $uses = key;
-        $rootScope.$emit('$translateChangeSuccess', {language: key});
 
+        // make sure to store new language key before triggering success event
         if ($storageFactory) {
           Storage.put($translate.storageKey(), $uses);
         }
+
+        $rootScope.$emit('$translateChangeSuccess', {language: key});
+
         // inform default interpolator
         defaultInterpolator.setLocale($uses);
 
@@ -68231,10 +69398,16 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           cache = $injector.get(cache);
         }
 
+        if (pendingLoader && abortLoader) {
+          abortLoader.resolve();
+        }
+        abortLoader = $q.defer();
+
         var loaderOptions = angular.extend({}, $loaderOptions, {
           key: key,
           $http: angular.extend({}, {
-            cache: cache
+            cache: cache,
+            timeout: abortLoader.promise
           }, $loaderOptions.$http)
         });
 
@@ -68653,6 +69826,20 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
 
       /**
        * @ngdoc function
+       * @name pascalprecht.translate.$translate#nestedObjectDelimeter
+       * @methodOf pascalprecht.translate.$translate
+       *
+       * @description
+       * Returns the configured delimiter for nested namespaces.
+       *
+       * @return {string} nestedObjectDelimeter
+       */
+      $translate.nestedObjectDelimeter = function () {
+        return $nestedObjectDelimeter;
+      };
+
+      /**
+       * @ngdoc function
        * @name pascalprecht.translate.$translate#fallbackLanguage
        * @methodOf pascalprecht.translate.$translate
        *
@@ -68756,14 +69943,17 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
        * When trying to 'use' a language which isn't available it tries to load it
        * asynchronously with registered loaders.
        *
-       * Returns promise object with loaded language file data
+       * Returns promise object with loaded language file data or string of the currently used language.
+       *
+       * If no or a falsy key is given it returns the currently used language key.
+       * The returned string will be ```undefined``` if setting up $translate hasn't finished.
        * @example
        * $translate.use("en_US").then(function(data){
        *   $scope.text = $translate("HELLO");
        * });
        *
-       * @param {string} key Language key
-       * @return {string} Language key
+       * @param {string} [key] Language key
+       * @return {object|string} Promise with loaded language data or the language key if a falsy param was given.
        */
       $translate.use = function (key) {
         if (!key) {
@@ -69076,12 +70266,72 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         return statefulFilter;
       };
 
+      /**
+       * @ngdoc function
+       * @name pascalprecht.translate.$translate#isReady
+       * @methodOf pascalprecht.translate.$translate
+       *
+       * @description
+       * Returns whether the service is "ready" to translate (i.e. loading 1st language).
+       *
+       * See also {@link pascalprecht.translate.$translate#methods_onReady onReady()}.
+       *
+       * @return {boolean} current value of ready
+       */
+      $translate.isReady = function () {
+        return $isReady;
+      };
+
+      var $onReadyDeferred = $q.defer();
+
+      /**
+       * @ngdoc function
+       * @name pascalprecht.translate.$translate#onReady
+       * @methodOf pascalprecht.translate.$translate
+       *
+       * @description
+       * Returns whether the service is "ready" to translate (i.e. loading 1st language).
+       *
+       * See also {@link pascalprecht.translate.$translate#methods_isReady isReady()}.
+       *
+       * @param {Function=} fn Function to invoke when service is ready
+       * @return {object} Promise resolved when service is ready
+       */
+      $translate.onReady = function (fn) {
+        var deferred = $q.defer();
+        if (angular.isFunction(fn)) {
+          deferred.promise.then(fn);
+        }
+        if ($isReady) {
+          deferred.resolve();
+        } else {
+          $onReadyDeferred.promise.then(function () {
+            deferred.resolve();
+          });
+        }
+        return deferred.promise;
+      };
+
+      // Whenever $translateReady is being fired, this will ensure the state of $isReady
+      var globalOnReadyListener = $rootScope.$on('$translateReady', function () {
+        $onReadyDeferred.resolve();
+        globalOnReadyListener(); // one time only
+        globalOnReadyListener = null;
+      });
+      var globalOnChangeListener = $rootScope.$on('$translateChangeEnd', function () {
+        $onReadyDeferred.resolve();
+        globalOnChangeListener(); // one time only
+        globalOnChangeListener = null;
+      });
+
       if ($loaderFactory) {
 
         // If at least one async loader is defined and there are no
         // (default) translations available we should try to load them.
         if (angular.equals($translationTable, {})) {
-          $translate.use($translate.use());
+          if ($translate.use()) {
+            $translate.use($translate.use());
+          }
         }
 
         // Also, if there are any fallback language registered, we start
@@ -69099,6 +70349,8 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
             }
           }
         }
+      } else {
+        $rootScope.$emit('$translateReady', { language: $translate.use() });
       }
 
       return $translate;
@@ -69327,6 +70579,7 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
         scope.interpolateParams = {};
         scope.preText = '';
         scope.postText = '';
+        scope.translateNamespace = getTranslateNamespace(scope);
         var translationIds = {};
 
         var initInterpolationParams = function (interpolateParams, iAttr, tAttr) {
@@ -69357,14 +70610,16 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
           }
 
           if (angular.equals(translationId , '') || !angular.isDefined(translationId)) {
+            var iElementText = trim.apply(iElement.text());
+
             // Resolve translation id by inner html if required
-            var interpolateMatches = trim.apply(iElement.text()).match(interpolateRegExp);
+            var interpolateMatches = iElementText.match(interpolateRegExp);
             // Interpolate translation id if required
             if (angular.isArray(interpolateMatches)) {
               scope.preText = interpolateMatches[1];
               scope.postText = interpolateMatches[3];
               translationIds.translate = $interpolate(interpolateMatches[2])(scope.$parent);
-              var watcherMatches = iElement.text().match(watcherRegExp);
+              var watcherMatches = iElementText.match(watcherRegExp);
               if (angular.isArray(watcherMatches) && watcherMatches[2] && watcherMatches[2].length) {
                 observeElementTranslation._unwatchOld = scope.$watch(watcherMatches[2], function (newValue) {
                   translationIds.translate = newValue;
@@ -69372,7 +70627,7 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
                 });
               }
             } else {
-              translationIds.translate = iElement.text().replace(/^\s+|\s+$/g,'');
+              translationIds.translate = iElementText;
             }
           } else {
             translationIds.translate = translationId;
@@ -69444,14 +70699,19 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
           for (var key in translationIds) {
 
             if (translationIds.hasOwnProperty(key) && translationIds[key] !== undefined) {
-              updateTranslation(key, translationIds[key], scope, scope.interpolateParams, scope.defaultText);
+              updateTranslation(key, translationIds[key], scope, scope.interpolateParams, scope.defaultText, scope.translateNamespace);
             }
           }
         };
 
         // Put translation processing function outside loop
-        var updateTranslation = function(translateAttr, translationId, scope, interpolateParams, defaultTranslationText) {
+        var updateTranslation = function(translateAttr, translationId, scope, interpolateParams, defaultTranslationText, translateNamespace) {
           if (translationId) {
+            // if translation id starts with '.' and translateNamespace given, prepend namespace
+            if (translateNamespace && translationId.charAt(0) === '.') {
+              translationId = translateNamespace + translationId;
+            }
+
             $translate(translationId, interpolateParams, translateInterpolation, defaultTranslationText)
               .then(function (translation) {
                 applyTranslation(translation, scope, true, translateAttr);
@@ -69470,7 +70730,7 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
             if (!successful && typeof scope.defaultText !== 'undefined') {
               value = scope.defaultText;
             }
-            iElement.html(scope.preText + value + scope.postText);
+            iElement.empty().append(scope.preText + value + scope.postText);
             var globallyEnabled = $translate.isPostCompilingEnabled();
             var locallyDefined = typeof tAttr.translateCompile !== 'undefined';
             var locallyEnabled = locallyDefined && tAttr.translateCompile !== 'false';
@@ -69519,6 +70779,22 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
 }
 translateDirective.$inject = ['$translate', '$q', '$interpolate', '$compile', '$parse', '$rootScope'];
 
+/**
+ * Returns the scope's namespace.
+ * @private
+ * @param scope
+ * @returns {string}
+ */
+function getTranslateNamespace(scope) {
+  'use strict';
+  if (scope.translateNamespace) {
+    return scope.translateNamespace;
+  }
+  if (scope.$parent) {
+    return getTranslateNamespace(scope.$parent);
+  }
+}
+
 translateDirective.displayName = 'translateDirective';
 
 angular.module('pascalprecht.translate')
@@ -69545,7 +70821,7 @@ angular.module('pascalprecht.translate')
  */
 .directive('translateCloak', translateCloakDirective);
 
-function translateCloakDirective($rootScope, $translate) {
+function translateCloakDirective($translate) {
 
   'use strict';
 
@@ -69556,11 +70832,9 @@ function translateCloakDirective($rootScope, $translate) {
       },
       removeCloak = function () {
         tElement.removeClass($translate.cloakClassName());
-      },
-      removeListener = $rootScope.$on('$translateChangeEnd', function () {
+      };
+      $translate.onReady(function () {
         removeCloak();
-        removeListener();
-        removeListener = null;
       });
       applyCloak();
 
@@ -69575,9 +70849,102 @@ function translateCloakDirective($rootScope, $translate) {
     }
   };
 }
-translateCloakDirective.$inject = ['$rootScope', '$translate'];
+translateCloakDirective.$inject = ['$translate'];
 
 translateCloakDirective.displayName = 'translateCloakDirective';
+
+angular.module('pascalprecht.translate')
+/**
+ * @ngdoc directive
+ * @name pascalprecht.translate.directive:translateNamespace
+ * @restrict A
+ *
+ * @description
+ * Translates given translation id either through attribute or DOM content.
+ * Internally it uses `translate` filter to translate translation id. It possible to
+ * pass an optional `translate-values` object literal as string into translation id.
+ *
+ * @param {string=} translate namespace name which could be either string or interpolated string.
+ *
+ * @example
+   <example module="ngView">
+    <file name="index.html">
+      <div translate-namespace="CONTENT">
+
+        <div>
+            <h1 translate>.HEADERS.TITLE</h1>
+            <h1 translate>.HEADERS.WELCOME</h1>
+        </div>
+
+        <div translate-namespace=".HEADERS">
+            <h1 translate>.TITLE</h1>
+            <h1 translate>.WELCOME</h1>
+        </div>
+
+      </div>
+    </file>
+    <file name="script.js">
+      angular.module('ngView', ['pascalprecht.translate'])
+
+      .config(function ($translateProvider) {
+
+        $translateProvider.translations('en',{
+          'TRANSLATION_ID': 'Hello there!',
+          'CONTENT': {
+            'HEADERS': {
+                TITLE: 'Title'
+            }
+          },
+          'CONTENT.HEADERS.WELCOME': 'Welcome'
+        }).preferredLanguage('en');
+
+      });
+
+    </file>
+   </example>
+ */
+.directive('translateNamespace', translateNamespaceDirective);
+
+function translateNamespaceDirective() {
+
+  'use strict';
+
+  return {
+    restrict: 'A',
+    scope: true,
+    compile: function () {
+      return {
+        pre: function (scope, iElement, iAttrs) {
+          scope.translateNamespace = getTranslateNamespace(scope);
+
+          if (scope.translateNamespace && iAttrs.translateNamespace.charAt(0) === '.') {
+            scope.translateNamespace += iAttrs.translateNamespace;
+          } else {
+            scope.translateNamespace = iAttrs.translateNamespace;
+          }
+        }
+      };
+    }
+  };
+}
+
+/**
+ * Returns the scope's namespace.
+ * @private
+ * @param scope
+ * @returns {string}
+ */
+function getTranslateNamespace(scope) {
+  'use strict';
+  if (scope.translateNamespace) {
+    return scope.translateNamespace;
+  }
+  if (scope.$parent) {
+    return getTranslateNamespace(scope.$parent);
+  }
+}
+
+translateNamespaceDirective.displayName = 'translateNamespaceDirective';
 
 angular.module('pascalprecht.translate')
 /**
@@ -78289,7 +79656,7 @@ restangular.provider('Restangular', function() {
 
 angular.module('debounce', [])
   .service('debounce', ['$timeout', function ($timeout) {
-    return function (func, wait, immediate) {
+    return function (func, wait, immediate, invokeApply) {
       var timeout, args, context, result;
       function debounce() {
         /* jshint validthis:true */
@@ -78305,7 +79672,7 @@ angular.module('debounce', [])
         if (timeout) {
           $timeout.cancel(timeout);
         }
-        timeout = $timeout(later, wait);
+        timeout = $timeout(later, wait, invokeApply);
         if (callNow) {
           result = func.apply(context, args);
         }
@@ -78329,6 +79696,7 @@ angular.module('debounce', [])
         var prevRender = ngModelController.$render.bind(ngModelController);
         var commitSoon = debounce(function (viewValue) {
           pass = true;
+          ngModelController.$$lastCommittedViewValue = debouncedValue;
           ngModelController.$setViewValue(viewValue);
           pass = false;
         }, parseInt(debounceDuration, 10), immediate);
@@ -78502,7 +79870,7 @@ angular.module('debounce', [])
 }());
 
 /**
- * Satellizer 0.12.2
+ * Satellizer 0.12.5
  * (c) 2015 Sahat Yalkabov
  * License: MIT
  */
@@ -78525,31 +79893,51 @@ angular.module('debounce', [])
       authToken: 'Bearer',
       storageType: 'localStorage',
       providers: {
-        google: {
-          name: 'google',
-          url: '/auth/google',
-          authorizationEndpoint: 'https://accounts.google.com/o/oauth2/auth',
-          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-          scope: ['profile', 'email'],
-          scopePrefix: 'openid',
-          scopeDelimiter: ' ',
-          requiredUrlParams: ['scope'],
-          optionalUrlParams: ['display'],
-          display: 'popup',
-          type: '2.0',
-          popupOptions: { width: 452, height: 633 }
-        },
         facebook: {
           name: 'facebook',
           url: '/auth/facebook',
           authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
           redirectUri: (window.location.origin || window.location.protocol + '//' + window.location.host) + '/',
+          requiredUrlParams: ['display', 'scope'],
           scope: ['email'],
           scopeDelimiter: ',',
-          requiredUrlParams: ['display', 'scope'],
           display: 'popup',
           type: '2.0',
           popupOptions: { width: 580, height: 400 }
+        },
+        google: {
+          name: 'google',
+          url: '/auth/google',
+          authorizationEndpoint: 'https://accounts.google.com/o/oauth2/auth',
+          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+          requiredUrlParams: ['scope'],
+          optionalUrlParams: ['display'],
+          scope: ['profile', 'email'],
+          scopePrefix: 'openid',
+          scopeDelimiter: ' ',
+          display: 'popup',
+          type: '2.0',
+          popupOptions: { width: 452, height: 633 }
+        },
+        github: {
+          name: 'github',
+          url: '/auth/github',
+          authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+          optionalUrlParams: ['scope'],
+          scope: ['user:email'],
+          scopeDelimiter: ' ',
+          type: '2.0',
+          popupOptions: { width: 1020, height: 618 }
+        },
+        instagram: {
+          name: 'instagram',
+          url: '/auth/instagram',
+          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+          requiredUrlParams: ['scope'],
+          scope: ['basic'],
+          scopeDelimiter: '+',
+          authorizationEndpoint: 'https://api.instagram.com/oauth/authorize'
         },
         linkedin: {
           name: 'linkedin',
@@ -78563,16 +79951,37 @@ angular.module('debounce', [])
           type: '2.0',
           popupOptions: { width: 527, height: 582 }
         },
-        github: {
-          name: 'github',
-          url: '/auth/github',
-          authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+        twitter: {
+          name: 'twitter',
+          url: '/auth/twitter',
+          authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
           redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-          optionalUrlParams: ['scope'],
-          scope: ['user:email'],
+          type: '1.0',
+          popupOptions: { width: 495, height: 645 }
+        },
+        twitch: {
+          name: 'twitch',
+          url: '/auth/twitch',
+          authorizationEndpoint: 'https://api.twitch.tv/kraken/oauth2/authorize',
+          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+          requiredUrlParams: ['scope'],
+          scope: ['user_read'],
           scopeDelimiter: ' ',
+          display: 'popup',
           type: '2.0',
-          popupOptions: { width: 1020, height: 618 }
+          popupOptions: { width: 500, height: 560 }
+        },
+        live: {
+          name: 'live',
+          url: '/auth/live',
+          authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
+          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+          requiredUrlParams: ['display', 'scope'],
+          scope: ['wl.emails'],
+          scopeDelimiter: ' ',
+          display: 'popup',
+          type: '2.0',
+          popupOptions: { width: 500, height: 560 }
         },
         yahoo: {
           name: 'yahoo',
@@ -78583,26 +79992,6 @@ angular.module('debounce', [])
           scopeDelimiter: ',',
           type: '2.0',
           popupOptions: { width: 559, height: 519 }
-        },
-        twitter: {
-          name: 'twitter',
-          url: '/auth/twitter',
-          authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
-          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-          type: '1.0',
-          popupOptions: { width: 495, height: 645 }
-        },
-        live: {
-          name: 'live',
-          url: '/auth/live',
-          authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
-          redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-          scope: ['wl.emails'],
-          scopeDelimiter: ' ',
-          requiredUrlParams: ['display', 'scope'],
-          display: 'popup',
-          type: '2.0',
-          popupOptions: { width: 500, height: 560 }
         }
       }
     })
@@ -78695,8 +80084,8 @@ angular.module('debounce', [])
             return local.login(user, opts);
           };
 
-          $auth.signup = function(user) {
-            return local.signup(user);
+          $auth.signup = function(user, options) {
+            return local.signup(user, options);
           };
 
           $auth.logout = function() {
@@ -78761,7 +80150,7 @@ angular.module('debounce', [])
 
           if (token && token.split('.').length === 3) {
             var base64Url = token.split('.')[1];
-            var base64 = base64Url.replace('-', '+').replace('_', '/');
+            var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
             return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
           }
         };
@@ -78804,10 +80193,18 @@ angular.module('debounce', [])
           if (token) {
             if (token.split('.').length === 3) {
               var base64Url = token.split('.')[1];
-              var base64 = base64Url.replace('-', '+').replace('_', '/');
+              var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
               var exp = JSON.parse($window.atob(base64)).exp;
+
               if (exp) {
-                return Math.round(new Date().getTime() / 1000) <= exp;
+                var isExpired = Math.round(new Date().getTime() / 1000) >= exp;
+
+                if (isExpired) {
+                  storage.remove(tokenName);
+                  return false;
+                } else {
+                  return true;
+                }
               }
               return true;
             }
@@ -78936,8 +80333,8 @@ angular.module('debounce', [])
           Oauth2.open = function(options, userData) {
             defaults = utils.merge(options, defaults);
 
+            var url;
             var openPopup;
-            var url = [defaults.authorizationEndpoint, Oauth2.buildQueryString()].join('?');
             var stateName = defaults.name + '_state';
 
             if (angular.isFunction(defaults.state)) {
@@ -78945,6 +80342,8 @@ angular.module('debounce', [])
             } else if (angular.isString(defaults.state)) {
               storage.set(stateName, defaults.state);
             }
+
+            url = [defaults.authorizationEndpoint, Oauth2.buildQueryString()].join('?');
 
             if (config.cordova) {
               openPopup = popup.open(url, defaults.name, defaults.popupOptions, defaults.redirectUri).eventListener(defaults.redirectUri);
@@ -79343,6 +80742,7 @@ angular.module('debounce', [])
     }]);
 
 })(window, window.angular);
+
 /* jquery.signalR.core.js */
 /*global window:false */
 /*!
