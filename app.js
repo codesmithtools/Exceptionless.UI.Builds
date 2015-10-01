@@ -1599,7 +1599,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   * https://github.com/paulmillr/es6-shim
   * @license es6-shim Copyright 2013-2015 by Paul Miller (http://paulmillr.com)
   *   and contributors,  MIT License
-  * es6-shim: v0.33.3
+  * es6-shim: v0.33.6
   * see https://github.com/paulmillr/es6-shim/blob/0.33.3/LICENSE
   * Details and documentation:
   * https://github.com/paulmillr/es6-shim/
@@ -1626,6 +1626,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
 
   var _apply = Function.call.bind(Function.apply);
   var _call = Function.call.bind(Function.call);
+  var isArray = Array.isArray;
 
   var not = function notThunker(func) {
     return function notThunk() { return !_apply(func, this, arguments); };
@@ -1649,7 +1650,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   var isCallableWithoutNew = not(throwsError);
   var arePropertyDescriptorsSupported = function () {
     // if Object.defineProperty exists but throws, it's IE 8
-    return !throwsError(function () { Object.defineProperty({}, 'x', {}); });
+    return !throwsError(function () { Object.defineProperty({}, 'x', { get: function () {} }); });
   };
   var supportsDescriptors = !!Object.defineProperty && arePropertyDescriptorsSupported();
   var functionsHaveNames = (function foo() {}).name === 'foo';
@@ -1889,19 +1890,18 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
 
   // taken directly from https://github.com/ljharb/is-arguments/blob/master/index.js
   // can be replaced with require('is-arguments') if we ever use a build process instead
-  var isArguments = function isArguments(value) {
-    var str = _toString(value);
-    var result = str === '[object Arguments]';
-    if (!result) {
-      result = str !== '[object Array]' &&
-        value !== null &&
-        typeof value === 'object' &&
-        typeof value.length === 'number' &&
-        value.length >= 0 &&
-        _toString(value.callee) === '[object Function]';
-    }
-    return result;
+  var isStandardArguments = function isArguments(value) {
+    return _toString(value) === '[object Arguments]';
   };
+  var isLegacyArguments = function isArguments(value) {
+    return value !== null &&
+      typeof value === 'object' &&
+      typeof value.length === 'number' &&
+      value.length >= 0 &&
+      _toString(value) !== '[object Array]' &&
+      _toString(value.callee) === '[object Function]';
+  };
+  var isArguments = isStandardArguments(arguments) ? isStandardArguments : isLegacyArguments;
 
   var ES = {
     // https://people.mozilla.org/~jorendorff/es6-draft.html#sec-call-f-v-args
@@ -2400,7 +2400,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     of: function of() {
       var len = arguments.length;
       var C = this;
-      var A = Array.isArray(C) || !ES.IsCallable(C) ? new Array(len) : ES.Construct(C, [len]);
+      var A = isArray(C) || !ES.IsCallable(C) ? new Array(len) : ES.Construct(C, [len]);
       for (var k = 0; k < len; ++k) {
         createDataPropertyOrThrow(A, k, arguments[k]);
       }
@@ -2654,7 +2654,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   var arrayFromHandlesIterables = (function () {
     // Detects a bug in Webkit nightly r181886
     var arr = Array.from([0].entries());
-    return arr.length === 1 && Array.isArray(arr[0]) && arr[0][0] === 0 && arr[0][1] === 0;
+    return arr.length === 1 && isArray(arr[0]) && arr[0][0] === 0 && arr[0][1] === 0;
   }());
   if (!arrayFromSwallowsNegativeLengths || !arrayFromHandlesIterables) {
     overrideNative(Array, 'from', ArrayShims.from);
@@ -2731,8 +2731,11 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
 
   if (Number('0o10') !== 8 || Number('0b10') !== 2) {
     var OrigNumber = Number;
-    var isBinary = Function.bind.call(Function.call, RegExp.prototype.test, /^0b/i);
-    var isOctal = Function.bind.call(Function.call, RegExp.prototype.test, /^0o/i);
+    var binaryRegex = /^0b/i;
+    var octalRegex = /^0o/i;
+    // Note that in IE 8, RegExp.prototype.test doesn't seem to exist: ie, "test" is an own property of regexes. wtf.
+    var isBinary = binaryRegex.test.bind(binaryRegex);
+    var isOctal = octalRegex.test.bind(octalRegex);
     var toPrimitive = function (O) { // need to replace this with `es-to-primitive/es6`
       var result;
       if (typeof O.valueOf === 'function') {
@@ -2749,22 +2752,25 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       }
       throw new TypeError('No default value');
     };
-    var NumberShim = function Number(value) {
-      var primValue = Type.primitive(value) ? value : toPrimitive(value, 'number');
-      if (typeof primValue === 'string') {
-        if (isBinary(primValue)) {
-          primValue = parseInt(_strSlice(primValue, 2), 2);
-        } else if (isOctal(primValue)) {
-          primValue = parseInt(_strSlice(primValue, 2), 8);
+    var NumberShim = (function () {
+      // this is wrapped in an IIFE because of IE 6-8's wacky scoping issues with named function expressions.
+      return function Number(value) {
+        var primValue = Type.primitive(value) ? value : toPrimitive(value, 'number');
+        if (typeof primValue === 'string') {
+          if (isBinary(primValue)) {
+            primValue = parseInt(_strSlice(primValue, 2), 2);
+          } else if (isOctal(primValue)) {
+            primValue = parseInt(_strSlice(primValue, 2), 8);
+          }
         }
-      }
-      if (this instanceof Number) {
-        return new OrigNumber(primValue);
-      }
-      /* jshint newcap: false */
-      return OrigNumber(primValue);
-      /* jshint newcap: true */
-    };
+        if (this instanceof Number) {
+          return new OrigNumber(primValue);
+        }
+        /* jshint newcap: false */
+        return OrigNumber(primValue);
+        /* jshint newcap: true */
+      };
+    }());
     wrapConstructor(OrigNumber, NumberShim, {});
     /*globals Number: true */
     Number = NumberShim;
@@ -3369,7 +3375,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   var PromiseShim = (function () {
     var setTimeout = globals.setTimeout;
     // some environments don't have setTimeout - no way to shim here.
-    if (typeof setTimeout !== 'function') { return; }
+    if (typeof setTimeout !== 'function' && typeof setTimeout !== 'object') { return; }
 
     ES.IsPromise = function (promise) {
       if (!ES.TypeIsObject(promise)) {
@@ -3845,7 +3851,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     };
 
     var addIterableToMap = function addIterableToMap(MapConstructor, map, iterable) {
-      if (Array.isArray(iterable) || Type.string(iterable)) {
+      if (isArray(iterable) || Type.string(iterable)) {
         _forEach(iterable, function (entry) {
           map.set(entry[0], entry[1]);
         });
@@ -3879,7 +3885,7 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       }
     };
     var addIterableToSet = function addIterableToSet(SetConstructor, set, iterable) {
-      if (Array.isArray(iterable) || Type.string(iterable)) {
+      if (isArray(iterable) || Type.string(iterable)) {
         _forEach(iterable, function (value) {
           set.add(value);
         });
@@ -4781,9 +4787,11 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     }
   }
   if (globals.Reflect.defineProperty) {
-    if (valueOrFalseIfThrows(function () {
-      globals.Reflect.defineProperty(1, 'test', { value: 1 });
-      return true;
+    if (!valueOrFalseIfThrows(function () {
+      var basic = !globals.Reflect.defineProperty(1, 'test', { value: 1 });
+      // "extensible" fails on Edge 0.12
+      var extensible = typeof Object.preventExtensions !== 'function' || !globals.Reflect.defineProperty(Object.preventExtensions({}), 'test', {});
+      return basic && extensible;
     })) {
       overrideNative(globals.Reflect, 'defineProperty', ReflectShims.defineProperty);
     }
@@ -4837,9 +4845,59 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       shouldOverwrite = true;
     }
     if (shouldOverwrite) {
-      defineProperty(String.prototype, key, stringHTMLshims[key], true);
+      overrideNative(String.prototype, key, stringHTMLshims[key]);
     }
   });
+
+  var JSONstringifiesSymbols = (function () {
+    // Microsoft Edge v0.12 stringifies Symbols incorrectly
+    if (!Type.symbol(Symbol.iterator)) { return false; } // Symbols are not supported
+    var stringify = typeof JSON === 'object' && typeof JSON.stringify === 'function' ? JSON.stringify : null;
+    if (!stringify) { return false; } // JSON.stringify is not supported
+    if (typeof stringify(Symbol()) !== 'undefined') { return true; } // Symbols should become `undefined`
+    if (stringify([Symbol()]) !== '[null]') { return true; } // Symbols in arrays should become `null`
+    var obj = { a: Symbol() };
+    obj[Symbol()] = true;
+    if (stringify(obj) !== '{}') { return true; } // Symbol-valued keys *and* Symbol-valued properties should be omitted
+    return false;
+  }());
+  var JSONstringifyAcceptsObjectSymbol = valueOrFalseIfThrows(function () {
+    // Chrome 45 throws on stringifying object symbols
+    if (!Type.symbol(Symbol.iterator)) { return true; } // Symbols are not supported
+    return JSON.stringify(Object(Symbol())) === '{}' && JSON.stringify([Object(Symbol())]) === '[{}]';
+  });
+  if (JSONstringifiesSymbols || !JSONstringifyAcceptsObjectSymbol) {
+    var origStringify = JSON.stringify;
+    overrideNative(JSON, 'stringify', function stringify(value) {
+      if (typeof value === 'symbol') { return; }
+      var replacer;
+      if (arguments.length > 1) {
+        replacer = arguments[1];
+      }
+      var args = [value];
+      if (!isArray(replacer)) {
+        var replaceFn = ES.IsCallable(replacer) ? replacer : null;
+        var wrappedReplacer = function (key, val) {
+          var parsedValue = replacer ? _call(replacer, this, key, val) : val;
+          if (typeof parsedValue !== 'symbol') {
+            if (Type.symbol(parsedValue)) {
+              return assignTo({})(parsedValue);
+            } else {
+              return parsedValue;
+            }
+          }
+        };
+        args.push(wrappedReplacer);
+      } else {
+        // create wrapped replacer that handles an array replacer?
+        args.push(replacer);
+      }
+      if (arguments.length > 2) {
+        args.push(arguments[2]);
+      }
+      return origStringify.apply(this, args);
+    });
+  }
 
   return globals;
 }));
@@ -67039,7 +67097,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.4.6
+ * @license AngularJS v1.4.7
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -98432,7 +98490,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.organizations;
           }
 
-          return  organizationService.getAll().then(onSuccess);
+          return  organizationService.getAll({ mode: 'summary' }).then(onSuccess);
         }
 
         function onSuccess() {
@@ -99631,7 +99689,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return organizationService.getAll().then(onSuccess);
+            return organizationService.getAll({ mode: 'summary' }).then(onSuccess);
           }
 
           function getProjects(canUpdate) {
@@ -99645,7 +99703,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.projects;
             }
 
-            return projectService.getAll().then(onSuccess);
+            return projectService.getAll({ mode: 'summary' }).then(onSuccess);
           }
 
           function getUser(canUpdate) {
@@ -100331,7 +100389,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return  organizationService.getAll().then(onSuccess);
+            return  organizationService.getAll({ mode: 'summary' }).then(onSuccess);
           }
 
           return getAllOrganizations().then(getSelectedOrganization);
@@ -100343,7 +100401,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.projects;
           }
 
-          return projectService.getAll().then(onSuccess);
+          return projectService.getAll({ mode: 'summary' }).then(onSuccess);
         }
 
         function hasExceededRequestLimitOrganizations() {
@@ -100673,7 +100731,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your organizations.');
           }
 
-          return organizationService.getAll().then(onSuccess, onFailure);
+          return organizationService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
         }
 
         function getOrganizationUrl(organization) {
@@ -100695,7 +100753,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your projects.');
           }
 
-          return projectService.getAll().then(onSuccess, onFailure);
+          return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
         }
 
         function getProjectsByOrganizationId(id) {
@@ -103214,7 +103272,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return response;
         }
 
-        return organizationService.getAll().then(onSuccess);
+        return organizationService.getAll({ mode: 'summary' }).then(onSuccess);
       }
 
       function getUser(data) {
@@ -103743,7 +103801,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll().then(onSuccess, onFailure);
+        return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
       }
 
       if (authService.isAuthenticated()) {
@@ -103897,7 +103955,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll().then(onSuccess, onFailure);
+        return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
       }
 
       function signup(isRetrying) {
@@ -104092,7 +104150,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error('An error occurred while loading the projects.');
         }
 
-        return projectService.getAll().then(onSuccess, onFailure);
+        return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
       }
 
       function getUser() {
@@ -105618,7 +105676,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           }
         }
 
-        organizationService.getAll().then(onSuccess);
+        organizationService.getAll({ mode: 'summary' }).then(onSuccess);
       }
 
       function hasOrganizations() {
