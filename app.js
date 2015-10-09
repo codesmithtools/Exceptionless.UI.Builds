@@ -67968,7 +67968,7 @@ function verifyQ (assertQConstructor) {
 },{"./provider":5,"angular-assert-q-constructor":1}]},{},[7])(7)
 });
 /*!
- * angular-translate - v2.8.0 - 2015-09-18
+ * angular-translate - v2.8.1 - 2015-10-01
  * 
  * Copyright (c) 2015 The angular-translate team, Pascal Precht; Licensed MIT
  */
@@ -68350,7 +68350,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         }
       };
 
-  var version = '2.8.0';
+  var version = '2.8.1';
 
   // tries to determine the browsers language
   var getFirstBrowserLanguage = function () {
@@ -69279,8 +69279,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           interpolatorHashMap = {},
           langPromises = {},
           fallbackIndex,
-          startFallbackIteration,
-          abortLoader;
+          startFallbackIteration;
 
       var $translate = function (translationId, interpolateParams, interpolationId, defaultTranslationText) {
 
@@ -69456,16 +69455,10 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           cache = $injector.get(cache);
         }
 
-        if (pendingLoader && abortLoader) {
-          abortLoader.resolve();
-        }
-        abortLoader = $q.defer();
-
         var loaderOptions = angular.extend({}, $loaderOptions, {
           key: key,
           $http: angular.extend({}, {
-            cache: cache,
-            timeout: abortLoader.promise
+            cache: cache
           }, $loaderOptions.$http)
         });
 
@@ -70035,7 +70028,9 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           langPromises[key] = loadAsync(key).then(function (translation) {
             translations(translation.key, translation.table);
             deferred.resolve(translation.key);
-            useLanguage(translation.key);
+            if ($nextLang === key) {
+              useLanguage(translation.key);
+            }
             return translation;
           }, function (key) {
             $rootScope.$emit('$translateChangeError', {language: key});
@@ -70341,6 +70336,9 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       };
 
       var $onReadyDeferred = $q.defer();
+      $onReadyDeferred.promise.then(function () {
+        $isReady = true;
+      });
 
       /**
        * @ngdoc function
@@ -70363,9 +70361,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         if ($isReady) {
           deferred.resolve();
         } else {
-          $onReadyDeferred.promise.then(function () {
-            deferred.resolve();
-          });
+          $onReadyDeferred.promise.then(deferred.resolve);
         }
         return deferred.promise;
       };
@@ -98490,7 +98486,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.organizations;
           }
 
-          return  organizationService.getAll({ mode: 'summary' }).then(onSuccess);
+          return  organizationService.getAll().then(onSuccess);
         }
 
         function onSuccess() {
@@ -99689,7 +99685,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return organizationService.getAll({ mode: 'summary' }).then(onSuccess);
+            return organizationService.getAll().then(onSuccess);
           }
 
           function getProjects(canUpdate) {
@@ -99703,7 +99699,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.projects;
             }
 
-            return projectService.getAll({ mode: 'summary' }).then(onSuccess);
+            return projectService.getAll().then(onSuccess);
           }
 
           function getUser(canUpdate) {
@@ -100389,7 +100385,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return  organizationService.getAll({ mode: 'summary' }).then(onSuccess);
+            return  organizationService.getAll().then(onSuccess);
           }
 
           return getAllOrganizations().then(getSelectedOrganization);
@@ -100401,7 +100397,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.projects;
           }
 
-          return projectService.getAll({ mode: 'summary' }).then(onSuccess);
+          return projectService.getAll({ mode: 'statistics' }).then(onSuccess);
         }
 
         function hasExceededRequestLimitOrganizations() {
@@ -100731,7 +100727,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your organizations.');
           }
 
-          return organizationService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
+          return organizationService.getAll().then(onSuccess, onFailure);
         }
 
         function getOrganizationUrl(organization) {
@@ -100753,7 +100749,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your projects.');
           }
 
-          return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
+          return projectService.getAll().then(onSuccess, onFailure);
         }
 
         function getProjectsByOrganizationId(id) {
@@ -103272,7 +103268,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return response;
         }
 
-        return organizationService.getAll({ mode: 'summary' }).then(onSuccess);
+        return organizationService.getAll().then(onSuccess);
       }
 
       function getUser(data) {
@@ -103801,7 +103797,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
+        return projectService.getAll().then(onSuccess, onFailure);
       }
 
       if (authService.isAuthenticated()) {
@@ -103955,7 +103951,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
+        return projectService.getAll().then(onSuccess, onFailure);
       }
 
       function signup(isRetrying) {
@@ -104150,7 +104146,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error('An error occurred while loading the projects.');
         }
 
-        return projectService.getAll({ mode: 'summary' }).then(onSuccess, onFailure);
+        return projectService.getAll().then(onSuccess, onFailure);
       }
 
       function getUser() {
@@ -105032,7 +105028,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   angular.module('app.organization')
     .controller('organization.List', ['$ExceptionlessClient', '$rootScope', '$scope', '$window', '$state', 'billingService', 'dialogs', 'dialogService', 'linkService', 'notificationService', 'organizationService', 'paginationService', function ($ExceptionlessClient, $rootScope, $scope, $window, $state, billingService, dialogs, dialogService, linkService, notificationService, organizationService, paginationService) {
       var source = 'exceptionless.organization.List';
-      var settings = {limit: 10, mode: 'summary'};
+      var settings = {limit: 10, mode: 'statistics'};
       var vm = this;
 
       function add() {
@@ -105425,8 +105421,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         },
         hideOrganizationName: true,
         options: {
-          limit: 10,
-          mode: 'summary'
+          limit: 10
         }
       };
       vm.removeOrganization = removeOrganization;
@@ -105676,7 +105671,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           }
         }
 
-        organizationService.getAll({ mode: 'summary' }).then(onSuccess);
+        organizationService.getAll().then(onSuccess);
       }
 
       function hasOrganizations() {
@@ -106090,7 +106085,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         get: projectService.getAll,
         options: {
           limit: 10,
-          mode: 'summary'
+          mode: 'statistics'
         }
       };
     }
