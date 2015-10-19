@@ -97483,6 +97483,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   .config(['$locationProvider', '$stateProvider', '$uiViewScrollProvider', '$urlRouterProvider', 'dialogsProvider', 'gravatarServiceProvider', 'RestangularProvider', 'BASE_URL', 'EXCEPTIONLESS_API_KEY', '$ExceptionlessClient', 'stripeProvider', 'STRIPE_PUBLISHABLE_KEY', 'USE_HTML5_MODE', function ($locationProvider, $stateProvider, $uiViewScrollProvider, $urlRouterProvider, dialogsProvider, gravatarServiceProvider, RestangularProvider, BASE_URL, EXCEPTIONLESS_API_KEY, $ExceptionlessClient, stripeProvider, STRIPE_PUBLISHABLE_KEY, USE_HTML5_MODE) {
     $ExceptionlessClient.config.apiKey = EXCEPTIONLESS_API_KEY;
     $ExceptionlessClient.config.serverUrl = BASE_URL;
+    $ExceptionlessClient.config.setVersion('@@version');
     $ExceptionlessClient.config.defaultTags.push('UI');
 
     $locationProvider.html5Mode({
@@ -98399,7 +98400,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.organizations;
           }
 
-          return  organizationService.getAll({ mode: 'stats' }).then(onSuccess);
+          return  organizationService.getAll().then(onSuccess);
         }
 
         function onSuccess() {
@@ -99568,6 +99569,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             if (versionParts.length === 3)
               data.app_build = parseInt(versionParts[2]);
 
+            // TODO: include the total event count for the organization.
             var currentOrganization = getCurrentOrganization();
             if (currentOrganization) {
               data.company = {
@@ -99575,8 +99577,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 name: currentOrganization.name,
                 remote_created_at: objectIDService.create(currentOrganization.id).timestamp,
                 plan: currentOrganization.plan_id,
-                monthly_spend: currentOrganization.billing_price,
-                total_errors: currentOrganization.total_event_count
+                monthly_spend: currentOrganization.billing_price
               };
 
               if (currentOrganization.subscribe_date) {
@@ -99598,7 +99599,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return organizationService.getAll({ mode: 'stats' }).then(onSuccess);
+            return organizationService.getAll().then(onSuccess);
           }
 
           function getProjects(canUpdate) {
@@ -99612,7 +99613,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.projects;
             }
 
-            return projectService.getAll({ mode: 'stats' }).then(onSuccess);
+            return projectService.getAll().then(onSuccess);
           }
 
           function getUser(canUpdate) {
@@ -100219,7 +100220,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             }
 
             // Only show it if you absolutely have no data or the current project has no data or if the current org has no data.
-            var canShowConfigurationAlert = currentProjects.filter(function(p) { return p.event_count === 0; }).length === currentProjects.length;
+            var canShowConfigurationAlert = currentProjects.filter(function(p) { return p.is_configured === false; }).length === currentProjects.length;
 
             // Only show the premium features dialog when searching on a plan without premium features and your project has been configured.
             var tryingToSearchWithoutPremiumFeatures = vm.filterUsesPremiumFeatures && !organization.has_premium_features;
@@ -100255,7 +100256,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                   return;
                 }
 
-                if (project.event_count === 0) {
+                if (project.is_configured === false) {
                   vm.projectsRequiringConfiguration.push(project);
                   hasProjectsRequiringConfiguration = true;
                 }
@@ -100298,7 +100299,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return  organizationService.getAll({ mode: 'stats' }).then(onSuccess);
+            return  organizationService.getAll().then(onSuccess);
           }
 
           return getAllOrganizations().then(getSelectedOrganization);
@@ -100310,7 +100311,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.projects;
           }
 
-          return projectService.getAll({ mode: 'stats' }).then(onSuccess);
+          return projectService.getAll().then(onSuccess);
         }
 
         function hasExceededRequestLimitOrganizations() {
@@ -100640,7 +100641,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your organizations.');
           }
 
-          return organizationService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
+          return organizationService.getAll().then(onSuccess, onFailure);
         }
 
         function getOrganizationUrl(organization) {
@@ -100662,7 +100663,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your projects.');
           }
 
-          return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
+          return projectService.getAll().then(onSuccess, onFailure);
         }
 
         function getProjectsByOrganizationId(id) {
@@ -101297,7 +101298,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.search', ['restangular'])
-    .factory('searchService', ['$cacheFactory', 'Restangular', function ($cacheFactory, Restangular) {
+    .factory('searchService', ['$cacheFactory', '$timeout', '$q', 'Restangular', function ($cacheFactory, $timeout, $q, Restangular) {
       var _cache = $cacheFactory('http:search');
 
       var _cachedRestangular = Restangular.withConfig(function(RestangularConfigurer) {
@@ -101305,7 +101306,21 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       function validate(query) {
-        return _cachedRestangular.one('search', 'validate').get({ query: query || '' });
+        if (!query) {
+          var deferred = $q.defer();
+          $timeout(function() {
+            deferred.resolve({
+              data: {
+                is_valid: true,
+                uses_premium_features: false
+              }
+            });
+          }, 0);
+
+          return deferred.promise;
+        }
+
+        return _cachedRestangular.one('search', 'validate').get({ query: query });
       }
 
       var service = {
@@ -103139,13 +103154,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app')
-    .controller('App', ['$scope', '$state', '$stateParams', '$window', 'authService', 'billingService', '$ExceptionlessClient', 'filterService', 'hotkeys', 'INTERCOM_APPID', '$intercom', 'locker', 'notificationService', 'organizationService', 'projectService', 'signalRService', 'stateService', 'STRIPE_PUBLISHABLE_KEY', 'SYSTEM_NOTIFICATION_MESSAGE', 'urlService', 'userService', function ($scope, $state, $stateParams, $window, authService, billingService, $ExceptionlessClient, filterService, hotkeys, INTERCOM_APPID, $intercom, locker, notificationService, organizationService, projectService, signalRService, stateService, STRIPE_PUBLISHABLE_KEY, SYSTEM_NOTIFICATION_MESSAGE, urlService, userService) {
+    .controller('App', ['$scope', '$state', '$stateParams', '$window', 'authService', 'billingService', '$ExceptionlessClient', 'filterService', 'hotkeys', 'INTERCOM_APPID', '$intercom', 'locker', 'notificationService', 'projectService', 'signalRService', 'stateService', 'STRIPE_PUBLISHABLE_KEY', 'SYSTEM_NOTIFICATION_MESSAGE', 'urlService', 'userService', function ($scope, $state, $stateParams, $window, authService, billingService, $ExceptionlessClient, filterService, hotkeys, INTERCOM_APPID, $intercom, locker, notificationService, projectService, signalRService, stateService, STRIPE_PUBLISHABLE_KEY, SYSTEM_NOTIFICATION_MESSAGE, urlService, userService) {
       var source = 'app.App';
       var _store = locker.driver('local').namespace('app');
       var vm = this;
 
       function canChangePlan() {
-        return !!STRIPE_PUBLISHABLE_KEY && vm.organizations && vm.organizations.length > 0;
+        return !!STRIPE_PUBLISHABLE_KEY && vm.projects && vm.projects.length > 0;
       }
 
       function changePlan(organizationId) {
@@ -103168,13 +103183,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return urlService.buildFilterUrl({ route: 'new', projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
       }
 
-      function getOrganizations() {
+      function getProjects() {
         function onSuccess(response) {
-          vm.organizations = response.data.plain();
+          vm.projects = response.data.plain();
           return response;
         }
 
-        return organizationService.getAll({ mode: 'stats' }).then(onSuccess);
+        return projectService.getAll().then(onSuccess);
       }
 
       function getUser(data) {
@@ -103292,7 +103307,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.getRecentUrl = getRecentUrl;
       vm.getFrequentUrl = getFrequentUrl;
       vm.getNewUrl = getNewUrl;
-      vm.getOrganizations = getOrganizations;
+      vm.getProjects = getProjects;
       vm.getUser = getUser;
       vm.getSystemNotificationMessage = getSystemNotificationMessage;
       vm.hasAdminRole = hasAdminRole;
@@ -103302,12 +103317,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.isIntercomEnabled = isIntercomEnabled;
       vm.isSideNavCollapsed = _store.get('sideNavCollapsed') === true;
       vm.isTypeMenuActive = isTypeMenuActive;
-      vm.organizations = [];
+      vm.projects = [];
       vm.showIntercom = showIntercom;
       vm.toggleSideNavCollapsed = toggleSideNavCollapsed;
       vm.user = {};
 
-      getUser().then(getOrganizations).then(startSignalR);
+      getUser().then(getProjects).then(startSignalR);
     }]);
 }());
 
@@ -103703,7 +103718,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
+        return projectService.getAll().then(onSuccess, onFailure);
       }
 
       if (authService.isAuthenticated()) {
@@ -103857,7 +103872,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
+        return projectService.getAll().then(onSuccess, onFailure);
       }
 
       function signup(isRetrying) {
@@ -104052,7 +104067,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error('An error occurred while loading the projects.');
         }
 
-        return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
+        return projectService.getAll().then(onSuccess, onFailure);
       }
 
       function getUser() {
@@ -105578,7 +105593,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           }
         }
 
-        organizationService.getAll({ mode: 'stats' }).then(onSuccess);
+        organizationService.getAll().then(onSuccess);
       }
 
       function hasOrganizations() {
@@ -106565,12 +106580,12 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/admin/dashboard.tpl.html',
-    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged\" refresh-action=\"vm.get()\" refresh-throttle=\"10000\"> <div class=\"col\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-signal\"></i> Dashboard</div> </div> </div> </div> </div>"
+    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged\" refresh-action=\"vm.get()\" refresh-throttle=\"10000\"> <div class=\"col\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-signal\"></i> Dashboard</div> <div class=\"panel-body\"> <p>This dashboard has yet to be finished. It will contain a system level overview.</p> </div> </div> </div> </div> </div>"
   );
 
 
   $templateCache.put('app/app.tpl.html',
-    "<div class=\"app-header-fixed app-aside-fixed\" ng-class=\"{'app-aside-folded': appVm.isSideNavCollapsed}\"> <div ng-include=\"'app/blocks/header.tpl.html'\" class=\"app-header navbar\"></div> <div ng-include=\"'app/blocks/sidebar.tpl.html'\" class=\"app-aside hidden-xs bg-dark\"></div> <div class=\"app-content\" refresh-on=\"UserChanged\" refresh-action=\"appVm.getUser(data)\" refresh-debounce=\"1000\"> <div refresh-on=\"OrganizationChanged\" refresh-action=\"appVm.getOrganizations()\" refresh-debounce=\"1000\"></div> <button type=\"button\" role=\"button\" class=\"off-screen-toggle hide\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\"></button> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"appVm.hasSystemNotificationMessage()\"> <div ng-bind-html=\"appVm.getSystemNotificationMessage()\"></div> </div> <rate-limit></rate-limit> <div class=\"app-content-body fade-in\" ui-view autoscroll=\"true\"></div> </div> <div class=\"app-footer wrapper b-t bg-light\"> <span class=\"pull-right\"> <a href=\"https://github.com/exceptionless/Exceptionless.UI/releases\" target=\"_blank\">@@version</a> <a href=\"javascript:void(0);\" ui-scroll=\"app\" class=\"m-l-sm text-muted\"><i class=\"fa fa-long-arrow-up\"></i></a> </span> &copy; 2015 <a href=\"http://exceptionless.io\">Exceptionless</a> </div> <intercom ng-if=\"appVm.isIntercomEnabled()\"></intercom> </div>"
+    "<div class=\"app-header-fixed app-aside-fixed\" ng-class=\"{'app-aside-folded': appVm.isSideNavCollapsed}\"> <div ng-include=\"'app/blocks/header.tpl.html'\" class=\"app-header navbar\"></div> <div ng-include=\"'app/blocks/sidebar.tpl.html'\" class=\"app-aside hidden-xs bg-dark\"></div> <div class=\"app-content\" refresh-on=\"UserChanged\" refresh-action=\"appVm.getUser(data)\" refresh-debounce=\"1000\"> <div refresh-on=\"ProjectChanged\" refresh-action=\"appVm.getProjects()\" refresh-debounce=\"10000\"></div> <button type=\"button\" role=\"button\" class=\"off-screen-toggle hide\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\"></button> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"appVm.hasSystemNotificationMessage()\"> <div ng-bind-html=\"appVm.getSystemNotificationMessage()\"></div> </div> <rate-limit></rate-limit> <div class=\"app-content-body fade-in\" ui-view autoscroll=\"true\"></div> </div> <div class=\"app-footer wrapper b-t bg-light\"> <span class=\"pull-right\"> <a href=\"https://github.com/exceptionless/Exceptionless.UI/releases\" target=\"_blank\">@@version</a> <a href=\"javascript:void(0);\" ui-scroll=\"app\" class=\"m-l-sm text-muted\"><i class=\"fa fa-long-arrow-up\"></i></a> </span> &copy; 2015 <a href=\"http://exceptionless.io\">Exceptionless</a> </div> <intercom ng-if=\"appVm.isIntercomEnabled()\"></intercom> </div>"
   );
 
 
@@ -106600,7 +106615,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/blocks/nav.tpl.html',
-    "<ul class=\"nav\"> <li ng-class=\"{active: appVm.isTypeMenuActive('error')}\"> <a href=\"#\" class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-warning fa-fw\"></i> <span>Exceptions</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Exceptions</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('error')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('error')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('error')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('error')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('log')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-file-text-o fa-fw\"></i> <span>Log Messages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Log Messages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('log')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('log')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('log')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('log')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('404')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-unlink fa-fw\"></i> <span>Broken Links</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Broken Links</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('404')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('404')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('404')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('404')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('usage')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-check-square-o fa-fw\"></i> <span>Feature Usages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Feature Usages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('usage')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('usage')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('usage')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAllMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-calendar fa-fw\"></i> <span>All Events</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">All Events</li> <li> <a ng-href=\"{{appVm.getDashboardUrl()}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl()}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl()}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl()}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAdminMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-cog fa-fw\"></i> <span>Admin</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Admin</li> <li> <a ui-sref=\"app.project.list\"> <i class=\"fa fa-briefcase fa-fw\"></i> <span>Projects</span> </a> </li> <li> <a ui-sref=\"app.organization.list\"> <i class=\"fa fa-group fa-fw\"></i> <span>Organizations</span> </a> </li> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> <span>My Account</span> </a> </li> <li ng-if=\"appVm.hasAdminRole()\"> <a ui-sref=\"app.admin.dashboard\"> <i class=\"fa fa-cogs fa-fw\"></i> <span>System</span> </a> </li> </ul> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\" title=\"Documentation\"> <i class=\"fa fa-book fa-fw\"></i> <span>Documentation</span> </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\" title=\"Support\"> <i class=\"fa fa-envelope fa-fw\"></i> <span>Support</span> </a> </li> </ul>"
+    "<ul class=\"nav\"> <li ng-class=\"{active: appVm.isTypeMenuActive('error')}\"> <a href=\"#\" class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-warning fa-fw\"></i> <span>Exceptions</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Exceptions</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('error')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('error')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('error')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('error')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('log')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-file-text-o fa-fw\"></i> <span>Log Messages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Log Messages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('log')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('log')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('log')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('log')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('404')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-unlink fa-fw\"></i> <span>Broken Links</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Broken Links</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('404')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('404')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('404')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('404')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('usage')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-check-square-o fa-fw\"></i> <span>Feature Usages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Feature Usages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('usage')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('usage')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('usage')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAllMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-calendar fa-fw\"></i> <span>All Events</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">All Events</li> <li> <a ng-href=\"{{appVm.getDashboardUrl()}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl()}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl()}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl()}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAdminMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-cog fa-fw\"></i> <span>Admin</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Admin</li> <li> <a ui-sref=\"app.project.list\"> <i class=\"fa fa-briefcase fa-fw\"></i> <span>Projects</span> </a> </li> <li> <a ui-sref=\"app.organization.list\"> <i class=\"fa fa-group fa-fw\"></i> <span>Organizations</span> </a> </li> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> <span>My Account</span> </a> </li>  </ul> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\" title=\"Documentation\"> <i class=\"fa fa-book fa-fw\"></i> <span>Documentation</span> </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\" title=\"Support\"> <i class=\"fa fa-envelope fa-fw\"></i> <span>Support</span> </a> </li> </ul>"
   );
 
 
@@ -106780,7 +106795,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/intercom/intercom-directive.tpl.html',
-    "<div> <div refresh-on=\"UserChanged\" refresh-action=\"vm.getUser(true)\" refresh-debounce=\"2500\" refresh-stopping=\"vm.shutdown()\"></div> <div refresh-on=\"OrganizationChanged\" refresh-action=\"vm.getOrganizations(true)\" refresh-debounce=\"2500\"></div> <div refresh-on=\"ProjectChanged\" refresh-action=\"vm.getProjects(true)\" refresh-debounce=\"2500\"></div> <div refresh-on=\"filterChanged\" refresh-action=\"vm.updateIntercom(true)\" refresh-debounce=\"2500\"></div> <div refresh-on=\"$stateChangeSuccess\" refresh-action=\"vm.hide()\" refresh-debounce=\"1000\"></div> </div>"
+    "<div> <div refresh-on=\"UserChanged\" refresh-action=\"vm.getUser(true)\" refresh-debounce=\"10000\" refresh-stopping=\"vm.shutdown()\"></div> <div refresh-on=\"OrganizationChanged\" refresh-action=\"vm.getOrganizations(true)\" refresh-debounce=\"10000\"></div> <div refresh-on=\"ProjectChanged\" refresh-action=\"vm.getProjects(true)\" refresh-debounce=\"10000\"></div> <div refresh-on=\"filterChanged\" refresh-action=\"vm.updateIntercom(true)\" refresh-debounce=\"10000\"></div> <div refresh-on=\"$stateChangeSuccess\" refresh-action=\"vm.hide()\" refresh-debounce=\"1000\"></div> </div>"
   );
 
 
