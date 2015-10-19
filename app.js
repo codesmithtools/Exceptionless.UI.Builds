@@ -83726,93 +83726,6 @@ angular.module('debounce', [])
     $.signalR.version = "2.2.0";
 }(window.jQuery));
 
-angular.module('SignalR', [])
-.constant('$', window.jQuery)
-.factory('Hub', ['$', function ($) {
-	//This will allow same connection to be used for all Hubs
-	//It also keeps connection as singleton.
-	var globalConnections = [];
-
-	function initNewConnection(options) {
-		var connection = null;
-		if (options && options.rootPath) {
-			connection = $.hubConnection(options.rootPath, { useDefaultPath: false });
-		} else {
-			connection = $.hubConnection();
-		}
-
-		connection.logging = (options && options.logging ? true : false);
-		return connection;
-	}
-
-	function getConnection(options) {
-		var useSharedConnection = !(options && options.useSharedConnection === false);
-		if (useSharedConnection) {
-			return typeof globalConnections[options.rootPath] === 'undefined' ?
-			globalConnections[options.rootPath] = initNewConnection(options) :
-			globalConnections[options.rootPath];
-		}
-		else {
-			return initNewConnection(options);
-		}
-	}
-
-	return function (hubName, options) {
-		var Hub = this;
-
-		Hub.connection = getConnection(options);
-		Hub.proxy = Hub.connection.createHubProxy(hubName);
-
-		Hub.on = function (event, fn) {
-			Hub.proxy.on(event, fn);
-		};
-		Hub.invoke = function (method, args) {
-			return Hub.proxy.invoke.apply(Hub.proxy, arguments)
-		};
-		Hub.disconnect = function () {
-			Hub.connection.stop();
-		};
-		Hub.connect = function () {
-			return Hub.connection.start(options.transport ? { transport: options.transport } : null);
-		};
-
-		if (options && options.listeners) {
-			angular.forEach(options.listeners, function (fn, event) {
-				Hub.on(event, fn);
-			});
-		}
-		if (options && options.methods) {
-			angular.forEach(options.methods, function (method) {
-				Hub[method] = function () {
-					var args = $.makeArray(arguments);
-					args.unshift(method);
-					return Hub.invoke.apply(Hub, args);
-				};
-			});
-		}
-		if (options && options.queryParams) {
-			Hub.connection.qs = options.queryParams;
-		}
-		if (options && options.errorHandler) {
-			Hub.connection.error(options.errorHandler);
-		}
-        //DEPRECATED
-		//Allow for the user of the hub to easily implement actions upon disconnected.
-		//e.g. : Laptop/PC sleep and reopen, one might want to automatically reconnect 
-		//by using the disconnected event on the connection as the starting point.
-		if (options && options.hubDisconnected) {
-		    Hub.connection.disconnected(options.hubDisconnected);
-		}
-		if (options && options.stateChanged) {
-		    Hub.connection.stateChanged(options.stateChanged);
-		}
-
-		//Adding additional property of promise allows to access it in rest of the application.
-		Hub.promise = Hub.connect();
-		return Hub;
-	};
-}]);
-
 !function() {
   var d3 = {
     version: "3.5.6"
@@ -98486,7 +98399,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.organizations;
           }
 
-          return  organizationService.getAll().then(onSuccess);
+          return  organizationService.getAll({ mode: 'stats' }).then(onSuccess);
         }
 
         function onSuccess() {
@@ -99685,7 +99598,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return organizationService.getAll().then(onSuccess);
+            return organizationService.getAll({ mode: 'stats' }).then(onSuccess);
           }
 
           function getProjects(canUpdate) {
@@ -99699,7 +99612,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.projects;
             }
 
-            return projectService.getAll().then(onSuccess);
+            return projectService.getAll({ mode: 'stats' }).then(onSuccess);
           }
 
           function getUser(canUpdate) {
@@ -100385,7 +100298,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               return vm.organizations;
             }
 
-            return  organizationService.getAll().then(onSuccess);
+            return  organizationService.getAll({ mode: 'stats' }).then(onSuccess);
           }
 
           return getAllOrganizations().then(getSelectedOrganization);
@@ -100397,7 +100310,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return vm.projects;
           }
 
-          return projectService.getAll({ mode: 'statistics' }).then(onSuccess);
+          return projectService.getAll({ mode: 'stats' }).then(onSuccess);
         }
 
         function hasExceededRequestLimitOrganizations() {
@@ -100727,7 +100640,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your organizations.');
           }
 
-          return organizationService.getAll().then(onSuccess, onFailure);
+          return organizationService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
         }
 
         function getOrganizationUrl(organization) {
@@ -100749,7 +100662,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             notificationService.error('An error occurred while loading your projects.');
           }
 
-          return projectService.getAll().then(onSuccess, onFailure);
+          return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
         }
 
         function getProjectsByOrganizationId(id) {
@@ -101492,82 +101405,75 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.signalr', [
-    'SignalR',
-
     'app.config',
     'exceptionless',
     'exceptionless.auth'
   ])
-  .factory('signalRService', ['$ExceptionlessClient', '$rootScope', '$timeout', 'authService', 'BASE_URL', 'Hub', function ($ExceptionlessClient, $rootScope, $timeout, authService, BASE_URL, Hub) {
+  .factory('signalRService', ['$ExceptionlessClient', '$rootScope', '$interval', '$timeout', 'authService', 'BASE_URL', function ($ExceptionlessClient, $rootScope, $interval, $timeout, authService, BASE_URL) {
     var source = 'exceptionless.signalr.signalRService';
-    var _hub;
+    var _connection;
     var _signalRTimeout;
+    var _reconnectInterval;
 
     function start() {
       startDelayed(1);
     }
 
     function startDelayed(delay) {
-      if (_hub || _signalRTimeout) {
+      if (_connection || _signalRTimeout || _reconnectInterval) {
         stop();
       }
 
+      _connection = $.connection(BASE_URL + '/api/v2/push', { access_token: authService.getToken() });
+      _connection.received(function (data) {
+        if (!data || typeof data === 'string') {
+          return;
+        }
+
+        if (data.message && data.message.change_type) {
+          data.message.added = data.message.change_type === 0;
+          data.message.updated = data.message.change_type === 1;
+          data.message.deleted = data.message.change_type === 2;
+        }
+
+        $rootScope.$emit(data.type, data.message);
+
+        // This event is fired when a user is added or removed from an organization.
+        if (data.type === 'UserMembershipChanged' && data.message && data.message.organization_id) {
+          $rootScope.$emit('OrganizationChanged', data.message);
+          $rootScope.$emit('ProjectChanged', data.message);
+        }
+      });
+
+      _connection.stateChanged(function (change) {
+        if (change.newState === $.signalR.connectionState.disconnected && authService.isAuthenticated()) {
+          _reconnectInterval = $interval(function() {
+            _connection.start().then(function() {
+              $interval.cancel(_reconnectInterval);
+            });
+          }, 5000);
+        }
+      });
+
       _signalRTimeout = $timeout(function () {
-        _hub = new Hub('messages', {
-          rootPath: BASE_URL + '/api/v2/push',
-
-          // client side methods
-          listeners: {
-            'releaseNotification': function (releaseNotification) {
-              $rootScope.$emit('notification:release', releaseNotification);
-            },
-            'systemNotification': function (systemNotification) {
-              $rootScope.$emit('notification:system', systemNotification);
-            },
-            'entityChanged': function (entityChanged) {
-              entityChanged.added = entityChanged.change_type === 0;
-              entityChanged.updated = entityChanged.change_type === 1;
-              entityChanged.deleted = entityChanged.change_type === 2;
-
-              $rootScope.$emit(entityChanged.type + 'Changed', entityChanged);
-            },
-            'planOverage': function (planOverage) {
-              $rootScope.$emit('planOverage', planOverage);
-            },
-            'planChanged': function (planChanged) {
-              $rootScope.$emit('planChanged', planChanged);
-            },
-            'userMembershipChanged': function (userMembershipChanged) {
-              // This event is fired when a user is added or removed from an organization.
-              if (userMembershipChanged && userMembershipChanged.organization_id){
-                $rootScope.$emit('OrganizationChanged', userMembershipChanged);
-                $rootScope.$emit('ProjectChanged', userMembershipChanged);
-              }
-            }
-          },
-
-          queryParams: {
-            'access_token': authService.getToken()
-          },
-          stateChanged: function(state) {
-            if (state.newState === $.signalR.connectionState.disconnected && authService.isAuthenticated()) {
-              stop();
-              start();
-            }
-          }
-        });
+        _connection.start();
       }, delay || 1000);
     }
 
     function stop() {
-      if (_hub) {
-        _hub.disconnect();
-        _hub = null;
-      }
-
       if (_signalRTimeout) {
         $timeout.cancel(_signalRTimeout);
         _signalRTimeout = null;
+      }
+
+      if (_reconnectInterval) {
+        $interval.cancel(_reconnectInterval);
+        _reconnectInterval = null;
+      }
+
+      if (_connection) {
+        _connection.stop();
+        _connection = null;
       }
     }
 
@@ -103268,7 +103174,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return response;
         }
 
-        return organizationService.getAll().then(onSuccess);
+        return organizationService.getAll({ mode: 'stats' }).then(onSuccess);
       }
 
       function getUser(data) {
@@ -103797,7 +103703,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll().then(onSuccess, onFailure);
+        return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
       }
 
       if (authService.isAuthenticated()) {
@@ -103951,7 +103857,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           return stateService.restore('app.project.add');
         }
 
-        return projectService.getAll().then(onSuccess, onFailure);
+        return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
       }
 
       function signup(isRetrying) {
@@ -104146,7 +104052,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error('An error occurred while loading the projects.');
         }
 
-        return projectService.getAll().then(onSuccess, onFailure);
+        return projectService.getAll({ mode: 'stats' }).then(onSuccess, onFailure);
       }
 
       function getUser() {
@@ -105028,7 +104934,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   angular.module('app.organization')
     .controller('organization.List', ['$ExceptionlessClient', '$rootScope', '$scope', '$window', '$state', 'billingService', 'dialogs', 'dialogService', 'linkService', 'notificationService', 'organizationService', 'paginationService', function ($ExceptionlessClient, $rootScope, $scope, $window, $state, billingService, dialogs, dialogService, linkService, notificationService, organizationService, paginationService) {
       var source = 'exceptionless.organization.List';
-      var settings = {limit: 10, mode: 'statistics'};
+      var settings = {limit: 10, mode: 'stats'};
       var vm = this;
 
       function add() {
@@ -105421,7 +105327,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         },
         hideOrganizationName: true,
         options: {
-          limit: 10
+          limit: 10,
+          mode: 'stats'
         }
       };
       vm.removeOrganization = removeOrganization;
@@ -105671,7 +105578,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           }
         }
 
-        organizationService.getAll().then(onSuccess);
+        organizationService.getAll({ mode: 'stats' }).then(onSuccess);
       }
 
       function hasOrganizations() {
@@ -106085,7 +105992,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         get: projectService.getAll,
         options: {
           limit: 10,
-          mode: 'statistics'
+          mode: 'stats'
         }
       };
     }
@@ -106703,7 +106610,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/dashboard.tpl.html',
-    "<organization-notifications></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged planChanged\" refresh-action=\"vm.get()\" refresh-if=\"vm.canRefresh(data)\" refresh-throttle=\"2500\"> <div class=\"col\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"wrapper-md\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <a ng-href=\"{{appVm.getRecentUrl(vm.type)}}\" class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> <i class=\"fa fa-chevron-right fa-2x more\"></i> </a> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <a ng-href=\"{{appVm.getFrequentUrl(vm.type)}}\" class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-key fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Unique</span> <span class=\"sub\">{{vm.stats.unique || 0 | number : 0}}</span> </div> <i class=\"fa fa-chevron-right fa-2x more\"></i> </a> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <a ng-href=\"{{appVm.getNewUrl(vm.type)}}\" class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-asterisk fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">New</span> <span class=\"sub\">{{vm.stats.new || 0 | number : 0}}</span> </div> <i class=\"fa fa-chevron-right fa-2x more\"></i> </a> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-line-chart fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Per Hour</span> <span class=\"sub\">{{vm.stats.avg_per_hour || 0 | number : 1}}</span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-bar-chart-o\"></i>History</div> <div class=\"panel-body\"> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-signal\"></i>Most Frequent</div> <stacks settings=\"vm.mostFrequent\"></stacks> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-calendar\"></i>Most Recent</div> <events settings=\"vm.mostRecent\"></events> </div> </div> </div> </div>"
+    "<organization-notifications></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get()\" refresh-if=\"vm.canRefresh(data)\" refresh-throttle=\"2500\"> <div class=\"col\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"wrapper-md\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <a ng-href=\"{{appVm.getRecentUrl(vm.type)}}\" class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> <i class=\"fa fa-chevron-right fa-2x more\"></i> </a> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <a ng-href=\"{{appVm.getFrequentUrl(vm.type)}}\" class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-key fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Unique</span> <span class=\"sub\">{{vm.stats.unique || 0 | number : 0}}</span> </div> <i class=\"fa fa-chevron-right fa-2x more\"></i> </a> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <a ng-href=\"{{appVm.getNewUrl(vm.type)}}\" class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-asterisk fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">New</span> <span class=\"sub\">{{vm.stats.new || 0 | number : 0}}</span> </div> <i class=\"fa fa-chevron-right fa-2x more\"></i> </a> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-line-chart fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Per Hour</span> <span class=\"sub\">{{vm.stats.avg_per_hour || 0 | number : 1}}</span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-bar-chart-o\"></i>History</div> <div class=\"panel-body\"> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-signal\"></i>Most Frequent</div> <stacks settings=\"vm.mostFrequent\"></stacks> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-calendar\"></i>Most Recent</div> <events settings=\"vm.mostRecent\"></events> </div> </div> </div> </div>"
   );
 
 
@@ -106773,7 +106680,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/organization/list/list.tpl.html',
-    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <div class=\"col\" refresh-on=\" planChanged PersistentEventChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"2500\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-group\"></i> My Organizations</div> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th>Plan</th> <th class=\"number hidden-xs\">Projects</th> <th class=\"number hidden-xs\">Stacks</th> <th class=\"number hidden-xs\">Events</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"organization in vm.organizations | orderBy: 'name' track by organization.id\"> <td ng-click=\"vm.open(organization.id, $event)\">{{organization.name}}</td> <td ng-click=\"vm.open(organization.id, $event)\">{{organization.plan_name}}</td> <td ng-click=\"vm.open(organization.id, $event)\" class=\"number hidden-xs\">{{organization.project_count | number:0}}</td> <td ng-click=\"vm.open(organization.id, $event)\" class=\"number hidden-xs\">{{organization.stack_count | number:0}}</td> <td ng-click=\"vm.open(organization.id, $event)\" class=\"number hidden-xs\">{{organization.event_count | number:0}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ui-sref=\"app.organization.manage({ id: organization.id })\"><i class=\"fa fa-fw fa-edit\"></i> Edit</a></li> <li><a ng-click=\"vm.leave(organization, appVm.user)\"><i class=\"fa fa-fw fa-sign-out\"></i> Leave Organization</a></li> <li><a ng-click=\"vm.remove(organization)\"><i class=\"fa fa-fw fa-times\"></i> Delete</a></li> </ul> </div> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <button type=\"button\" role=\"button\" ng-click=\"vm.add()\" class=\"btn btn-primary\">New Organization</button> </footer> </div> </div> </div> </div>"
+    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <div class=\"col\" refresh-on=\" PlanChanged PersistentEventChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"2500\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-group\"></i> My Organizations</div> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th>Plan</th> <th class=\"number hidden-xs\">Projects</th> <th class=\"number hidden-xs\">Stacks</th> <th class=\"number hidden-xs\">Events</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"organization in vm.organizations | orderBy: 'name' track by organization.id\"> <td ng-click=\"vm.open(organization.id, $event)\">{{organization.name}}</td> <td ng-click=\"vm.open(organization.id, $event)\">{{organization.plan_name}}</td> <td ng-click=\"vm.open(organization.id, $event)\" class=\"number hidden-xs\">{{organization.project_count | number:0}}</td> <td ng-click=\"vm.open(organization.id, $event)\" class=\"number hidden-xs\">{{organization.stack_count | number:0}}</td> <td ng-click=\"vm.open(organization.id, $event)\" class=\"number hidden-xs\">{{organization.event_count | number:0}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ui-sref=\"app.organization.manage({ id: organization.id })\"><i class=\"fa fa-fw fa-edit\"></i> Edit</a></li> <li><a ng-click=\"vm.leave(organization, appVm.user)\"><i class=\"fa fa-fw fa-sign-out\"></i> Leave Organization</a></li> <li><a ng-click=\"vm.remove(organization)\"><i class=\"fa fa-fw fa-times\"></i> Delete</a></li> </ul> </div> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <button type=\"button\" role=\"button\" ng-click=\"vm.add()\" class=\"btn btn-primary\">New Organization</button> </footer> </div> </div> </div> </div>"
   );
 
 
@@ -106783,7 +106690,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/organization/manage/invoices-directive.tpl.html',
-    "<div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\" refresh-on=\"OrganizationChanged planChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"2500\"> <thead> <tr> <th>Payment Number</th> <th>Date</th> <th class=\"number\">Status</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"invoice in vm.invoices track by invoice.id\"> <td class=\"row-clickable\" ng-click=\"vm.open(invoice.id)\">{{invoice.id}}</td> <td class=\"row-clickable\" ng-click=\"vm.open(invoice.id)\">{{invoice.date | date: 'medium'}}</td> <td class=\"row-clickable\" ng-click=\"vm.open(invoice.id)\">{{invoice.paid ? 'Paid' : 'Unpaid'}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.open(invoice.id)\"><i class=\"fa fa-file\"></i> View Payment</a></li> <li ng-if=\"vm.hasAdminRole(appVm.user)\"> <a ng-href=\"https://manage.stripe.com/invoices/in_{{::invoice.id}}\" target=\"_blank\"><i class=\"fa fa-credit-card\"></i> View Stripe Invoice</a> </li> </ul> </div> </td> </tr> <tr ng-if=\"!vm.hasInvoices()\"> <td colspan=\"4\"> <strong>No invoices were found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\" refresh-on=\"OrganizationChanged PlanChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"2500\"> <thead> <tr> <th>Payment Number</th> <th>Date</th> <th class=\"number\">Status</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"invoice in vm.invoices track by invoice.id\"> <td class=\"row-clickable\" ng-click=\"vm.open(invoice.id)\">{{invoice.id}}</td> <td class=\"row-clickable\" ng-click=\"vm.open(invoice.id)\">{{invoice.date | date: 'medium'}}</td> <td class=\"row-clickable\" ng-click=\"vm.open(invoice.id)\">{{invoice.paid ? 'Paid' : 'Unpaid'}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.open(invoice.id)\"><i class=\"fa fa-file\"></i> View Payment</a></li> <li ng-if=\"vm.hasAdminRole(appVm.user)\"> <a ng-href=\"https://manage.stripe.com/invoices/in_{{::invoice.id}}\" target=\"_blank\"><i class=\"fa fa-credit-card\"></i> View Stripe Invoice</a> </li> </ul> </div> </td> </tr> <tr ng-if=\"!vm.hasInvoices()\"> <td colspan=\"4\"> <strong>No invoices were found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -106833,7 +106740,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/stack/stack.tpl.html',
-    "<organization-notifications organization-id=\"vm.stack.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged planChanged StackChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"2500\"> <div class=\"wrapper-md\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-left fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">First</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.first_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">NA</span> </span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-right fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Last</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.last_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">NA</span> </span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> Stack <span class=\"labels\"> <span class=\"label label-success\" ng-if=\"vm.isFixed()\"> <span class=\"hidden-xs\">FIXED</span> <span class=\"visible-xs\">F</span> </span> <span class=\"label label-success\" ng-if=\"vm.isRegressed()\"> <span class=\"hidden-xs\">REGRESSED</span> <span class=\"visible-xs\">R</span> </span> <span class=\"label label-success\" ng-if=\"vm.isHidden()\"> <span class=\"hidden-xs\">HIDDEN</span> <span class=\"visible-xs\">H</span> </span> </span> <div class=\"pull-right btn-toolbar hidden-print\"> <div class=\"btn-group btn-group-sm\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" title=\"{{vm.isFixed() ? 'Mark this stack as not fixed' : 'Mark this stack as fixed'}}\" promise-button=\"vm.updateIsFixed()\" promise-button-busy-text=\"{{vm.isFixed() ? 'Marking Not Fixed' : 'Marking Fixed' }}\" promise-button-busy-spinner-class=\"fa-size-sm\"> {{vm.isFixed() ? 'Mark Not Fixed' : 'Mark Fixed' }} </button> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"hidden-xs\">Options</span> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.updateIsHidden()\" title=\"Hide this stack from reports and mutes occurrence notifications\"><i ng-if=\"vm.isHidden()\" class=\"fa fa-fw fa-check\"></i>Hide</a></li> <li><a ng-click=\"vm.updateIsCritical()\" title=\"All future occurrences will be marked as critical\"><i ng-if=\"vm.isCritical()\" class=\"fa fa-fw fa-check\"></i>Future Occurrences Are Critical</a></li> <li><a ng-click=\"vm.updateNotifications()\" title=\"Stop sending occurrence notifications for this stack\"><i ng-if=\"vm.notificationsDisabled()\" class=\"fa fa-fw fa-check\"></i>Disable Notifications</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.promoteToExternal()\" title=\"Used to promote stacks to external systems.\">Promote To External</a></li> <li><a ng-click=\"vm.addReferenceLink()\" title=\"Add a reference link to an external resource.\">Add Reference Link</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.remove()\" title=\"Delete this stack\">Delete</a></li> </ul> </div> </div> </div> <div class=\"panel-body\"> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr> <th>Title</th> <td><span truncate lines=\"3\">{{vm.stack.title}}</span></td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.isFixed()\"> <th>Date Fixed</th> <td><span>{{vm.stack.date_fixed | date: 'medium'}}</span></td> </tr> <tr ng-if=\"vm.stack.description\"> <th>Description</th> <td><span truncate lines=\"2\">{{vm.stack.description}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.stack.tags track by tag\">{{tag}}</span></td> </tr> <tr ng-if=\"vm.hasReference()\"> <th>{{vm.hasReferences() ? 'Reference Links' : 'Reference Link'}}</th> <td> <ul ng-if=\"vm.hasReferences()\"> <li ng-repeat=\"reference in vm.stack.references track by reference\"> <a ng-href=\"{{::reference}}\" target=\"_blank\">{{::reference}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(reference)\"><i class=\"fa fa-fw fa-times\"></i></a> </li> </ul> <div ng-if=\"!vm.hasReferences()\"> <a ng-href=\"{{::vm.stack.references[0]}}\" target=\"_blank\">{{::vm.stack.references[0]}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(vm.stack.references[0])\"><i class=\"fa fa-fw fa-times\"></i></a> </div> </td> </tr> </tbody> </table> <h4>Stacking Information</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr ng-repeat=\"(key, value) in vm.stack.signature_info track by key\"> <th>{{key}}</th> <td>{{value}}</td> </tr> </tbody> </table> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-fw fa-calendar\"></i> Recent Occurrences</div> <events settings=\"vm.recentOccurrences\"></events> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.stack.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged PlanChanged StackChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"2500\"> <div class=\"wrapper-md\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-left fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">First</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.first_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">NA</span> </span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-right fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Last</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.last_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">NA</span> </span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> Stack <span class=\"labels\"> <span class=\"label label-success\" ng-if=\"vm.isFixed()\"> <span class=\"hidden-xs\">FIXED</span> <span class=\"visible-xs\">F</span> </span> <span class=\"label label-success\" ng-if=\"vm.isRegressed()\"> <span class=\"hidden-xs\">REGRESSED</span> <span class=\"visible-xs\">R</span> </span> <span class=\"label label-success\" ng-if=\"vm.isHidden()\"> <span class=\"hidden-xs\">HIDDEN</span> <span class=\"visible-xs\">H</span> </span> </span> <div class=\"pull-right btn-toolbar hidden-print\"> <div class=\"btn-group btn-group-sm\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" title=\"{{vm.isFixed() ? 'Mark this stack as not fixed' : 'Mark this stack as fixed'}}\" promise-button=\"vm.updateIsFixed()\" promise-button-busy-text=\"{{vm.isFixed() ? 'Marking Not Fixed' : 'Marking Fixed' }}\" promise-button-busy-spinner-class=\"fa-size-sm\"> {{vm.isFixed() ? 'Mark Not Fixed' : 'Mark Fixed' }} </button> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"hidden-xs\">Options</span> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.updateIsHidden()\" title=\"Hide this stack from reports and mutes occurrence notifications\"><i ng-if=\"vm.isHidden()\" class=\"fa fa-fw fa-check\"></i>Hide</a></li> <li><a ng-click=\"vm.updateIsCritical()\" title=\"All future occurrences will be marked as critical\"><i ng-if=\"vm.isCritical()\" class=\"fa fa-fw fa-check\"></i>Future Occurrences Are Critical</a></li> <li><a ng-click=\"vm.updateNotifications()\" title=\"Stop sending occurrence notifications for this stack\"><i ng-if=\"vm.notificationsDisabled()\" class=\"fa fa-fw fa-check\"></i>Disable Notifications</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.promoteToExternal()\" title=\"Used to promote stacks to external systems.\">Promote To External</a></li> <li><a ng-click=\"vm.addReferenceLink()\" title=\"Add a reference link to an external resource.\">Add Reference Link</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.remove()\" title=\"Delete this stack\">Delete</a></li> </ul> </div> </div> </div> <div class=\"panel-body\"> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr> <th>Title</th> <td><span truncate lines=\"3\">{{vm.stack.title}}</span></td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.isFixed()\"> <th>Date Fixed</th> <td><span>{{vm.stack.date_fixed | date: 'medium'}}</span></td> </tr> <tr ng-if=\"vm.stack.description\"> <th>Description</th> <td><span truncate lines=\"2\">{{vm.stack.description}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.stack.tags track by tag\">{{tag}}</span></td> </tr> <tr ng-if=\"vm.hasReference()\"> <th>{{vm.hasReferences() ? 'Reference Links' : 'Reference Link'}}</th> <td> <ul ng-if=\"vm.hasReferences()\"> <li ng-repeat=\"reference in vm.stack.references track by reference\"> <a ng-href=\"{{::reference}}\" target=\"_blank\">{{::reference}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(reference)\"><i class=\"fa fa-fw fa-times\"></i></a> </li> </ul> <div ng-if=\"!vm.hasReferences()\"> <a ng-href=\"{{::vm.stack.references[0]}}\" target=\"_blank\">{{::vm.stack.references[0]}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(vm.stack.references[0])\"><i class=\"fa fa-fw fa-times\"></i></a> </div> </td> </tr> </tbody> </table> <h4>Stacking Information</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr ng-repeat=\"(key, value) in vm.stack.signature_info track by key\"> <th>{{key}}</th> <td>{{value}}</td> </tr> </tbody> </table> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-fw fa-calendar\"></i> Recent Occurrences</div> <events settings=\"vm.recentOccurrences\"></events> </div> </div> </div>"
   );
 
 
@@ -106868,7 +106775,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/events/events-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged planChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <tr> <th class=\"selection hidden-xs\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th class=\"date\">Date</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"><abbr title=\"{{::event.date | date : 'medium'}}\"> <timeago date=\"event.date\"></timeago> </abbr></td> </tr> <tr ng-if=\"!vm.hasEvents()\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong>No data found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-xs-4 hidden-xs\"> <div class=\"dropdown\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <tr> <th class=\"selection hidden-xs\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th class=\"date\">Date</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"><abbr title=\"{{::event.date | date : 'medium'}}\"> <timeago date=\"event.date\"></timeago> </abbr></td> </tr> <tr ng-if=\"!vm.hasEvents()\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong>No data found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-xs-4 hidden-xs\"> <div class=\"dropdown\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -106878,7 +106785,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/organization-notifications/organization-notifications-directive.tpl.html',
-    "<div> <div ng-if=\"vm.hasNotifications\" refresh-on=\"filterChanged\" refresh-action=\"vm.onFilterChanged()\"> <div refresh-on=\"OrganizationChanged ProjectChanged PersistentEventChanged planChanged planOverage\" refresh-action=\"vm.get()\" refresh-throttle=\"2500\"></div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"!vm.hasOrganizations()\"> <h4>Setup your first project</h4> <p> Please <a ui-sref=\"app.project.add\">add a new project</a> and start becoming exceptionless in less than 60 seconds! </p> </div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"vm.hasOrganizationsWithNoProjects()\"> <h4>Setup your first project</h4> <p> <strong ng-repeat=\"organization in vm.organizationsWithNoProjects\"> <span ng-if=\"!$first\">, </span><a ui-sref=\"app.project.add({ organizationId: organization.id })\">{{organization.name}}</a> </strong> currently has no projects. <a ui-sref=\"app.project.add({ organizationId: vm.organizationsWithNoProjects[0].id })\">Add a new project</a> and start becoming exceptionless in less than 60 seconds! </p> </div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"vm.hasProjectsRequiringConfiguration()\"> <h4>We haven't received any data!</h4> <p> Please configure your clients for <strong ng-repeat=\"project in vm.projectsRequiringConfiguration\"> <span ng-if=\"!$first\">, </span><a ui-sref=\"app.project.configure({ id: project.id, redirect: true })\" title=\"Configure {{project.name}} ({{project.organization_name}})\">{{project.name}}</a> </strong> projects and start becoming exceptionless in less than 60 seconds! </p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasSuspendedOrganizations()\"> <h4> <span ng-repeat=\"organization in vm.suspendedOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> has been suspended. </h4> <p><em>Please note that while your account is suspended all new client events will be discarded.</em></p> <p ng-if=\"vm.hasSuspendedForBillingOrganizations()\"> To unsuspend <strong ng-repeat=\"organization in vm.suspendedForBillingOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </strong> , please <a ng-click=\"vm.showChangePlanDialog(vm.suspendedForBillingOrganizations[0].id)\">update your billing information</a>. </p> <p ng-if=\"vm.hasSuspendedForAbuseOrOverageOrNotActiveOrganizations()\"> <strong ng-repeat=\"organization in vm.suspendedForAbuseOrOverageOrNotActiveOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </strong> has exceeded the plan limits. To unsuspend your account, please <a ng-click=\"vm.showChangePlanDialog(vm.suspendedForAbuseOrOverageOrNotActiveOrganizations[0].id)\">upgrade your plan</a>. </p> <p ng-if=\"vm.isIntercomEnabled()\"> Please <a ng-click=\"appVm.showIntercom()\">contact us</a> for more information on why your account was suspended. </p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasExceededRequestLimitOrganizations()\"> <h4> API requests are currently being throttled for <span ng-repeat=\"organization in vm.exceededRequestLimitOrganizations\"> <span ng-if=\"!$first\">, </span>{{organization.name}} </span> </h4> <p ng-if=\"vm.isIntercomEnabled()\"> Please <a ng-click=\"appVm.showIntercom()\">contact us</a> for more information. </p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasHourlyOverageOrganizations()\"> <h4> Events are currently being throttled for <span ng-repeat=\"organization in vm.hourlyOverageOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> </h4> <p>Events are currently being throttled to prevent using up your plan limit in a small window of time. <a ng-click=\"vm.showChangePlanDialog(vm.hourlyOverageOrganizations[0].id)\">Upgrade now</a> to increase your limits.</p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasMonthlyOverageOrganizations()\"> <h4> <span ng-repeat=\"organization in vm.monthlyOverageOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> has reached its monthly plan limit. </h4> <p><a ng-click=\"vm.showChangePlanDialog(vm.monthlyOverageOrganizations[0].id)\">Upgrade now</a> to continue receiving errors.</p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasOrganizationsSearchingWithoutPremiumFeatures()\"> <h4> <span ng-repeat=\"organization in vm.organizationsSearchingWithoutPremiumFeatures\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> is attempting to use a premium feature. </h4> <p><a ng-click=\"vm.showChangePlanDialog(vm.organizationsSearchingWithoutPremiumFeatures[0].id)\">Upgrade now</a> to enable search and other premium!</p> </div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"vm.hasFreeOrganizations()\"> <h4> <span ng-repeat=\"organization in vm.freeOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> is currently on a free plan. </h4> <p><a ng-click=\"vm.showChangePlanDialog(vm.freeOrganizations[0].id)\">Upgrade now</a> to enable premium features and extra storage!</p> </div> </div> </div>"
+    "<div> <div ng-if=\"vm.hasNotifications\" refresh-on=\"filterChanged\" refresh-action=\"vm.onFilterChanged()\"> <div refresh-on=\"OrganizationChanged ProjectChanged PersistentEventChanged PlanChanged PlanOverage\" refresh-action=\"vm.get()\" refresh-throttle=\"2500\"></div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"!vm.hasOrganizations()\"> <h4>Setup your first project</h4> <p> Please <a ui-sref=\"app.project.add\">add a new project</a> and start becoming exceptionless in less than 60 seconds! </p> </div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"vm.hasOrganizationsWithNoProjects()\"> <h4>Setup your first project</h4> <p> <strong ng-repeat=\"organization in vm.organizationsWithNoProjects\"> <span ng-if=\"!$first\">, </span><a ui-sref=\"app.project.add({ organizationId: organization.id })\">{{organization.name}}</a> </strong> currently has no projects. <a ui-sref=\"app.project.add({ organizationId: vm.organizationsWithNoProjects[0].id })\">Add a new project</a> and start becoming exceptionless in less than 60 seconds! </p> </div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"vm.hasProjectsRequiringConfiguration()\"> <h4>We haven't received any data!</h4> <p> Please configure your clients for <strong ng-repeat=\"project in vm.projectsRequiringConfiguration\"> <span ng-if=\"!$first\">, </span><a ui-sref=\"app.project.configure({ id: project.id, redirect: true })\" title=\"Configure {{project.name}} ({{project.organization_name}})\">{{project.name}}</a> </strong> projects and start becoming exceptionless in less than 60 seconds! </p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasSuspendedOrganizations()\"> <h4> <span ng-repeat=\"organization in vm.suspendedOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> has been suspended. </h4> <p><em>Please note that while your account is suspended all new client events will be discarded.</em></p> <p ng-if=\"vm.hasSuspendedForBillingOrganizations()\"> To unsuspend <strong ng-repeat=\"organization in vm.suspendedForBillingOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </strong> , please <a ng-click=\"vm.showChangePlanDialog(vm.suspendedForBillingOrganizations[0].id)\">update your billing information</a>. </p> <p ng-if=\"vm.hasSuspendedForAbuseOrOverageOrNotActiveOrganizations()\"> <strong ng-repeat=\"organization in vm.suspendedForAbuseOrOverageOrNotActiveOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </strong> has exceeded the plan limits. To unsuspend your account, please <a ng-click=\"vm.showChangePlanDialog(vm.suspendedForAbuseOrOverageOrNotActiveOrganizations[0].id)\">upgrade your plan</a>. </p> <p ng-if=\"vm.isIntercomEnabled()\"> Please <a ng-click=\"appVm.showIntercom()\">contact us</a> for more information on why your account was suspended. </p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasExceededRequestLimitOrganizations()\"> <h4> API requests are currently being throttled for <span ng-repeat=\"organization in vm.exceededRequestLimitOrganizations\"> <span ng-if=\"!$first\">, </span>{{organization.name}} </span> </h4> <p ng-if=\"vm.isIntercomEnabled()\"> Please <a ng-click=\"appVm.showIntercom()\">contact us</a> for more information. </p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasHourlyOverageOrganizations()\"> <h4> Events are currently being throttled for <span ng-repeat=\"organization in vm.hourlyOverageOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> </h4> <p>Events are currently being throttled to prevent using up your plan limit in a small window of time. <a ng-click=\"vm.showChangePlanDialog(vm.hourlyOverageOrganizations[0].id)\">Upgrade now</a> to increase your limits.</p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasMonthlyOverageOrganizations()\"> <h4> <span ng-repeat=\"organization in vm.monthlyOverageOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> has reached its monthly plan limit. </h4> <p><a ng-click=\"vm.showChangePlanDialog(vm.monthlyOverageOrganizations[0].id)\">Upgrade now</a> to continue receiving errors.</p> </div> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"vm.hasOrganizationsSearchingWithoutPremiumFeatures()\"> <h4> <span ng-repeat=\"organization in vm.organizationsSearchingWithoutPremiumFeatures\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> is attempting to use a premium feature. </h4> <p><a ng-click=\"vm.showChangePlanDialog(vm.organizationsSearchingWithoutPremiumFeatures[0].id)\">Upgrade now</a> to enable search and other premium!</p> </div> <div class=\"alert alert-success alert-banner m-b-none\" ng-if=\"vm.hasFreeOrganizations()\"> <h4> <span ng-repeat=\"organization in vm.freeOrganizations\"> <span ng-if=\"!$first\">, </span><a ng-click=\"vm.showChangePlanDialog(organization.id)\">{{organization.name}}</a> </span> is currently on a free plan. </h4> <p><a ng-click=\"vm.showChangePlanDialog(vm.freeOrganizations[0].id)\">Upgrade now</a> to enable premium features and extra storage!</p> </div> </div> </div>"
   );
 
 
@@ -106888,7 +106795,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/projects/projects-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <table class=\"table table-striped table-bordered table-fixed b-t\" refresh-on=\"PersistentEventChanged planChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"2500\"> <thead> <tr> <th>Name</th> <th ng-show=\"vm.includeOrganizationName\">Organization</th> <th class=\"number hidden-xs\">Stacks</th> <th class=\"number hidden-xs\">Events</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"project in vm.projects | orderBy: 'name' track by project.id\" ng-if=\"vm.hasProjects()\"> <td ng-click=\"vm.open(project.id, $event)\">{{project.name}}</td> <td ng-show=\"vm.includeOrganizationName\" ng-click=\"vm.open(project.id, $event)\">{{project.organization_name}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.stack_count | number:0}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.event_count | number:0}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ui-sref=\"app.project-dashboard({ projectId: project.id })\"><i class=\"fa fa-fw fa-dashboard\"></i> Dashboard</a></li> <li><a ui-sref=\"app.project.manage({ id: project.id })\"><i class=\"fa fa-fw fa-edit\"></i> Edit</a></li> <li><a ui-sref=\"app.project.configure({ id: project.id })\"><i class=\"fa fa-fw fa-cloud-download\"></i> Download & Configure Client</a></li> <li><a ng-click=\"vm.remove(project)\"><i class=\"fa fa-fw fa-times\"></i> Delete</a></li> </ul> </div> </td> </tr> <tr ng-if=\"!vm.hasProjects()\"> <td class=\"hidden-xs\" colspan=\"5\" ng-if=\"vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> <td class=\"visible-xs\" colspan=\"3\" ng-if=\"vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> <td class=\"hidden-xs\" colspan=\"4\" ng-if=\"!vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> <td class=\"visible-xs\" colspan=\"2\" ng-if=\"!vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <table class=\"table table-striped table-bordered table-fixed b-t\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"2500\"> <thead> <tr> <th>Name</th> <th ng-show=\"vm.includeOrganizationName\">Organization</th> <th class=\"number hidden-xs\">Stacks</th> <th class=\"number hidden-xs\">Events</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"project in vm.projects | orderBy: 'name' track by project.id\" ng-if=\"vm.hasProjects()\"> <td ng-click=\"vm.open(project.id, $event)\">{{project.name}}</td> <td ng-show=\"vm.includeOrganizationName\" ng-click=\"vm.open(project.id, $event)\">{{project.organization_name}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.stack_count | number:0}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.event_count | number:0}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ui-sref=\"app.project-dashboard({ projectId: project.id })\"><i class=\"fa fa-fw fa-dashboard\"></i> Dashboard</a></li> <li><a ui-sref=\"app.project.manage({ id: project.id })\"><i class=\"fa fa-fw fa-edit\"></i> Edit</a></li> <li><a ui-sref=\"app.project.configure({ id: project.id })\"><i class=\"fa fa-fw fa-cloud-download\"></i> Download & Configure Client</a></li> <li><a ng-click=\"vm.remove(project)\"><i class=\"fa fa-fw fa-times\"></i> Delete</a></li> </ul> </div> </td> </tr> <tr ng-if=\"!vm.hasProjects()\"> <td class=\"hidden-xs\" colspan=\"5\" ng-if=\"vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> <td class=\"visible-xs\" colspan=\"3\" ng-if=\"vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> <td class=\"hidden-xs\" colspan=\"4\" ng-if=\"!vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> <td class=\"visible-xs\" colspan=\"2\" ng-if=\"!vm.includeOrganizationName\"> <strong>No projects were found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -106903,7 +106810,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/release-notification/release-notification-directive.tpl.html',
-    "<div refresh-on=\"notification:release\" refresh-action=\"vm.processNotification(data)\"></div>"
+    "<div refresh-on=\"ReleaseNotification\" refresh-action=\"vm.processNotification(data)\"></div>"
   );
 
 
@@ -106913,7 +106820,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/stacks/stacks-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged planChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <thead> <tr> <th class=\"selection hidden-xs\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasStacks()\"><i></i> </label> </th> <th>Summary</th> <th class=\"number\">Count</th> <th class=\"date hidden-xs\">First</th> <th class=\"date\">Last</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"stack in vm.stacks track by stack.id\" ng-if=\"vm.hasStacks()\"> <td class=\"hidden-xs\"> <label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"stack.id\"><i></i></label> </td> <td ng-click=\"vm.open(stack.id, $event)\"> <summary source=\"stack\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"number\">{{stack.total | number:0}}</td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"hidden-xs\"> <abbr title=\"{{::stack.first_occurrence | date : 'medium'}}\"> <timeago date=\"stack.first_occurrence\"></timeago> </abbr> </td> <td ng-click=\"vm.open(stack.id, $event)\"><abbr title=\"{{::stack.last_occurrence | date : 'medium'}}\"> <timeago date=\"stack.last_occurrence\"></timeago> </abbr></td> </tr> <tr ng-if=\"!vm.hasStacks()\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"4\" class=\"hidden-xs\"> <strong>No data found.</strong> </td> <td colspan=\"3\" class=\"visible-xs\"> <strong>No data found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"2500\"> <thead> <tr> <th class=\"selection hidden-xs\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasStacks()\"><i></i> </label> </th> <th>Summary</th> <th class=\"number\">Count</th> <th class=\"date hidden-xs\">First</th> <th class=\"date\">Last</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"stack in vm.stacks track by stack.id\" ng-if=\"vm.hasStacks()\"> <td class=\"hidden-xs\"> <label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"stack.id\"><i></i></label> </td> <td ng-click=\"vm.open(stack.id, $event)\"> <summary source=\"stack\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"number\">{{stack.total | number:0}}</td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"hidden-xs\"> <abbr title=\"{{::stack.first_occurrence | date : 'medium'}}\"> <timeago date=\"stack.first_occurrence\"></timeago> </abbr> </td> <td ng-click=\"vm.open(stack.id, $event)\"><abbr title=\"{{::stack.last_occurrence | date : 'medium'}}\"> <timeago date=\"stack.last_occurrence\"></timeago> </abbr></td> </tr> <tr ng-if=\"!vm.hasStacks()\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"4\" class=\"hidden-xs\"> <strong>No data found.</strong> </td> <td colspan=\"3\" class=\"visible-xs\"> <strong>No data found.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
