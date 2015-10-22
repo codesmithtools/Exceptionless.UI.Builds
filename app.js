@@ -119,6 +119,8 @@ var isPrimitive = function isPrimitive(input) {
     return input === null || (type !== 'object' && type !== 'function');
 };
 
+var isActualNaN = $Number.isNaN || function (x) { return x !== x; };
+
 var ES = {
     // ES5 9.4
     // http://es5.github.com/#x9.4
@@ -126,7 +128,7 @@ var ES = {
     /* replaceable with https://npmjs.com/package/es-abstract ES5.ToInteger */
     ToInteger: function ToInteger(num) {
         var n = +num;
-        if (n !== n) { // isNaN
+        if (isActualNaN(n)) {
             n = 0;
         } else if (n !== 0 && n !== (1 / 0) && n !== -(1 / 0)) {
             n = (n > 0 || -1) * Math.floor(Math.abs(n));
@@ -396,7 +398,7 @@ defineProperties(ArrayPrototype, {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
         var i = -1;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
         var T;
         if (arguments.length > 1) {
           T = arguments[1];
@@ -411,10 +413,10 @@ defineProperties(ArrayPrototype, {
             if (i in self) {
                 // Invoke the callback function with call, passing arguments:
                 // context, property value, property key, thisArg object
-                if (typeof T !== 'undefined') {
-                    callbackfn.call(T, self[i], i, object);
-                } else {
+                if (typeof T === 'undefined') {
                     callbackfn(self[i], i, object);
+                } else {
+                    callbackfn.call(T, self[i], i, object);
                 }
             }
         }
@@ -428,7 +430,7 @@ defineProperties(ArrayPrototype, {
     map: function map(callbackfn/*, thisArg*/) {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
         var result = $Array(length);
         var T;
         if (arguments.length > 1) {
@@ -442,10 +444,10 @@ defineProperties(ArrayPrototype, {
 
         for (var i = 0; i < length; i++) {
             if (i in self) {
-                if (typeof T !== 'undefined') {
-                    result[i] = callbackfn.call(T, self[i], i, object);
-                } else {
+                if (typeof T === 'undefined') {
                     result[i] = callbackfn(self[i], i, object);
+                } else {
+                    result[i] = callbackfn.call(T, self[i], i, object);
                 }
             }
         }
@@ -460,7 +462,7 @@ defineProperties(ArrayPrototype, {
     filter: function filter(callbackfn /*, thisArg*/) {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
         var result = [];
         var value;
         var T;
@@ -492,7 +494,7 @@ defineProperties(ArrayPrototype, {
     every: function every(callbackfn /*, thisArg*/) {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
         var T;
         if (arguments.length > 1) {
             T = arguments[1];
@@ -519,7 +521,7 @@ defineProperties(ArrayPrototype, {
     some: function some(callbackfn/*, thisArg */) {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
         var T;
         if (arguments.length > 1) {
             T = arguments[1];
@@ -550,7 +552,7 @@ defineProperties(ArrayPrototype, {
     reduce: function reduce(callbackfn /*, initialValue*/) {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
 
         // If no callback function or if callback is not a callable function
         if (!isCallable(callbackfn)) {
@@ -601,7 +603,7 @@ defineProperties(ArrayPrototype, {
     reduceRight: function reduceRight(callbackfn/*, initial*/) {
         var object = ES.ToObject(this);
         var self = splitString && isString(this) ? strSplit(this, '') : object;
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
 
         // If no callback function or if callback is not a callable function
         if (!isCallable(callbackfn)) {
@@ -652,7 +654,7 @@ var hasFirefox2IndexOfBug = ArrayPrototype.indexOf && [0, 1].indexOf(1, 2) !== -
 defineProperties(ArrayPrototype, {
     indexOf: function indexOf(searchElement /*, fromIndex */) {
         var self = splitString && isString(this) ? strSplit(this, '') : ES.ToObject(this);
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
 
         if (length === 0) {
             return -1;
@@ -681,7 +683,7 @@ var hasFirefox2LastIndexOfBug = ArrayPrototype.lastIndexOf && [0, 1].lastIndexOf
 defineProperties(ArrayPrototype, {
     lastIndexOf: function lastIndexOf(searchElement /*, fromIndex */) {
         var self = splitString && isString(this) ? strSplit(this, '') : ES.ToObject(this);
-        var length = self.length >>> 0;
+        var length = ES.ToUint32(self.length);
 
         if (length === 0) {
             return -1;
@@ -844,6 +846,7 @@ var blacklistedKeys = {
     $console: true,
     $parent: true,
     $self: true,
+    $frame: true,
     $frames: true,
     $frameElement: true,
     $webkitIndexedDB: true,
@@ -853,12 +856,12 @@ var hasAutomationEqualityBug = (function () {
     /* globals window */
     if (typeof window === 'undefined') { return false; }
     for (var k in window) {
-        if (!blacklistedKeys['$' + k] && owns(window, k) && window[k] !== null && typeof window[k] === 'object') {
-            try {
+        try {
+            if (!blacklistedKeys['$' + k] && owns(window, k) && window[k] !== null && typeof window[k] === 'object') {
                 equalsConstructorPrototype(window[k]);
-            } catch (e) {
-                return true;
             }
+        } catch (e) {
+            return true;
         }
     }
     return false;
@@ -943,7 +946,7 @@ var keysWorksWithArguments = $Object.keys && (function () {
 }(1, 2));
 var keysHasArgumentsLengthBug = $Object.keys && (function () {
     var argKeys = $Object.keys(arguments);
-	return arguments.length !== 1 || argKeys.length !== 1 || argKeys[0] !== 1;
+    return arguments.length !== 1 || argKeys.length !== 1 || argKeys[0] !== 1;
 }(1));
 var originalKeys = $Object.keys;
 defineProperties($Object, {
@@ -1076,6 +1079,9 @@ if (doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExtendedYears) {
     // an alternate object for the context.
     /* global Date: true */
     /* eslint-disable no-undef */
+    var maxSafeUnsigned32Bit = Math.pow(2, 31) - 1;
+    var secondsWithinMaxSafeUnsigned32Bit = Math.floor(maxSafeUnsigned32Bit / 1e3);
+    var hasSafariSignedIntBug = isActualNaN(new Date(1970, 0, 1, 0, 0, 0, maxSafeUnsigned32Bit + 1).getTime());
     Date = (function (NativeDate) {
     /* eslint-enable no-undef */
         // Date.length === 7
@@ -1083,13 +1089,22 @@ if (doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExtendedYears) {
             var length = arguments.length;
             var date;
             if (this instanceof NativeDate) {
+                var seconds = s;
+                var millis = ms;
+                if (hasSafariSignedIntBug && length >= 7 && ms > maxSafeUnsigned32Bit) {
+                    // work around a Safari 8/9 bug where it treats the seconds as signed
+                    var msToShift = Math.floor(ms / maxSafeUnsigned32Bit) * maxSafeUnsigned32Bit;
+                    var sToShift = Math.floor(msToShift / 1e3);
+                    seconds += sToShift;
+                    millis -= sToShift * 1e3;
+                }
                 date = length === 1 && $String(Y) === Y ? // isString(Y)
                     // We explicitly pass it through parse:
                     new NativeDate(DateShim.parse(Y)) :
                     // We have to manually make calls depending on argument
                     // length here
-                    length >= 7 ? new NativeDate(Y, M, D, h, m, s, ms) :
-                    length >= 6 ? new NativeDate(Y, M, D, h, m, s) :
+                    length >= 7 ? new NativeDate(Y, M, D, h, m, seconds, millis) :
+                    length >= 6 ? new NativeDate(Y, M, D, h, m, seconds) :
                     length >= 5 ? new NativeDate(Y, M, D, h, m) :
                     length >= 4 ? new NativeDate(Y, M, D, h) :
                     length >= 3 ? new NativeDate(Y, M, D) :
@@ -1143,7 +1158,16 @@ if (doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExtendedYears) {
         };
 
         var toUTC = function toUTC(t) {
-            return $Number(new NativeDate(1970, 0, 1, 0, 0, 0, t));
+            var s = 0;
+            var ms = t;
+            if (hasSafariSignedIntBug && ms > maxSafeUnsigned32Bit) {
+                // work around a Safari 8/9 bug where it treats the seconds as signed
+                var msToShift = Math.floor(ms / maxSafeUnsigned32Bit) * maxSafeUnsigned32Bit;
+                var sToShift = Math.floor(msToShift / 1e3);
+                s += sToShift;
+                ms -= sToShift * 1e3;
+            }
+            return $Number(new NativeDate(1970, 0, 1, 0, 0, s, ms));
         };
 
         // Copy any custom methods a 3rd party library may have added
@@ -1185,19 +1209,14 @@ if (doesNotParseY2KNewYear || acceptsInvalidDates || !supportsExtendedYears) {
                     hourOffset = $Number(match[10] || 0),
                     minuteOffset = $Number(match[11] || 0),
                     result;
+                var hasMinutesOrSecondsOrMilliseconds = minute > 0 || second > 0 || millisecond > 0;
                 if (
-                    hour < (
-                        minute > 0 || second > 0 || millisecond > 0 ?
-                        24 : 25
-                    ) &&
+                    hour < (hasMinutesOrSecondsOrMilliseconds ? 24 : 25) &&
                     minute < 60 && second < 60 && millisecond < 1000 &&
                     month > -1 && month < 12 && hourOffset < 24 &&
                     minuteOffset < 60 && // detect invalid offsets
                     day > -1 &&
-                    day < (
-                        dayFromMonth(year, month + 1) -
-                        dayFromMonth(year, month)
-                    )
+                    day < (dayFromMonth(year, month + 1) - dayFromMonth(year, month))
                 ) {
                     result = (
                         (dayFromMonth(year, month) + day) * 24 +
@@ -1308,7 +1327,7 @@ defineProperties(NumberPrototype, {
 
         // Test for NaN and round fractionDigits down
         f = $Number(fractionDigits);
-        f = f !== f ? 0 : Math.floor(f);
+        f = isActualNaN(f) ? 0 : Math.floor(f);
 
         if (f < 0 || f > 20) {
             throw new RangeError('Number.toFixed called with invalid number of decimals');
@@ -1316,8 +1335,7 @@ defineProperties(NumberPrototype, {
 
         x = $Number(this);
 
-        // Test for NaN
-        if (x !== x) {
+        if (isActualNaN(x)) {
             return 'NaN';
         }
 
@@ -1419,6 +1437,7 @@ if (
 ) {
     (function () {
         var compliantExecNpcg = typeof (/()??/).exec('')[1] === 'undefined'; // NPCG: nonparticipating capturing group
+        var maxSafe32BitInt = Math.pow(2, 32) - 1;
 
         StringPrototype.split = function (separator, limit) {
             var string = this;
@@ -1446,15 +1465,13 @@ if (
                 separator2 = new RegExp('^' + separatorCopy.source + '$(?!\\s)', flags);
             }
             /* Values for `limit`, per the spec:
-             * If undefined: 4294967295 // Math.pow(2, 32) - 1
+             * If undefined: 4294967295 // maxSafe32BitInt
              * If 0, Infinity, or NaN: 0
              * If positive number: limit = Math.floor(limit); if (limit > 4294967295) limit -= 4294967296;
              * If negative number: 4294967296 - Math.floor(Math.abs(limit))
              * If other: Type-convert, then use the above rules
              */
-            var splitLimit = typeof limit === 'undefined' ?
-                -1 >>> 0 : // Math.pow(2, 32) - 1
-                ES.ToUint32(limit);
+            var splitLimit = typeof limit === 'undefined' ? maxSafe32BitInt : ES.ToUint32(limit);
             match = separatorCopy.exec(string);
             while (match) {
                 // `separatorCopy.lastIndex` is not reliable cross-browser
@@ -6086,12 +6103,6 @@ if (!exports) {
 var SettingsManager = (function () {
     function SettingsManager() {
     }
-    SettingsManager.changed = function (config) {
-        var handlers = this._handlers;
-        for (var index = 0; index < handlers.length; index++) {
-            handlers[index](config);
-        }
-    };
     SettingsManager.onChanged = function (handler) {
         !!handler && this._handlers.push(handler);
     };
@@ -6100,12 +6111,9 @@ var SettingsManager = (function () {
         config.settings = Utils.merge(config.settings, this.getSavedServerSettings(config));
         this.changed(config);
     };
-    SettingsManager.getSavedServerSettings = function (config) {
-        return config.storage.get(this._configPath) || {};
-    };
     SettingsManager.checkVersion = function (version, config) {
         if (version) {
-            var savedConfigVersion = parseInt(config.storage.get(this._configPath + "-version"));
+            var savedConfigVersion = parseInt(config.storage.get(this._configPath + "-version"), 10);
             if (isNaN(savedConfigVersion) || version > savedConfigVersion) {
                 config.log.info("Updating settings from v" + (!isNaN(savedConfigVersion) ? savedConfigVersion : 0) + " to v" + version);
                 this.updateSettings(config);
@@ -6136,6 +6144,15 @@ var SettingsManager = (function () {
             config.log.info('Updated settings');
             _this.changed(config);
         });
+    };
+    SettingsManager.changed = function (config) {
+        var handlers = this._handlers;
+        for (var index = 0; index < handlers.length; index++) {
+            handlers[index](config);
+        }
+    };
+    SettingsManager.getSavedServerSettings = function (config) {
+        return config.storage.get(this._configPath) || {};
     };
     SettingsManager._configPath = 'ex-server-settings.json';
     SettingsManager._handlers = [];
@@ -6274,7 +6291,7 @@ var DefaultEventQueue = (function () {
         config.log.info("Enqueuing event: " + key + " type=" + event.type + " " + (!!event.reference_id ? 'refid=' + event.reference_id : ''));
         config.storage.save(key, event);
     };
-    DefaultEventQueue.prototype.process = function () {
+    DefaultEventQueue.prototype.process = function (isAppExiting) {
         var _this = this;
         function getEvents(events) {
             var items = [];
@@ -6302,7 +6319,7 @@ var DefaultEventQueue = (function () {
         this._processingQueue = true;
         try {
             var events = config.storage.getList('ex-q', config.submissionBatchSize);
-            if (!events || events.length == 0) {
+            if (!events || events.length === 0) {
                 this._processingQueue = false;
                 return;
             }
@@ -6311,12 +6328,43 @@ var DefaultEventQueue = (function () {
                 _this.processSubmissionResponse(response, events);
                 log.info('Finished processing queue.');
                 _this._processingQueue = false;
-            });
+            }, isAppExiting);
         }
         catch (ex) {
             log.error("Error processing queue: " + ex);
             this.suspendProcessing();
             this._processingQueue = false;
+        }
+    };
+    DefaultEventQueue.prototype.suspendProcessing = function (durationInMinutes, discardFutureQueuedItems, clearQueue) {
+        var config = this._config;
+        if (!durationInMinutes || durationInMinutes <= 0) {
+            durationInMinutes = 5;
+        }
+        config.log.info("Suspending processing for " + durationInMinutes + " minutes.");
+        this._suspendProcessingUntil = new Date(new Date().getTime() + (durationInMinutes * 60000));
+        if (discardFutureQueuedItems) {
+            this._discardQueuedItemsUntil = new Date(new Date().getTime() + (durationInMinutes * 60000));
+        }
+        if (clearQueue) {
+            this.removeEvents(config.storage.getList('ex-q'));
+        }
+    };
+    DefaultEventQueue.prototype.areQueuedItemsDiscarded = function () {
+        return this._discardQueuedItemsUntil && this._discardQueuedItemsUntil > new Date();
+    };
+    DefaultEventQueue.prototype.ensureQueueTimer = function () {
+        var _this = this;
+        if (!this._queueTimer) {
+            this._queueTimer = setInterval(function () { return _this.onProcessQueue(); }, 10000);
+        }
+    };
+    DefaultEventQueue.prototype.isQueueProcessingSuspended = function () {
+        return this._suspendProcessingUntil && this._suspendProcessingUntil > new Date();
+    };
+    DefaultEventQueue.prototype.onProcessQueue = function () {
+        if (!this.isQueueProcessingSuspended() && !this._processingQueue) {
+            this.process();
         }
     };
     DefaultEventQueue.prototype.processSubmissionResponse = function (response, events) {
@@ -6367,41 +6415,10 @@ var DefaultEventQueue = (function () {
             this.suspendProcessing();
         }
     };
-    DefaultEventQueue.prototype.ensureQueueTimer = function () {
-        var _this = this;
-        if (!this._queueTimer) {
-            this._queueTimer = setInterval(function () { return _this.onProcessQueue(); }, 10000);
-        }
-    };
-    DefaultEventQueue.prototype.onProcessQueue = function () {
-        if (!this.isQueueProcessingSuspended() && !this._processingQueue) {
-            this.process();
-        }
-    };
-    DefaultEventQueue.prototype.suspendProcessing = function (durationInMinutes, discardFutureQueuedItems, clearQueue) {
-        var config = this._config;
-        if (!durationInMinutes || durationInMinutes <= 0) {
-            durationInMinutes = 5;
-        }
-        config.log.info("Suspending processing for " + durationInMinutes + " minutes.");
-        this._suspendProcessingUntil = new Date(new Date().getTime() + (durationInMinutes * 60000));
-        if (discardFutureQueuedItems) {
-            this._discardQueuedItemsUntil = new Date(new Date().getTime() + (durationInMinutes * 60000));
-        }
-        if (clearQueue) {
-            this.removeEvents(config.storage.getList('ex-q'));
-        }
-    };
     DefaultEventQueue.prototype.removeEvents = function (events) {
         for (var index = 0; index < (events || []).length; index++) {
             this._config.storage.remove(events[index].path);
         }
-    };
-    DefaultEventQueue.prototype.isQueueProcessingSuspended = function () {
-        return this._suspendProcessingUntil && this._suspendProcessingUntil > new Date();
-    };
-    DefaultEventQueue.prototype.areQueuedItemsDiscarded = function () {
-        return this._discardQueuedItemsUntil && this._discardQueuedItemsUntil > new Date();
     };
     return DefaultEventQueue;
 })();
@@ -6453,6 +6470,65 @@ var InMemoryStorage = (function () {
     return InMemoryStorage;
 })();
 exports.InMemoryStorage = InMemoryStorage;
+var DefaultSubmissionClient = (function () {
+    function DefaultSubmissionClient() {
+        this.configurationVersionHeader = 'x-exceptionless-configversion';
+    }
+    DefaultSubmissionClient.prototype.postEvents = function (events, config, callback, isAppExiting) {
+        var data = Utils.stringify(events, config.dataExclusions);
+        var request = this.createRequest(config, 'POST', '/api/v2/events', data);
+        var cb = this.createSubmissionCallback(config, callback);
+        return config.submissionAdapter.sendRequest(request, cb, isAppExiting);
+    };
+    DefaultSubmissionClient.prototype.postUserDescription = function (referenceId, description, config, callback) {
+        var path = "/api/v2/events/by-ref/" + encodeURIComponent(referenceId) + "/user-description";
+        var data = Utils.stringify(description, config.dataExclusions);
+        var request = this.createRequest(config, 'POST', path, data);
+        var cb = this.createSubmissionCallback(config, callback);
+        return config.submissionAdapter.sendRequest(request, cb);
+    };
+    DefaultSubmissionClient.prototype.getSettings = function (config, callback) {
+        var request = this.createRequest(config, 'GET', '/api/v2/projects/config');
+        var cb = function (status, message, data, headers) {
+            if (status !== 200) {
+                return callback(new SettingsResponse(false, null, -1, null, message));
+            }
+            var settings;
+            try {
+                settings = JSON.parse(data);
+            }
+            catch (e) {
+                config.log.error("Unable to parse settings: '" + data + "'");
+            }
+            if (!settings || isNaN(settings.version)) {
+                return callback(new SettingsResponse(false, null, -1, null, 'Invalid configuration settings.'));
+            }
+            callback(new SettingsResponse(true, settings.settings || {}, settings.version));
+        };
+        return config.submissionAdapter.sendRequest(request, cb);
+    };
+    DefaultSubmissionClient.prototype.createRequest = function (config, method, path, data) {
+        if (data === void 0) { data = null; }
+        return {
+            method: method,
+            path: path,
+            data: data,
+            serverUrl: config.serverUrl,
+            apiKey: config.apiKey,
+            userAgent: config.userAgent
+        };
+    };
+    DefaultSubmissionClient.prototype.createSubmissionCallback = function (config, callback) {
+        var _this = this;
+        return function (status, message, data, headers) {
+            var settingsVersion = headers && parseInt(headers[_this.configurationVersionHeader], 10);
+            SettingsManager.checkVersion(settingsVersion, config);
+            callback(new SubmissionResponse(status, message));
+        };
+    };
+    return DefaultSubmissionClient;
+})();
+exports.DefaultSubmissionClient = DefaultSubmissionClient;
 var Utils = (function () {
     function Utils() {
     }
@@ -6563,19 +6639,22 @@ var Utils = (function () {
             if (endsWithWildcard) {
                 pattern = pattern.substring(0, pattern.length - 1);
             }
-            if (startsWithWildcard && endsWithWildcard)
+            if (startsWithWildcard && endsWithWildcard) {
                 return value.indexOf(pattern) !== -1;
-            if (startsWithWildcard)
-                return value.lastIndexOf(pattern, 0) !== -1;
-            if (endsWithWildcard)
+            }
+            if (startsWithWildcard) {
                 return value.lastIndexOf(pattern) === (value.length - pattern.length);
+            }
+            if (endsWithWildcard) {
+                return value.indexOf(pattern) === 0;
+            }
             return value === pattern;
         }
-        function stringifyImpl(data, exclusions) {
+        function stringifyImpl(obj, excludedKeys) {
             var cache = [];
-            return JSON.stringify(data, function (key, value) {
-                for (var index = 0; index < (exclusions || []).length; index++) {
-                    if (checkForMatch(exclusions[index], key)) {
+            return JSON.stringify(obj, function (key, value) {
+                for (var index = 0; index < (excludedKeys || []).length; index++) {
+                    if (checkForMatch(excludedKeys[index], key)) {
                         return;
                     }
                 }
@@ -6607,9 +6686,9 @@ var Configuration = (function () {
         this.enabled = true;
         this.lastReferenceIdManager = new DefaultLastReferenceIdManager();
         this.settings = {};
+        this._plugins = [];
         this._serverUrl = 'https://collector.exceptionless.io';
         this._dataExclusions = [];
-        this._plugins = [];
         function inject(fn) {
             return typeof fn === 'function' ? fn(this) : fn;
         }
@@ -6623,7 +6702,8 @@ var Configuration = (function () {
         this.moduleCollector = inject(configSettings.moduleCollector);
         this.requestInfoCollector = inject(configSettings.requestInfoCollector);
         this.submissionBatchSize = inject(configSettings.submissionBatchSize) || 50;
-        this.submissionClient = inject(configSettings.submissionClient);
+        this.submissionAdapter = inject(configSettings.submissionAdapter);
+        this.submissionClient = inject(configSettings.submissionClient) || new DefaultSubmissionClient();
         this.storage = inject(configSettings.storage) || new InMemoryStorage();
         this.queue = inject(configSettings.queue) || new DefaultEventQueue(this);
         SettingsManager.applySavedServerSettings(this);
@@ -6741,7 +6821,7 @@ var Configuration = (function () {
     };
     Object.defineProperty(Configuration.prototype, "userAgent", {
         get: function () {
-            return 'exceptionless-js/1.0.1';
+            return 'exceptionless-js/1.1.1';
         },
         enumerable: true,
         configurable: true
@@ -6768,7 +6848,7 @@ var Configuration = (function () {
 exports.Configuration = Configuration;
 var EventBuilder = (function () {
     function EventBuilder(event, client, pluginContextData) {
-        this._validIdentifierErrorMessage = "must contain between 8 and 100 alphanumeric or '-' characters.";
+        this._validIdentifierErrorMessage = 'must contain between 8 and 100 alphanumeric or \'-\' characters.';
         this.target = event;
         this.client = client;
         this.pluginContextData = pluginContextData || new ContextData();
@@ -6806,10 +6886,12 @@ var EventBuilder = (function () {
         return this;
     };
     EventBuilder.prototype.setGeo = function (latitude, longitude) {
-        if (latitude < -90.0 || latitude > 90.0)
+        if (latitude < -90.0 || latitude > 90.0) {
             throw new Error('Must be a valid latitude value between -90.0 and 90.0.');
-        if (longitude < -180.0 || longitude > 180.0)
+        }
+        if (longitude < -180.0 || longitude > 180.0) {
             throw new Error('Must be a valid longitude value between -180.0 and 180.0.');
+        }
         this.target.geo = latitude + "," + longitude;
         return this;
     };
@@ -7013,18 +7095,19 @@ var ExceptionlessClient = (function () {
         return new EventBuilder({ date: new Date() }, this, pluginContextData);
     };
     ExceptionlessClient.prototype.submitEvent = function (event, pluginContextData, callback) {
-        function cancelled() {
+        function cancelled(context) {
             if (!!context) {
                 context.cancelled = true;
             }
             return !!callback && callback(context);
         }
+        var context = new EventPluginContext(this, event, pluginContextData);
         if (!event) {
-            return cancelled();
+            return cancelled(context);
         }
         if (!this.config.enabled) {
             this.config.log.info('Event submission is currently disabled.');
-            return cancelled();
+            return cancelled(context);
         }
         if (!event.data) {
             event.data = {};
@@ -7032,24 +7115,23 @@ var ExceptionlessClient = (function () {
         if (!event.tags || !event.tags.length) {
             event.tags = [];
         }
-        var context = new EventPluginContext(this, event, pluginContextData);
-        EventPluginManager.run(context, function (context) {
-            var ev = context.event;
-            if (!context.cancelled) {
+        EventPluginManager.run(context, function (ctx) {
+            var ev = ctx.event;
+            if (!ctx.cancelled) {
                 if (!ev.type || ev.type.length === 0) {
                     ev.type = 'log';
                 }
                 if (!ev.date) {
                     ev.date = new Date();
                 }
-                var config = context.client.config;
+                var config = ctx.client.config;
                 config.queue.enqueue(ev);
                 if (ev.reference_id && ev.reference_id.length > 0) {
-                    context.log.info("Setting last reference id '" + ev.reference_id + "'");
+                    ctx.log.info("Setting last reference id '" + ev.reference_id + "'");
                     config.lastReferenceIdManager.setLast(ev.reference_id);
                 }
             }
-            !!callback && callback(context);
+            !!callback && callback(ctx);
         });
     };
     ExceptionlessClient.prototype.updateUserEmailAndDescription = function (referenceId, email, description, callback) {
@@ -7058,7 +7140,7 @@ var ExceptionlessClient = (function () {
             return !!callback && callback(new SubmissionResponse(500, 'cancelled'));
         }
         var userDescription = { email_address: email, description: description };
-        var response = this.config.submissionClient.postUserDescription(referenceId, userDescription, this.config, function (response) {
+        this.config.submissionClient.postUserDescription(referenceId, userDescription, this.config, function (response) {
             if (!response.success) {
                 _this.config.log.error("Failed to submit user email and description for event '" + referenceId + "': " + response.statusCode + " " + response.message);
             }
@@ -7232,7 +7314,7 @@ var DefaultErrorParser = (function () {
             }
             return result;
         }
-        function getStackFrames(context, stackFrames) {
+        function getStackFrames(stackFrames) {
             var ANONYMOUS = '<anonymous>';
             var frames = [];
             for (var index = 0; index < stackFrames.length; index++) {
@@ -7257,7 +7339,7 @@ var DefaultErrorParser = (function () {
         return {
             type: stackTrace.name,
             message: stackTrace.message || exception.message,
-            stack_trace: getStackFrames(context, stackTrace.stack || [])
+            stack_trace: getStackFrames(stackTrace.stack || [])
         };
     };
     return DefaultErrorParser;
@@ -7306,7 +7388,7 @@ var DefaultRequestInfoCollector = (function () {
             user_agent: navigator.userAgent,
             is_secure: location.protocol === 'https:',
             host: location.hostname,
-            port: location.port && location.port !== '' ? parseInt(location.port) : 80,
+            port: location.port && location.port !== '' ? parseInt(location.port, 10) : 80,
             path: location.pathname,
             cookies: Utils.getCookies(document.cookie),
             query_string: Utils.parseQueryString(location.search.substring(1))
@@ -7319,46 +7401,10 @@ var DefaultRequestInfoCollector = (function () {
     return DefaultRequestInfoCollector;
 })();
 exports.DefaultRequestInfoCollector = DefaultRequestInfoCollector;
-var DefaultSubmissionClient = (function () {
-    function DefaultSubmissionClient() {
-        this.configurationVersionHeader = 'X-Exceptionless-ConfigVersion';
+var DefaultSubmissionAdapter = (function () {
+    function DefaultSubmissionAdapter() {
     }
-    DefaultSubmissionClient.prototype.postEvents = function (events, config, callback) {
-        var _this = this;
-        return this.sendRequest(config, 'POST', '/api/v2/events', Utils.stringify(events, config.dataExclusions), function (status, message, data, headers) {
-            var settingsVersion = headers && parseInt(headers[_this.configurationVersionHeader]);
-            SettingsManager.checkVersion(settingsVersion, config);
-            callback(new SubmissionResponse(status, message));
-        });
-    };
-    DefaultSubmissionClient.prototype.postUserDescription = function (referenceId, description, config, callback) {
-        var _this = this;
-        var path = "/api/v2/events/by-ref/" + encodeURIComponent(referenceId) + "/user-description";
-        return this.sendRequest(config, 'POST', path, Utils.stringify(description, config.dataExclusions), function (status, message, data, headers) {
-            var settingsVersion = headers && parseInt(headers[_this.configurationVersionHeader]);
-            SettingsManager.checkVersion(settingsVersion, config);
-            callback(new SubmissionResponse(status, message));
-        });
-    };
-    DefaultSubmissionClient.prototype.getSettings = function (config, callback) {
-        return this.sendRequest(config, 'GET', '/api/v2/projects/config', null, function (status, message, data) {
-            if (status !== 200) {
-                return callback(new SettingsResponse(false, null, -1, null, message));
-            }
-            var settings;
-            try {
-                settings = JSON.parse(data);
-            }
-            catch (e) {
-                config.log.error("Unable to parse settings: '" + data + "'");
-            }
-            if (!settings || isNaN(settings.version)) {
-                return callback(new SettingsResponse(false, null, -1, null, 'Invalid configuration settings.'));
-            }
-            callback(new SettingsResponse(true, settings.settings || {}, settings.version));
-        });
-    };
-    DefaultSubmissionClient.prototype.sendRequest = function (config, method, path, data, callback) {
+    DefaultSubmissionAdapter.prototype.sendRequest = function (request, callback, isAppExiting) {
         var TIMEOUT = 'timeout';
         var LOADED = 'loaded';
         var WITH_CREDENTIALS = 'withCredentials';
@@ -7366,13 +7412,16 @@ var DefaultSubmissionClient = (function () {
         var useSetTimeout = false;
         function complete(mode, xhr) {
             function parseResponseHeaders(headerStr) {
+                function trim(value) {
+                    return value.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
+                }
                 var headers = {};
                 var headerPairs = (headerStr || '').split('\u000d\u000a');
                 for (var index = 0; index < headerPairs.length; index++) {
                     var headerPair = headerPairs[index];
                     var separator = headerPair.indexOf('\u003a\u0020');
                     if (separator > 0) {
-                        headers[headerPair.substring(0, separator)] = headerPair.substring(separator + 2);
+                        headers[trim(headerPair.substring(0, separator).toLowerCase())] = headerPair.substring(separator + 2);
                     }
                 }
                 return headers;
@@ -7389,7 +7438,7 @@ var DefaultSubmissionClient = (function () {
                 status = 0;
             }
             else if (mode === LOADED && !status) {
-                status = method === 'POST' ? 202 : 200;
+                status = request.method === 'POST' ? 202 : 200;
             }
             else if (status < 200 || status > 299) {
                 var responseBody = xhr.responseBody;
@@ -7407,16 +7456,16 @@ var DefaultSubmissionClient = (function () {
             }
             callback(status || 500, message || '', responseText, parseResponseHeaders(xhr.getAllResponseHeaders && xhr.getAllResponseHeaders()));
         }
-        function createRequest(config, method, url) {
+        function createRequest(userAgent, method, url) {
             var xhr = new XMLHttpRequest();
             if (WITH_CREDENTIALS in xhr) {
                 xhr.open(method, url, true);
-                xhr.setRequestHeader('X-Exceptionless-Client', config.userAgent);
+                xhr.setRequestHeader('X-Exceptionless-Client', userAgent);
                 if (method === 'POST') {
                     xhr.setRequestHeader('Content-Type', 'application/json');
                 }
             }
-            else if (typeof XDomainRequest != 'undefined') {
+            else if (typeof XDomainRequest !== 'undefined') {
                 useSetTimeout = true;
                 xhr = new XDomainRequest();
                 xhr.open(method, location.protocol === 'http:' ? url.replace('https:', 'http:') : url);
@@ -7429,8 +7478,8 @@ var DefaultSubmissionClient = (function () {
             }
             return xhr;
         }
-        var url = "" + config.serverUrl + path + "?access_token=" + encodeURIComponent(config.apiKey);
-        var xhr = createRequest(config, method || 'POST', url);
+        var url = "" + request.serverUrl + request.path + "?access_token=" + encodeURIComponent(request.apiKey);
+        var xhr = createRequest(request.userAgent, request.method || 'POST', url);
         if (!xhr) {
             return callback(503, 'CORS not supported.');
         }
@@ -7447,15 +7496,15 @@ var DefaultSubmissionClient = (function () {
         xhr.onerror = function () { return complete('error', xhr); };
         xhr.onload = function () { return complete(LOADED, xhr); };
         if (useSetTimeout) {
-            setTimeout(function () { return xhr.send(data); }, 500);
+            setTimeout(function () { return xhr.send(request.data); }, 500);
         }
         else {
-            xhr.send(data);
+            xhr.send(request.data);
         }
     };
-    return DefaultSubmissionClient;
+    return DefaultSubmissionAdapter;
 })();
-exports.DefaultSubmissionClient = DefaultSubmissionClient;
+exports.DefaultSubmissionAdapter = DefaultSubmissionAdapter;
 function getDefaultsSettingsFromScriptTag() {
     if (!document || !document.getElementsByTagName) {
         return null;
@@ -7473,20 +7522,6 @@ function processUnhandledException(stackTrace, options) {
     builder.pluginContextData['@@_TraceKit.StackTrace'] = stackTrace;
     builder.submit();
 }
-function processJQueryAjaxError(event, xhr, settings, error) {
-    var client = ExceptionlessClient.default;
-    if (xhr.status === 404) {
-        client.submitNotFound(settings.url);
-    }
-    else if (xhr.status !== 401) {
-        client.createUnhandledException(error, 'JQuery.ajaxError')
-            .setSource(settings.url)
-            .setProperty('status', xhr.status)
-            .setProperty('request', settings.data)
-            .setProperty('response', xhr.responseText && xhr.responseText.slice && xhr.responseText.slice(0, 1024))
-            .submit();
-    }
-}
 var defaults = Configuration.defaults;
 var settings = getDefaultsSettingsFromScriptTag();
 if (settings && (settings.apiKey || settings.serverUrl)) {
@@ -7496,12 +7531,9 @@ if (settings && (settings.apiKey || settings.serverUrl)) {
 defaults.errorParser = new DefaultErrorParser();
 defaults.moduleCollector = new DefaultModuleCollector();
 defaults.requestInfoCollector = new DefaultRequestInfoCollector();
-defaults.submissionClient = new DefaultSubmissionClient();
+defaults.submissionAdapter = new DefaultSubmissionAdapter();
 TraceKit.report.subscribe(processUnhandledException);
 TraceKit.extendToAsynchronousCallbacks();
-if (typeof $ !== 'undefined' && $(document)) {
-    $(document).ajaxError(processJQueryAjaxError);
-}
 Error.stackTraceLimit = Infinity;
 
 return exports;
@@ -7509,7 +7541,9 @@ return exports;
 }));
 
 
+
 //# sourceMappingURL=exceptionless.js.map
+
 //! moment.js
 //! version : 2.10.6
 //! authors : Tim Wood, Iskren Chernev, Moment.js contributors
@@ -10706,7 +10740,7 @@ return exports;
 
 }));
 /**
-* @version: 2.0.11
+* @version: 2.1.13
 * @author: Dan Grossman http://www.dangrossman.info/
 * @copyright: Copyright (c) 2012-2015 Dan Grossman. All rights reserved.
 * @license: Licensed under the MIT license. See http://www.opensource.org/licenses/mit-license.php
@@ -10721,15 +10755,16 @@ return exports;
     });
 
   } else if (typeof exports !== 'undefined') {
-    var momentjs = require('moment');
-    var jQuery = window.jQuery;
-    if (jQuery === undefined) {
-      try {
-        jQuery = require('jquery');
-      } catch (err) {
-        if (!jQuery) throw new Error('jQuery dependency not found');
+      var momentjs = require('moment');
+      var jQuery = (typeof window != 'undefined') ? window.jQuery : undefined;  //isomorphic issue
+      if (!jQuery) {
+          try {
+              jQuery = require('jquery');
+              if (!jQuery.fn) jQuery.fn = {}; //isomorphic issue
+          } catch (err) {
+              if (!jQuery) throw new Error('jQuery dependency not found');
+          }
       }
-    }
 
     factory(root, exports, momentjs, jQuery);
 
@@ -10738,7 +10773,7 @@ return exports;
     root.daterangepicker = factory(root, {}, root.moment || moment, (root.jQuery || root.Zepto || root.ender || root.$));
   }
 
-}(this, function(root, daterangepicker, moment, $) {
+}(this || {}, function(root, daterangepicker, moment, $) { // 'this' doesn't exist on a server
 
     var DateRangePicker = function(element, options, cb) {
 
@@ -10747,7 +10782,6 @@ return exports;
         this.element = $(element);
         this.startDate = moment().startOf('day');
         this.endDate = moment().endOf('day');
-        this.timeZone = moment().utcOffset();
         this.minDate = false;
         this.maxDate = false;
         this.dateLimit = false;
@@ -10995,19 +11029,6 @@ return exports;
             }
         }
 
-        // bind the time zone used to build the calendar to either the timeZone passed in through the options or the zone of the startDate (which will be the local time zone by default)
-        if (typeof options.timeZone === 'string' || typeof options.timeZone === 'number') {
-            if (typeof options.timeZone === 'string' && typeof moment.tz !== 'undefined') {
-                this.timeZone = moment.tz.zone(options.timeZone).parse(new Date) * -1;  // Offset is positive if the timezone is behind UTC and negative if it is ahead.
-            } else {
-                this.timeZone = options.timeZone;
-            }
-          this.startDate.utcOffset(this.timeZone);
-          this.endDate.utcOffset(this.timeZone);
-        } else {
-            this.timeZone = moment(this.startDate).utcOffset();
-        }
-
         if (typeof options.ranges === 'object') {
             for (range in options.ranges) {
 
@@ -11036,8 +11057,13 @@ return exports;
                 // after the maximum, don't display this range option at all.
                 if ((this.minDate && end.isBefore(this.minDate)) || (maxDate && start.isAfter(maxDate)))
                     continue;
+                
+                //Support unicode chars in the range names.
+                var elem = document.createElement('textarea');
+                elem.innerHTML = range;
+                rangeHtml = elem.value;
 
-                this.ranges[range] = [start, end];
+                this.ranges[rangeHtml] = [start, end];
             }
 
             var list = '<ul>';
@@ -11158,7 +11184,7 @@ return exports;
 
         setStartDate: function(startDate) {
             if (typeof startDate === 'string')
-                this.startDate = moment(startDate, this.locale.format).utcOffset(this.timeZone);
+                this.startDate = moment(startDate, this.locale.format);
 
             if (typeof startDate === 'object')
                 this.startDate = moment(startDate);
@@ -11183,7 +11209,7 @@ return exports;
 
         setEndDate: function(endDate) {
             if (typeof endDate === 'string')
-                this.endDate = moment(endDate, this.locale.format).utcOffset(this.timeZone);
+                this.endDate = moment(endDate, this.locale.format);
 
             if (typeof endDate === 'object')
                 this.endDate = moment(endDate);
@@ -11239,7 +11265,7 @@ return exports;
             if (this.endDate) {
 
                 //if both dates are visible already, do nothing
-                if (this.leftCalendar.month && this.rightCalendar.month &&
+                if (!this.singleDatePicker && this.leftCalendar.month && this.rightCalendar.month &&
                     (this.startDate.format('YYYY-MM') == this.leftCalendar.month.format('YYYY-MM') || this.startDate.format('YYYY-MM') == this.rightCalendar.month.format('YYYY-MM'))
                     &&
                     (this.endDate.format('YYYY-MM') == this.leftCalendar.month.format('YYYY-MM') || this.endDate.format('YYYY-MM') == this.rightCalendar.month.format('YYYY-MM'))
@@ -11363,8 +11389,7 @@ return exports;
             if (dayOfWeek == this.locale.firstDay)
                 startDay = daysInLastMonth - 6;
 
-            // Possible patch for issue #626 https://github.com/dangrossman/bootstrap-daterangepicker/issues/626
-            var curDate = moment([lastYear, lastMonth, startDay, 12, minute, second]).utcOffset(this.timeZone); // .utcOffset(this.timeZone);
+            var curDate = moment([lastYear, lastMonth, startDay, 12, minute, second]);
 
             var col, row;
             for (var i = 0, col = 0, row = 0; i < 42; i++, col++, curDate = moment(curDate).add(24, 'hour')) {
@@ -11762,6 +11787,7 @@ return exports;
 
             // Create a click proxy that is private to this instance of datepicker, for unbinding
             this._outsideClickProxy = $.proxy(function(e) { this.outsideClick(e); }, this);
+
             // Bind global datepicker mousedown for hiding and
             $(document)
               .on('mousedown.daterangepicker', this._outsideClickProxy)
@@ -11771,6 +11797,9 @@ return exports;
               .on('click.daterangepicker', '[data-toggle=dropdown]', this._outsideClickProxy)
               // and also close when focus changes to outside the picker (eg. tabbing between controls)
               .on('focusin.daterangepicker', this._outsideClickProxy);
+
+            // Reposition the picker if the window is resized while it's open
+            $(window).on('resize.daterangepicker', $.proxy(function(e) { this.move(e); }, this));
 
             this.oldStartDate = this.startDate.clone();
             this.oldEndDate = this.endDate.clone();
@@ -11799,6 +11828,7 @@ return exports;
             this.updateElement();
 
             $(document).off('.daterangepicker');
+            $(window).off('.daterangepicker');
             this.container.hide();
             this.element.trigger('hide.daterangepicker', this);
             this.isShowing = false;
@@ -12087,8 +12117,11 @@ return exports;
                 start.minute(minute);
                 start.second(second);
                 this.setStartDate(start);
-                if (this.singleDatePicker)
+                if (this.singleDatePicker) {
                     this.endDate = this.startDate.clone();
+                } else if (this.endDate && this.endDate.format('YYYY-MM-DD') == start.format('YYYY-MM-DD') && this.endDate.isBefore(start)) {
+                    this.setEndDate(start.clone());
+                }
             } else if (this.endDate) {
                 var end = this.endDate.clone();
                 end.hour(hour);
@@ -12111,8 +12144,8 @@ return exports;
 
         formInputsChanged: function(e) {
             var isRight = $(e.target).closest('.calendar').hasClass('right');
-            var start = moment(this.container.find('input[name="daterangepicker_start"]').val(), this.locale.format).utcOffset(this.timeZone);
-            var end = moment(this.container.find('input[name="daterangepicker_end"]').val(), this.locale.format).utcOffset(this.timeZone);
+            var start = moment(this.container.find('input[name="daterangepicker_start"]').val(), this.locale.format);
+            var end = moment(this.container.find('input[name="daterangepicker_end"]').val(), this.locale.format);
 
             if (start.isValid() && end.isValid()) {
 
@@ -12140,20 +12173,23 @@ return exports;
         elementChanged: function() {
             if (!this.element.is('input')) return;
             if (!this.element.val().length) return;
+            if (this.element.val().length < this.locale.format.length) return;
 
             var dateString = this.element.val().split(this.locale.separator),
                 start = null,
                 end = null;
 
             if (dateString.length === 2) {
-                start = moment(dateString[0], this.locale.format).utcOffset(this.timeZone);
-                end = moment(dateString[1], this.locale.format).utcOffset(this.timeZone);
+                start = moment(dateString[0], this.locale.format);
+                end = moment(dateString[1], this.locale.format);
             }
 
             if (this.singleDatePicker || start === null || end === null) {
-                start = moment(this.element.val(), this.locale.format).utcOffset(this.timeZone);
+                start = moment(this.element.val(), this.locale.format);
                 end = start;
             }
+
+            if (!start.isValid() || !end.isValid()) return;
 
             this.setStartDate(start);
             this.setEndDate(end);
@@ -12196,6 +12232,7 @@ return exports;
     };
 
 }));
+
 // Generated by CoffeeScript 1.9.3
 (function() {
   var hasModule, isArray, makeTwix,
@@ -20539,7 +20576,7 @@ return /******/ (function(modules) { // webpackBootstrap
 })(jQuery);
 
 /**
- * @license AngularJS v1.4.6
+ * @license AngularJS v1.4.7
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -20597,7 +20634,7 @@ function minErr(module, ErrorConstructor) {
       return match;
     });
 
-    message += '\nhttp://errors.angularjs.org/1.4.6/' +
+    message += '\nhttp://errors.angularjs.org/1.4.7/' +
       (module ? module + '/' : '') + code;
 
     for (i = SKIP_INDEXES, paramPrefix = '?'; i < templateArgs.length; i++, paramPrefix = '&') {
@@ -22881,6 +22918,7 @@ function toDebugString(obj) {
   $HttpParamSerializerProvider,
   $HttpParamSerializerJQLikeProvider,
   $HttpBackendProvider,
+  $xhrFactoryProvider,
   $LocationProvider,
   $LogProvider,
   $ParseProvider,
@@ -22918,11 +22956,11 @@ function toDebugString(obj) {
  * - `codeName` – `{string}` – Code name of the release, such as "jiggling-armfat".
  */
 var version = {
-  full: '1.4.6',    // all of these placeholder strings will be replaced by grunt's
+  full: '1.4.7',    // all of these placeholder strings will be replaced by grunt's
   major: 1,    // package task
   minor: 4,
-  dot: 6,
-  codeName: 'multiplicative-elevation'
+  dot: 7,
+  codeName: 'dark-luminescence'
 };
 
 
@@ -23039,6 +23077,7 @@ function publishExternalAPI(angular) {
         $httpParamSerializer: $HttpParamSerializerProvider,
         $httpParamSerializerJQLike: $HttpParamSerializerJQLikeProvider,
         $httpBackend: $HttpBackendProvider,
+        $xhrFactory: $xhrFactoryProvider,
         $location: $LocationProvider,
         $log: $LogProvider,
         $parse: $ParseProvider,
@@ -23213,10 +23252,10 @@ function camelCase(name) {
     replace(MOZ_HACK_REGEXP, 'Moz$1');
 }
 
-var SINGLE_TAG_REGEXP = /^<(\w+)\s*\/?>(?:<\/\1>|)$/;
+var SINGLE_TAG_REGEXP = /^<([\w-]+)\s*\/?>(?:<\/\1>|)$/;
 var HTML_REGEXP = /<|&#?\w+;/;
-var TAG_NAME_REGEXP = /<([\w:]+)/;
-var XHTML_TAG_REGEXP = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
+var TAG_NAME_REGEXP = /<([\w:-]+)/;
+var XHTML_TAG_REGEXP = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:-]+)[^>]*)\/>/gi;
 
 var wrapMap = {
   'option': [1, '<select multiple="multiple">', '</select>'],
@@ -25948,6 +25987,13 @@ var $CoreAnimateCssProvider = function() {
     };
 
     return function(element, options) {
+      // there is no point in applying the styles since
+      // there is no animation that goes on at all in
+      // this version of $animateCss.
+      if (options.cleanupStyles) {
+        options.from = options.to = null;
+      }
+
       if (options.from) {
         element.css(options.from);
         options.from = null;
@@ -26415,10 +26461,10 @@ function $BrowserProvider() {
            $scope.keys = [];
            $scope.cache = $cacheFactory('cacheId');
            $scope.put = function(key, value) {
-             if (isUndefined($scope.cache.get(key))) {
+             if (angular.isUndefined($scope.cache.get(key))) {
                $scope.keys.push(key);
              }
-             $scope.cache.put(key, isUndefined(value) ? null : value);
+             $scope.cache.put(key, angular.isUndefined(value) ? null : value);
            };
          }]);
      </file>
@@ -29175,7 +29221,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
         compile: function() {
             return {
               pre: function attrInterpolatePreLinkFn(scope, element, attr) {
-                var $$observers = (attr.$$observers || (attr.$$observers = {}));
+                var $$observers = (attr.$$observers || (attr.$$observers = createMap()));
 
                 if (EVENT_HANDLER_ATTR_REGEXP.test(name)) {
                   throw $compileMinErr('nodomevents',
@@ -30227,28 +30273,18 @@ function $HttpProvider() {
      *
      *
      * ## General usage
-     * The `$http` service is a function which takes a single argument — a configuration object —
+     * The `$http` service is a function which takes a single argument — a {@link $http#usage configuration object} —
      * that is used to generate an HTTP request and returns  a {@link ng.$q promise}.
      *
      * ```js
-     *   // Simple GET request example :
-     *   $http.get('/someUrl').
-     *     then(function(response) {
+     *   // Simple GET request example:
+     *   $http({
+     *     method: 'GET',
+     *     url: '/someUrl'
+     *   }).then(function successCallback(response) {
      *       // this callback will be called asynchronously
      *       // when the response is available
-     *     }, function(response) {
-     *       // called asynchronously if an error occurs
-     *       // or server returns response with an error status.
-     *     });
-     * ```
-     *
-     * ```js
-     *   // Simple POST request example (passing data) :
-     *   $http.post('/someUrl', {msg:'hello word!'}).
-     *     then(function(response) {
-     *       // this callback will be called asynchronously
-     *       // when the response is available
-     *     }, function(response) {
+     *     }, function errorCallback(response) {
      *       // called asynchronously if an error occurs
      *       // or server returns response with an error status.
      *     });
@@ -30268,25 +30304,16 @@ function $HttpProvider() {
      * XMLHttpRequest will transparently follow it, meaning that the error callback will not be
      * called for such responses.
      *
-     * ## Writing Unit Tests that use $http
-     * When unit testing (using {@link ngMock ngMock}), it is necessary to call
-     * {@link ngMock.$httpBackend#flush $httpBackend.flush()} to flush each pending
-     * request using trained responses.
-     *
-     * ```
-     * $httpBackend.expectGET(...);
-     * $http.get(...);
-     * $httpBackend.flush();
-     * ```
      *
      * ## Shortcut methods
      *
      * Shortcut methods are also available. All shortcut methods require passing in the URL, and
-     * request data must be passed in for POST/PUT requests.
+     * request data must be passed in for POST/PUT requests. An optional config can be passed as the
+     * last argument.
      *
      * ```js
-     *   $http.get('/someUrl').then(successCallback);
-     *   $http.post('/someUrl', data).then(successCallback);
+     *   $http.get('/someUrl', config).then(successCallback, errorCallback);
+     *   $http.post('/someUrl', data, config).then(successCallback, errorCallback);
      * ```
      *
      * Complete list of shortcut methods:
@@ -30299,6 +30326,17 @@ function $HttpProvider() {
      * - {@link ng.$http#jsonp $http.jsonp}
      * - {@link ng.$http#patch $http.patch}
      *
+     *
+     * ## Writing Unit Tests that use $http
+     * When unit testing (using {@link ngMock ngMock}), it is necessary to call
+     * {@link ngMock.$httpBackend#flush $httpBackend.flush()} to flush each pending
+     * request using trained responses.
+     *
+     * ```
+     * $httpBackend.expectGET(...);
+     * $http.get(...);
+     * $httpBackend.flush();
+     * ```
      *
      * ## Deprecation Notice
      * <div class="alert alert-danger">
@@ -30457,7 +30495,7 @@ function $HttpProvider() {
      *
      * There are two kinds of interceptors (and two kinds of rejection interceptors):
      *
-     *   * `request`: interceptors get called with a http `config` object. The function is free to
+     *   * `request`: interceptors get called with a http {@link $http#usage config} object. The function is free to
      *     modify the `config` object or create a new one. The function needs to return the `config`
      *     object directly, or a promise containing the `config` or a new `config` object.
      *   * `requestError`: interceptor gets called when a previous interceptor threw an error or
@@ -31123,8 +31161,33 @@ function $HttpProvider() {
   }];
 }
 
-function createXhr() {
-    return new window.XMLHttpRequest();
+/**
+ * @ngdoc service
+ * @name $xhrFactory
+ *
+ * @description
+ * Factory function used to create XMLHttpRequest objects.
+ *
+ * Replace or decorate this service to create your own custom XMLHttpRequest objects.
+ *
+ * ```
+ * angular.module('myApp', [])
+ * .factory('$xhrFactory', function() {
+ *   return function createXhr(method, url) {
+ *     return new window.XMLHttpRequest({mozSystem: true});
+ *   };
+ * });
+ * ```
+ *
+ * @param {string} method HTTP method of the request (GET, POST, PUT, ..)
+ * @param {string} url URL of the request.
+ */
+function $xhrFactoryProvider() {
+  this.$get = function() {
+    return function createXhr() {
+      return new window.XMLHttpRequest();
+    };
+  };
 }
 
 /**
@@ -31132,6 +31195,7 @@ function createXhr() {
  * @name $httpBackend
  * @requires $window
  * @requires $document
+ * @requires $xhrFactory
  *
  * @description
  * HTTP backend used by the {@link ng.$http service} that delegates to
@@ -31144,8 +31208,8 @@ function createXhr() {
  * $httpBackend} which can be trained with responses.
  */
 function $HttpBackendProvider() {
-  this.$get = ['$browser', '$window', '$document', function($browser, $window, $document) {
-    return createHttpBackend($browser, createXhr, $browser.defer, $window.angular.callbacks, $document[0]);
+  this.$get = ['$browser', '$window', '$document', '$xhrFactory', function($browser, $window, $document, $xhrFactory) {
+    return createHttpBackend($browser, $xhrFactory, $browser.defer, $window.angular.callbacks, $document[0]);
   }];
 }
 
@@ -31169,7 +31233,7 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
       });
     } else {
 
-      var xhr = createXhr();
+      var xhr = createXhr(method, url);
 
       xhr.open(method, url, true);
       forEach(headers, function(value, key) {
@@ -33038,20 +33102,30 @@ var $parseMinErr = minErr('$parse');
 
 
 function ensureSafeMemberName(name, fullExpression) {
+  if (name === "__defineGetter__" || name === "__defineSetter__"
+      || name === "__lookupGetter__" || name === "__lookupSetter__"
+      || name === "__proto__") {
+    throw $parseMinErr('isecfld',
+        'Attempting to access a disallowed field in Angular expressions! '
+        + 'Expression: {0}', fullExpression);
+  }
+  return name;
+}
+
+function getStringValue(name, fullExpression) {
   // From the JavaScript docs:
   // Property names must be strings. This means that non-string objects cannot be used
   // as keys in an object. Any non-string object, including a number, is typecasted
   // into a string via the toString method.
   //
   // So, to ensure that we are checking the same `name` that JavaScript would use,
-  // we cast it to a string, if possible
-  name =  (isObject(name) && name.toString) ? name.toString() : name;
-
-  if (name === "__defineGetter__" || name === "__defineSetter__"
-      || name === "__lookupGetter__" || name === "__lookupSetter__"
-      || name === "__proto__") {
-    throw $parseMinErr('isecfld',
-        'Attempting to access a disallowed field in Angular expressions! '
+  // we cast it to a string, if possible.
+  // Doing `name + ''` can cause a repl error if the result to `toString` is not a string,
+  // this is, this will handle objects that misbehave.
+  name = name + '';
+  if (!isString(name)) {
+    throw $parseMinErr('iseccst',
+        'Cannot convert object to primitive value! '
         + 'Expression: {0}', fullExpression);
   }
   return name;
@@ -33098,6 +33172,16 @@ function ensureSafeFunction(obj, fullExpression) {
       throw $parseMinErr('isecff',
         'Referencing call, apply or bind in Angular expressions is disallowed! Expression: {0}',
         fullExpression);
+    }
+  }
+}
+
+function ensureSafeAssignContext(obj, fullExpression) {
+  if (obj) {
+    if (obj === (0).constructor || obj === (false).constructor || obj === ''.constructor ||
+        obj === {}.constructor || obj === [].constructor || obj === Function.constructor) {
+      throw $parseMinErr('isecaf',
+        'Assigning to a constructor is disallowed! Expression: {0}', fullExpression);
     }
   }
 }
@@ -33816,6 +33900,8 @@ ASTCompiler.prototype = {
         'ensureSafeMemberName',
         'ensureSafeObject',
         'ensureSafeFunction',
+        'getStringValue',
+        'ensureSafeAssignContext',
         'ifDefined',
         'plus',
         'text',
@@ -33824,6 +33910,8 @@ ASTCompiler.prototype = {
           ensureSafeMemberName,
           ensureSafeObject,
           ensureSafeFunction,
+          getStringValue,
+          ensureSafeAssignContext,
           ifDefined,
           plusFn,
           expression);
@@ -33967,6 +34055,7 @@ ASTCompiler.prototype = {
           if (ast.computed) {
             right = self.nextId();
             self.recurse(ast.property, right);
+            self.getStringValue(right);
             self.addEnsureSafeMemberName(right);
             if (create && create !== 1) {
               self.if_(self.not(self.computedMember(left, right)), self.lazyAssign(self.computedMember(left, right), '{}'));
@@ -34050,6 +34139,7 @@ ASTCompiler.prototype = {
         self.if_(self.notNull(left.context), function() {
           self.recurse(ast.right, right);
           self.addEnsureSafeObject(self.member(left.context, left.name, left.computed));
+          self.addEnsureSafeAssignContext(left.context);
           expression = self.member(left.context, left.name, left.computed) + ast.operator + right;
           self.assign(intoId, expression);
           recursionFn(intoId || expression);
@@ -34175,6 +34265,10 @@ ASTCompiler.prototype = {
     this.current().body.push(this.ensureSafeFunction(item), ';');
   },
 
+  addEnsureSafeAssignContext: function(item) {
+    this.current().body.push(this.ensureSafeAssignContext(item), ';');
+  },
+
   ensureSafeObject: function(item) {
     return 'ensureSafeObject(' + item + ',text)';
   },
@@ -34185,6 +34279,14 @@ ASTCompiler.prototype = {
 
   ensureSafeFunction: function(item) {
     return 'ensureSafeFunction(' + item + ',text)';
+  },
+
+  getStringValue: function(item) {
+    this.assign(item, 'getStringValue(' + item + ',text)');
+  },
+
+  ensureSafeAssignContext: function(item) {
+    return 'ensureSafeAssignContext(' + item + ',text)';
   },
 
   lazyRecurse: function(ast, intoId, nameId, recursionFn, create, skipWatchIdCheck) {
@@ -34364,6 +34466,7 @@ ASTInterpreter.prototype = {
         var lhs = left(scope, locals, assign, inputs);
         var rhs = right(scope, locals, assign, inputs);
         ensureSafeObject(lhs.value, self.expression);
+        ensureSafeAssignContext(lhs.context);
         lhs.context[lhs.name] = rhs;
         return context ? {value: rhs} : rhs;
       };
@@ -34561,6 +34664,7 @@ ASTInterpreter.prototype = {
       var value;
       if (lhs != null) {
         rhs = right(scope, locals, assign, inputs);
+        rhs = getStringValue(rhs);
         ensureSafeMemberName(rhs, expression);
         if (create && create !== 1 && lhs && !(lhs[rhs])) {
           lhs[rhs] = {};
@@ -39197,6 +39301,7 @@ function formatNumber(number, pattern, groupSep, decimalSep, fractionSize) {
     if (fractionSize > 0 && number < 1) {
       formatedText = number.toFixed(fractionSize);
       number = parseFloat(formatedText);
+      formatedText = formatedText.replace(DECIMAL_SEP, decimalSep);
     }
   }
 
@@ -44992,7 +45097,7 @@ var ngInitDirective = ngDirective({
  *   </file>
  * </example>
  *
- * ### Example - splitting on whitespace
+ * ### Example - splitting on newline
  * <example name="ngList-directive-newlines">
  *   <file name="index.html">
  *    <textarea ng-model="list" ng-list="&#10;" ng-trim="false"></textarea>
@@ -45077,7 +45182,9 @@ var ngModelMinErr = minErr('ngModel');
  * @ngdoc type
  * @name ngModel.NgModelController
  *
- * @property {string} $viewValue Actual string value in the view.
+ * @property {*} $viewValue The actual value from the control's view. For `input` elements, this is a
+ * String. See {@link ngModel.NgModelController#$setViewValue} for information about when the $viewValue
+ * is set.
  * @property {*} $modelValue The value in the model that the control is bound to.
  * @property {Array.<Function>} $parsers Array of functions to execute, as a pipeline, whenever
        the control reads value from the DOM. The functions are called in array order, each passing
@@ -47028,11 +47135,16 @@ var ngOptionsDirective = ['$compile', '$parse', function($compile, $parse) {
       function updateOptionElement(option, element) {
         option.element = element;
         element.disabled = option.disabled;
-        if (option.value !== element.value) element.value = option.selectValue;
+        // NOTE: The label must be set before the value, otherwise IE10/11/EDGE create unresponsive
+        // selects in certain circumstances when multiple selects are next to each other and display
+        // the option list in listbox style, i.e. the select is [multiple], or specifies a [size].
+        // See https://github.com/angular/angular.js/issues/11314 for more info.
+        // This is unfortunately untestable with unit / e2e tests
         if (option.label !== element.label) {
           element.label = option.label;
           element.textContent = option.label;
         }
+        if (option.value !== element.value) element.value = option.selectValue;
       }
 
       function addOrReuseElement(parent, current, type, templateElement) {
@@ -47073,7 +47185,10 @@ var ngOptionsDirective = ['$compile', '$parse', function($compile, $parse) {
         if (emptyOption_ || unknownOption_) {
           while (current &&
                 (current === emptyOption_ ||
-                current === unknownOption_)) {
+                current === unknownOption_ ||
+                emptyOption_ && emptyOption_.nodeType === NODE_TYPE_COMMENT)) {
+            // Empty options might have directives that transclude
+            // and insert comments (e.g. ngIf)
             current = current.nextSibling;
           }
         }
@@ -48821,7 +48936,7 @@ var SelectController =
  *     </select><br>
  *
  *     <label for="singleSelect"> Single select with "not selected" option and dynamic option values: </label><br>
- *     <select name="singleSelect" ng-model="data.singleSelect">
+ *     <select name="singleSelect" id="singleSelect" ng-model="data.singleSelect">
  *       <option value="">---Please select---</option> <!-- not selected / blank option -->
  *       <option value="{{data.option1}}">Option 1</option> <!-- interpolation -->
  *       <option value="option-2">Option 2</option>
@@ -48862,7 +48977,7 @@ var SelectController =
  * <div ng-controller="ExampleController">
  *   <form name="myForm">
  *     <label for="repeatSelect"> Repeat select: </label>
- *     <select name="repeatSelect" ng-model="data.repeatSelect">
+ *     <select name="repeatSelect" id="repeatSelect" ng-model="data.repeatSelect">
  *       <option ng-repeat="option in data.availableOptions" value="{{option.id}}">{{option.name}}</option>
  *     </select>
  *   </form>
@@ -48874,7 +48989,7 @@ var SelectController =
  *  angular.module('ngrepeatSelect', [])
  *    .controller('ExampleController', ['$scope', function($scope) {
  *      $scope.data = {
- *       singleSelect: null,
+ *       repeatSelect: null,
  *       availableOptions: [
  *         {id: '1', name: 'Option A'},
  *         {id: '2', name: 'Option B'},
@@ -49462,7 +49577,7 @@ angular.module('exceptionless', [])
     }]);
 
 /**
- * @license AngularJS v1.4.6
+ * @license AngularJS v1.4.7
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -49836,12 +49951,6 @@ function concatWithSpace(a,b) {
   return a + ' ' + b;
 }
 
-function $$BodyProvider() {
-  this.$get = ['$document', function($document) {
-    return jqLite($document[0].body);
-  }];
-}
-
 var $$rAFSchedulerFactory = ['$$rAF', function($$rAF) {
   var queue, cancelFn;
 
@@ -50092,7 +50201,7 @@ var ANIMATE_TIMER_KEY = '$$animateCss';
  * * `event` - The DOM event (e.g. enter, leave, move). When used, a generated CSS class of `ng-EVENT` and `ng-EVENT-active` will be applied
  * to the element during the animation. Multiple events can be provided when spaces are used as a separator. (Note that this will not perform any DOM operation.)
  * * `easing` - The CSS easing value that will be applied to the transition or keyframe animation (or both).
- * * `transition` - The raw CSS transition style that will be used (e.g. `1s linear all`).
+ * * `transitionStyle` - The raw CSS transition style that will be used (e.g. `1s linear all`).
  * * `keyframeStyle` - The raw CSS keyframe animation style that will be used (e.g. `1s my_animation linear`).
  * * `from` - The starting CSS styles (a key/value object) that will be applied at the start of the animation.
  * * `to` - The ending CSS styles (a key/value object) that will be applied across the animation via a CSS transition.
@@ -50109,6 +50218,10 @@ var ANIMATE_TIMER_KEY = '$$animateCss';
  * * `staggerIndex` - The numeric index representing the stagger item (e.g. a value of 5 is equal to the sixth item in the stagger; therefore when a
  * * `stagger` option value of `0.1` is used then there will be a stagger delay of `600ms`)
  * * `applyClassesEarly` - Whether or not the classes being added or removed will be used when detecting the animation. This is set by `$animate` when enter/leave/move animations are fired to ensure that the CSS classes are resolved in time. (Note that this will prevent any transitions from occuring on the classes being added and removed.)
+ * * `cleanupStyles` - Whether or not the provided `from` and `to` styles will be removed once
+ *    the animation is closed. This is useful for when the styles are used purely for the sake of
+ *    the animation and do not have a lasting visual effect on the element (e.g. a colapse and open animation).
+ *    By default this value is set to `false`.
  *
  * @return {object} an object with start and end methods and details about the animation.
  *
@@ -50229,6 +50342,23 @@ function createLocalCacheLookup() {
   };
 }
 
+// we do not reassign an already present style value since
+// if we detect the style property value again we may be
+// detecting styles that were added via the `from` styles.
+// We make use of `isDefined` here since an empty string
+// or null value (which is what getPropertyValue will return
+// for a non-existing style) will still be marked as a valid
+// value for the style (a falsy value implies that the style
+// is to be removed at the end of the animation). If we had a simple
+// "OR" statement then it would not be enough to catch that.
+function registerRestorableStyles(backup, node, properties) {
+  forEach(properties, function(prop) {
+    backup[prop] = isDefined(backup[prop])
+        ? backup[prop]
+        : node.style.getPropertyValue(prop);
+  });
+}
+
 var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
   var gcsLookup = createLocalCacheLookup();
   var gcsStaggerLookup = createLocalCacheLookup();
@@ -50329,6 +50459,7 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
     }
 
     return function init(element, options) {
+      var restoreStyles = {};
       var node = getDomNode(element);
       if (!node
           || !node.parentNode
@@ -50530,7 +50661,12 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
                                        stagger.animationDuration === 0;
       }
 
-      applyAnimationFromStyles(element, options);
+      if (options.from) {
+        if (options.cleanupStyles) {
+          registerRestorableStyles(restoreStyles, node, Object.keys(options.from));
+        }
+        applyAnimationFromStyles(element, options);
+      }
 
       if (flags.blockTransition || flags.blockKeyframeAnimation) {
         applyBlocking(maxDuration);
@@ -50596,6 +50732,13 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
 
         applyAnimationClasses(element, options);
         applyAnimationStyles(element, options);
+
+        if (Object.keys(restoreStyles).length) {
+          forEach(restoreStyles, function(value, prop) {
+            value ? node.style.setProperty(prop, value)
+                  : node.style.removeProperty(prop);
+          });
+        }
 
         // the reason why we have this option is to allow a synchronous closing callback
         // that is fired as SOON as the animation ends (when the CSS is removed) or if
@@ -50791,7 +50934,12 @@ var $AnimateCssProvider = ['$animateProvider', function($animateProvider) {
           }
 
           element.on(events.join(' '), onAnimationProgress);
-          applyAnimationToStyles(element, options);
+          if (options.to) {
+            if (options.cleanupStyles) {
+              registerRestorableStyles(restoreStyles, node, Object.keys(options.to));
+            }
+            applyAnimationToStyles(element, options);
+          }
         }
 
         function onAnimationExpired() {
@@ -50845,16 +50993,25 @@ var $$AnimateCssDriverProvider = ['$$animationProvider', function($$animationPro
   var NG_OUT_ANCHOR_CLASS_NAME = 'ng-anchor-out';
   var NG_IN_ANCHOR_CLASS_NAME = 'ng-anchor-in';
 
-  this.$get = ['$animateCss', '$rootScope', '$$AnimateRunner', '$rootElement', '$$body', '$sniffer', '$$jqLite',
-       function($animateCss,   $rootScope,   $$AnimateRunner,   $rootElement,   $$body,   $sniffer,   $$jqLite) {
+  function isDocumentFragment(node) {
+    return node.parentNode && node.parentNode.nodeType === 11;
+  }
+
+  this.$get = ['$animateCss', '$rootScope', '$$AnimateRunner', '$rootElement', '$sniffer', '$$jqLite', '$document',
+       function($animateCss,   $rootScope,   $$AnimateRunner,   $rootElement,   $sniffer,   $$jqLite,   $document) {
 
     // only browsers that support these properties can render animations
     if (!$sniffer.animations && !$sniffer.transitions) return noop;
 
-    var bodyNode = getDomNode($$body);
+    var bodyNode = $document[0].body;
     var rootNode = getDomNode($rootElement);
 
-    var rootBodyElement = jqLite(bodyNode.parentNode === rootNode ? bodyNode : rootNode);
+    var rootBodyElement = jqLite(
+      // this is to avoid using something that exists outside of the body
+      // we also special case the doc fragement case because our unit test code
+      // appends the $rootElement to the body after the app has been bootstrapped
+      isDocumentFragment(rootNode) || bodyNode.contains(rootNode) ? rootNode : bodyNode
+    );
 
     var applyAnimationClasses = applyAnimationClassesFactory($$jqLite);
 
@@ -51481,14 +51638,32 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
     return (nO.addClass && nO.addClass === cO.removeClass) || (nO.removeClass && nO.removeClass === cO.addClass);
   });
 
-  this.$get = ['$$rAF', '$rootScope', '$rootElement', '$document', '$$body', '$$HashMap',
+  this.$get = ['$$rAF', '$rootScope', '$rootElement', '$document', '$$HashMap',
                '$$animation', '$$AnimateRunner', '$templateRequest', '$$jqLite', '$$forceReflow',
-       function($$rAF,   $rootScope,   $rootElement,   $document,   $$body,   $$HashMap,
+       function($$rAF,   $rootScope,   $rootElement,   $document,   $$HashMap,
                 $$animation,   $$AnimateRunner,   $templateRequest,   $$jqLite,   $$forceReflow) {
 
     var activeAnimationsLookup = new $$HashMap();
     var disabledElementsLookup = new $$HashMap();
     var animationsEnabled = null;
+
+    function postDigestTaskFactory() {
+      var postDigestCalled = false;
+      return function(fn) {
+        // we only issue a call to postDigest before
+        // it has first passed. This prevents any callbacks
+        // from not firing once the animation has completed
+        // since it will be out of the digest cycle.
+        if (postDigestCalled) {
+          fn();
+        } else {
+          $rootScope.$$postDigest(function() {
+            postDigestCalled = true;
+            fn();
+          });
+        }
+      };
+    }
 
     // Wait until all directive and route-related templates are downloaded and
     // compiled. The $templateRequest.totalPendingRequests variable keeps track of
@@ -51550,14 +51725,6 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
       }
 
       return matches;
-    }
-
-    function triggerCallback(event, element, phase, data) {
-      $$rAF(function() {
-        forEach(findCallbacks(element, event), function(callback) {
-          callback(element, phase, data);
-        });
-      });
     }
 
     return {
@@ -51653,6 +51820,9 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
       // we create a fake runner with a working promise.
       // These methods will become available after the digest has passed
       var runner = new $$AnimateRunner();
+
+      // this is used to trigger callbacks in postDigest mode
+      var runInNextPostDigestOrNow = postDigestTaskFactory();
 
       if (isArray(options.addClass)) {
         options.addClass = options.addClass.join(' ');
@@ -51874,7 +52044,20 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
       return runner;
 
       function notifyProgress(runner, event, phase, data) {
-        triggerCallback(event, element, phase, data);
+        runInNextPostDigestOrNow(function() {
+          var callbacks = findCallbacks(element, event);
+          if (callbacks.length) {
+            // do not optimize this call here to RAF because
+            // we don't know how heavy the callback code here will
+            // be and if this code is buffered then this can
+            // lead to a performance regression.
+            $$rAF(function() {
+              forEach(callbacks, function(callback) {
+                callback(element, phase, data);
+              });
+            });
+          }
+        });
         runner.progress(event, phase, data);
       }
 
@@ -51917,7 +52100,8 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
     }
 
     function areAnimationsAllowed(element, parentElement, event) {
-      var bodyElementDetected = isMatchingElement(element, $$body) || element[0].nodeName === 'HTML';
+      var bodyElement = jqLite($document[0].body);
+      var bodyElementDetected = isMatchingElement(element, bodyElement) || element[0].nodeName === 'HTML';
       var rootElementDetected = isMatchingElement(element, $rootElement);
       var parentAnimationDetected = false;
       var animateChildren;
@@ -51973,7 +52157,7 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
         if (!bodyElementDetected) {
           // we also need to ensure that the element is or will be apart of the body element
           // otherwise it is pointless to even issue an animation to be rendered
-          bodyElementDetected = isMatchingElement(parentElement, $$body);
+          bodyElementDetected = isMatchingElement(parentElement, bodyElement);
         }
 
         parentElement = parentElement.parent();
@@ -52564,7 +52748,6 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
 
 /* global angularAnimateModule: true,
 
-   $$BodyProvider,
    $$AnimateAsyncRunFactory,
    $$rAFSchedulerFactory,
    $$AnimateChildrenDirective,
@@ -53304,8 +53487,6 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
  * Click here {@link ng.$animate to learn more about animations with `$animate`}.
  */
 angular.module('ngAnimate', [])
-  .provider('$$body', $$BodyProvider)
-
   .directive('ngAnimateChildren', $$AnimateChildrenDirective)
   .factory('$$rAFScheduler', $$rAFSchedulerFactory)
 
@@ -59164,7 +59345,7 @@ angular.module("dialogs.default-translations",["pascalprecht.translate"]).config
 !function(){"use strict";var a=angular.module("translate.sub",[]);a.provider("$translate",[function(){var a=[],n="en-US";this.translations=function(e,s){angular.isDefined(e)&&angular.isDefined(s)&&(a[e]=angular.copy(s),n=e)},this.$get=[function(){return{instant:function(e){return angular.isDefined(e)&&angular.isDefined(a[n][e])?a[n][e]:""}}}]}]),a.filter("translate",["$translate",function(a){return function(n){return a.instant(n)}}]);var n;try{angular.module("pascalprecht.translate"),n=angular.module("dialogs.controllers",["ui.bootstrap.modal","pascalprecht.translate"])}catch(e){n=angular.module("dialogs.controllers",["ui.bootstrap.modal","translate.sub"])}n.controller("errorDialogCtrl",["$scope","$modalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_ERROR"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_ERROR_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-warning":"glyphicon glyphicon-warning-sign",a.close=function(){n.close(),a.$destroy()}}]),n.controller("waitDialogCtrl",["$scope","$modalInstance","$translate","$timeout","data",function(a,n,e,s,t){a.header=angular.isDefined(t.header)?t.header:e.instant("DIALOGS_PLEASE_WAIT_ELIPS"),a.msg=angular.isDefined(t.msg)?t.msg:e.instant("DIALOGS_PLEASE_WAIT_MSG"),a.progress=angular.isDefined(t.progress)?t.progress:100,a.icon=angular.isDefined(t.fa)&&angular.equals(t.fa,!0)?"fa fa-clock-o":"glyphicon glyphicon-time",a.$on("dialogs.wait.complete",function(){s(function(){n.close(),a.$destroy()})}),a.$on("dialogs.wait.message",function(n,e){a.msg=angular.isDefined(e.msg)?e.msg:a.msg}),a.$on("dialogs.wait.progress",function(n,e){a.msg=angular.isDefined(e.msg)?e.msg:a.msg,a.progress=angular.isDefined(e.progress)?e.progress:a.progress}),a.getProgress=function(){return{width:a.progress+"%"}}}]),n.controller("notifyDialogCtrl",["$scope","$modalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_NOTIFICATION"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_NOTIFICATION_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-info":"glyphicon glyphicon-info-sign",a.close=function(){n.close(),a.$destroy()}}]),n.controller("confirmDialogCtrl",["$scope","$modalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_CONFIRMATION"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_CONFIRMATION_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-check":"glyphicon glyphicon-check",a.no=function(){n.dismiss("no")},a.yes=function(){n.close("yes")}}]),angular.module("dialogs.services",["ui.bootstrap.modal","dialogs.controllers"]).provider("dialogs",[function(){var a=!0,n=!0,e="dialogs-default",s="dialogs-backdrop-default",t=!0,o=null,l="lg",r=!1,i=!1,d=function(t){var o={};return t=t||{},o.kb=angular.isDefined(t.keyboard)?!!t.keyboard:n,o.bd=angular.isDefined(t.backdrop)?t.backdrop:a,o.bdc=angular.isDefined(t.backdropClass)?t.backdropClass:s,o.ws=!angular.isDefined(t.size)||"sm"!==t.size&&"lg"!==t.size&&"md"!==t.size?l:t.size,o.wc=angular.isDefined(t.windowClass)?t.windowClass:e,o.anim=angular.isDefined(t.animation)?!!t.animation:r,o};this.useBackdrop=function(n){angular.isDefined(n)&&(a=n)},this.useEscClose=function(a){angular.isDefined(a)&&(n=angular.equals(a,0)||angular.equals(a,"false")||angular.equals(a,"no")||angular.equals(a,null)||angular.equals(a,!1)?!1:!0)},this.useClass=function(a){angular.isDefined(a)&&(e=a)},this.useCopy=function(a){angular.isDefined(a)&&(t=angular.equals(a,0)||angular.equals(a,"false")||angular.equals(a,"no")||angular.equals(a,null)||angular.equals(a,!1)?!1:!0)},this.setWindowTmpl=function(a){angular.isDefined(a)&&(o=a)},this.setSize=function(a){angular.isDefined(a)&&(l=angular.equals(a,"sm")||angular.equals(a,"lg")||angular.equals(a,"md")?a:l)},this.useAnimation=function(){r=!0},this.useFontAwesome=function(){i=!0},this.$get=["$modal",function(a){return{error:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/error.html",controller:"errorDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},wait:function(n,e,s,t){return t=d(t),a.open({templateUrl:"/dialogs/wait.html",controller:"waitDialogCtrl",backdrop:t.bd,backdropClass:t.bdc,keyboard:t.kb,windowClass:t.wc,size:t.ws,animation:t.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),progress:angular.copy(s),fa:i}}}})},notify:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/notify.html",controller:"notifyDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},confirm:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/confirm.html",controller:"confirmDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},create:function(n,e,s,o){var l=o&&angular.isDefined(o.copy)?o.copy:t;return o=d(o),a.open({templateUrl:n,controller:e,keyboard:o.kb,backdrop:o.bd,backdropClass:o.bdc,windowClass:o.wc,size:o.ws,animation:o.anim,resolve:{data:function(){return l?angular.copy(s):s}}})}}}]}]),angular.module("dialogs.main",["dialogs.services","ngSanitize"]).config(["$translateProvider","dialogsProvider",function(a,n){try{angular.module("pascalprecht.translate")}catch(e){a.translations("en-US",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"An unknown error has occurred.",DIALOGS_CLOSE:"Close",DIALOGS_PLEASE_WAIT:"Please Wait",DIALOGS_PLEASE_WAIT_ELIPS:"Please Wait...",DIALOGS_PLEASE_WAIT_MSG:"Waiting on operation to complete.",DIALOGS_PERCENT_COMPLETE:"% Complete",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Unknown application notification.",DIALOGS_CONFIRMATION:"Confirmation",DIALOGS_CONFIRMATION_MSG:"Confirmation required.",DIALOGS_OK:"OK",DIALOGS_YES:"Yes",DIALOGS_NO:"No"})}try{var s=document.styleSheets;a:for(var t=s.length-1;t>=0;t--){var o=null,l=null;if(!s[t].disabled){if(null!==s[t].href&&(o=s[t].href.match(/font\-*awesome/i)),angular.isArray(o)){n.useFontAwesome();break}l=s[t].cssRules;for(var r=l.length-1;r>=0;r--)if(".fa"==l[r].selectorText.toLowerCase()){n.useFontAwesome();break a}}}}catch(e){}}]).run(["$templateCache","$interpolate",function(a,n){var e=n.startSymbol(),s=n.endSymbol();a.put("/dialogs/error.html",'<div class="modal-header dialog-header-error"><button type="button" class="close" ng-click="close()">&times;</button><h4 class="modal-title text-danger"><span class="'+e+"icon"+s+'"></span> <span ng-bind-html="header"></span></h4></div><div class="modal-body text-danger" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-default" ng-click="close()">'+e+'"DIALOGS_CLOSE" | translate'+s+"</button></div>"),a.put("/dialogs/wait.html",'<div class="modal-header dialog-header-wait"><h4 class="modal-title"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body"><p ng-bind-html="msg"></p><div class="progress progress-striped active"><div class="progress-bar progress-bar-info" ng-style="getProgress()"></div><span class="sr-only">'+e+"progress"+s+e+'"DIALOGS_PERCENT_COMPLETE" | translate'+s+"</span></div></div>"),a.put("/dialogs/notify.html",'<div class="modal-header dialog-header-notify"><button type="button" class="close" ng-click="close()" class="pull-right">&times;</button><h4 class="modal-title text-info"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body text-info" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-primary" ng-click="close()">'+e+'"DIALOGS_OK" | translate'+s+"</button></div>"),a.put("/dialogs/confirm.html",'<div class="modal-header dialog-header-confirm"><button type="button" class="close" ng-click="no()">&times;</button><h4 class="modal-title"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-default" ng-click="yes()">'+e+'"DIALOGS_YES" | translate'+s+'</button><button type="button" class="btn btn-primary" ng-click="no()">'+e+'"DIALOGS_NO" | translate'+s+"</button></div>")}])}();
 /**
  * Bunch of useful filters for angularJS(with no external dependencies!)
- * @version v0.5.6 - 2015-09-23 * @link https://github.com/a8m/angular-filter
+ * @version v0.5.7 - 2015-10-04 * @link https://github.com/a8m/angular-filter
  * @author Ariel Mashraki <ariel@mashraki.co.il>
  * @license MIT License, http://www.opensource.org/licenses/MIT
  */
@@ -61265,7 +61446,20 @@ angular.module('a8m.filter-watcher', [])
        * @returns {string}
        */
       function getHashKey(fName, args) {
-        return [fName, angular.toJson(args)]
+        function replacerFactory() {
+          var cache = [];
+          return function(key, val) {
+            if(isObject(val) && !isNull(val)) {
+              if (~cache.indexOf(val)) return '[Circular]';
+              cache.push(val)
+            }
+            if($window == val) return '$WINDOW';
+            if($window.document == val) return '$DOCUMENT';
+            if(isScope(val)) return '$SCOPE';
+            return val;
+          }
+        }
+        return [fName, JSON.stringify(args, replacerFactory())]
           .join('#')
           .replace(/"/g,'');
       }
@@ -61354,7 +61548,6 @@ angular.module('a8m.filter-watcher', [])
         isMemoized: $$isMemoized,
         memoize: $$memoize
       }
-
     }];
   });
   
@@ -64247,7 +64440,7 @@ angular.module('cfp.loadingBar', [])
 
     'use strict';
 
-    angular.module('angular-locker', [])
+    return angular.module('angular-locker', [])
 
     .provider('locker', function () {
 
@@ -64494,7 +64687,7 @@ angular.module('cfp.loadingBar', [])
                      */
                     this._event = function (name, payload) {
                         if (this._options.eventsEnabled) {
-                            $rootScope.$emit(name, angular.extend(payload, {
+                            $rootScope.$emit('locker.' + name, angular.extend(payload, {
                                 driver: this._options.driver,
                                 namespace: this._namespace,
                             }));
@@ -64519,9 +64712,9 @@ angular.module('cfp.loadingBar', [])
                             var oldVal = this._getItem(key);
                             this._driver.setItem(this._getPrefix(key), this._serialize(value));
                             if (this._exists(key) && ! angular.equals(oldVal, value)) {
-                                this._event('locker.item.updated', { key: key, oldValue: oldVal, newValue: value });
+                                this._event('item.updated', { key: key, oldValue: oldVal, newValue: value });
                             } else {
-                                this._event('locker.item.added', { key: key, value: value });
+                                this._event('item.added', { key: key, value: value });
                             }
                         } catch (e) {
                             if (['QUOTA_EXCEEDED_ERR',
@@ -64588,7 +64781,7 @@ angular.module('cfp.loadingBar', [])
                         if (! this._exists(key)) return false;
 
                         this._driver.removeItem(this._getPrefix(key));
-                        this._event('locker.item.forgotten', { key: key });
+                        this._event('item.forgotten', { key: key });
 
                         return true;
                     };
@@ -64924,12 +65117,12 @@ angular.module('cfp.loadingBar', [])
             }]
         };
 
-    });
+    }).name; // export module name for the likes of Browserify and Webpack
 
 });
 
 /**
- * @license AngularJS v1.4.6
+ * @license AngularJS v1.4.7
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -65260,6 +65453,9 @@ angular.module('ngMessages', [])
        controller: ['$element', '$scope', '$attrs', function($element, $scope, $attrs) {
          var ctrl = this;
          var latestKey = 0;
+         var nextAttachId = 0;
+
+         this.getAttachId = function getAttachId() { return nextAttachId++; };
 
          var messages = this.messages = {};
          var renderLater, cachedCollection;
@@ -65571,11 +65767,15 @@ function ngMessageDirectiveFactory(restrict) {
                 $animate.enter(elm, null, element);
                 currentElement = elm;
 
+                // Each time we attach this node to a message we get a new id that we can match
+                // when we are destroying the node later.
+                var $$attachId = currentElement.$$attachId = ngMessagesCtrl.getAttachId();
+
                 // in the event that the parent element is destroyed
                 // by any other structural directive then it's time
                 // to deregister the message from the controller
                 currentElement.on('$destroy', function() {
-                  if (currentElement) {
+                  if (currentElement && currentElement.$$attachId === $$attachId) {
                     ngMessagesCtrl.deregister(commentNode);
                     messageCtrl.detach();
                   }
@@ -66421,7 +66621,7 @@ angular.module('angularPayments', []);angular.module('angularPayments')
 }]);
 
 /**
- * @license AngularJS v1.4.6
+ * @license AngularJS v1.4.7
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -101463,6 +101663,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       _connection.stateChanged(function (change) {
         if (change.newState === $.signalR.connectionState.disconnected && authService.isAuthenticated()) {
           _reconnectInterval = $interval(function() {
+            if (!_connection) {
+              return $interval.cancel(_reconnectInterval);
+            }
+
             _connection.start().then(function() {
               $interval.cancel(_reconnectInterval);
             });
