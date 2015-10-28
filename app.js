@@ -1616,8 +1616,8 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   * https://github.com/paulmillr/es6-shim
   * @license es6-shim Copyright 2013-2015 by Paul Miller (http://paulmillr.com)
   *   and contributors,  MIT License
-  * es6-shim: v0.33.6
-  * see https://github.com/paulmillr/es6-shim/blob/0.33.3/LICENSE
+  * es6-shim: v0.33.8
+  * see https://github.com/paulmillr/es6-shim/blob/0.33.8/LICENSE
   * Details and documentation:
   * https://github.com/paulmillr/es6-shim/
   */
@@ -1748,30 +1748,19 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
     });
   };
 
-  var startsWithRejectsRegex = function () {
-    return String.prototype.startsWith && throwsError(function () {
-      /* throws if spec-compliant */
-      '/a/'.startsWith(/a/);
-    });
-  };
-  var startsWithHandlesInfinity = (function () {
-    return String.prototype.startsWith && 'abc'.startsWith('a', Infinity) === false;
-  }());
-
   var getGlobal = function () {
-	// the only reliable means to get the global object is
-	// `Function('return this')()`
-	// However, this causes CSP violations in Chrome apps.
+    // the only reliable means to get the global object is
+    // `Function('return this')()`
+    // However, this causes CSP violations in Chrome apps.
     if (typeof self !== 'undefined') { return self; }
     if (typeof window !== 'undefined') { return window; }
     if (typeof global !== 'undefined') { return global; }
-	throw new Error('unable to locate global object');
+    throw new Error('unable to locate global object');
   };
 
   var globals = getGlobal();
   var globalIsFinite = globals.isFinite;
   var hasStrictMode = (function () { return this === null; }.call(null));
-  var startsWithIsCompliant = startsWithRejectsRegex() && startsWithHandlesInfinity;
   var _indexOf = Function.call.bind(String.prototype.indexOf);
   var _toString = Function.call.bind(Object.prototype.toString);
   var _concat = Function.call.bind(Array.prototype.concat);
@@ -1832,7 +1821,9 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       }
     },
     preserveToString: function (target, source) {
-      defineProperty(target, 'toString', source.toString.bind(source), true);
+      if (source && ES.IsCallable(source.toString)) {
+        defineProperty(target, 'toString', source.toString.bind(source), true);
+      }
     }
   };
 
@@ -1842,10 +1833,17 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       // sets up proper prototype chain where possible
       Object.setPrototypeOf(original, replacement);
     }
-    _forEach(Object.getOwnPropertyNames(original), function (key) {
-      if (key in noop || keysToSkip[key]) { return; }
-      Value.proxy(original, key, replacement);
-    });
+    if (supportsDescriptors) {
+      _forEach(Object.getOwnPropertyNames(original), function (key) {
+        if (key in noop || keysToSkip[key]) { return; }
+        Value.proxy(original, key, replacement);
+      });
+    } else {
+      _forEach(Object.keys(original), function (key) {
+        if (key in noop || keysToSkip[key]) { return; }
+        replacement[key] = original[key];
+      });
+    }
     replacement.prototype = original.prototype;
     Value.redefine(original.prototype, 'constructor', replacement);
   };
@@ -2212,11 +2210,11 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       return stringElements.join('');
     }
   };
-  defineProperties(String, StringShims);
-  if (String.raw({ raw: { 0: 'x', 1: 'y', length: 2 } }) !== 'xy') {
+  if (String.raw && String.raw({ raw: { 0: 'x', 1: 'y', length: 2 } }) !== 'xy') {
     // IE 11 TP has a broken String.raw implementation
     overrideNative(String, 'raw', StringShims.raw);
   }
+  defineProperties(String, StringShims);
 
   // Fast repeat, uses the `Exponentiation by squaring` algorithm.
   // Perf: http://jsperf.com/string-repeat2/2
@@ -2292,11 +2290,24 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       }
     }
   };
-  defineProperties(String.prototype, StringPrototypeShims);
-
-  if ('a'.includes('a', Infinity) !== false) {
+  if (String.prototype.includes && 'a'.includes('a', Infinity) !== false) {
     overrideNative(String.prototype, 'includes', StringPrototypeShims.includes);
   }
+
+  if (String.prototype.startsWith && String.prototype.endsWith) {
+    var startsWithRejectsRegex = throwsError(function () {
+      /* throws if spec-compliant */
+      '/a/'.startsWith(/a/);
+    });
+    var startsWithHandlesInfinity = 'abc'.startsWith('a', Infinity) === false;
+    if (!startsWithRejectsRegex || !startsWithHandlesInfinity) {
+      // Firefox (< 37?) and IE 11 TP have a noncompliant startsWith implementation
+      overrideNative(String.prototype, 'startsWith', StringPrototypeShims.startsWith);
+      overrideNative(String.prototype, 'endsWith', StringPrototypeShims.endsWith);
+    }
+  }
+
+  defineProperties(String.prototype, StringPrototypeShims);
 
   var hasStringTrimBug = '\u0085'.trim().length !== 1;
   if (hasStringTrimBug) {
@@ -2345,12 +2356,6 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
   addIterator(String.prototype, function () {
     return new StringIterator(this);
   });
-
-  if (!startsWithIsCompliant) {
-    // Firefox (< 37?) and IE 11 TP have a noncompliant startsWith implementation
-    overrideNative(String.prototype, 'startsWith', StringPrototypeShims.startsWith);
-    overrideNative(String.prototype, 'endsWith', StringPrototypeShims.endsWith);
-  }
 
   var ArrayShims = {
     from: function from(items) {
@@ -2780,7 +2785,12 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
             primValue = parseInt(_strSlice(primValue, 2), 8);
           }
         }
-        if (this instanceof Number) {
+        var receiver = this;
+        var valueOfSucceeds = valueOrFalseIfThrows(function () {
+          Number.prototype.valueOf.call(receiver);
+          return true;
+        });
+        if (receiver instanceof Number && !valueOfSucceeds) {
           return new OrigNumber(primValue);
         }
         /* jshint newcap: false */
@@ -3459,12 +3469,14 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       };
     };
     /*global process */
+    /* jscs:disable disallowMultiLineTernary */
     var enqueue = ES.IsCallable(globals.setImmediate) ?
       globals.setImmediate.bind(globals) :
       typeof process === 'object' && process.nextTick ? process.nextTick :
       makePromiseAsap() ||
       (ES.IsCallable(makeZeroTimeout) ? makeZeroTimeout() :
       function (task) { setTimeout(task, 0); }); // fallback
+    /* jscs:enable disallowMultiLineTernary */
 
     // Constants for Promise implementation
     var PROMISE_IDENTITY = 1;
@@ -3577,34 +3589,37 @@ if (parseInt(ws + '08') !== 8 || parseInt(ws + '0x16') !== 22) {
       return C;
     };
 
-    var Promise = function Promise(resolver) {
-      if (!(this instanceof Promise)) {
-        throw new TypeError('Constructor Promise requires "new"');
-      }
-      if (this && this._promise) {
-        throw new TypeError('Bad construction');
-      }
-      // see https://bugs.ecmascript.org/show_bug.cgi?id=2482
-      if (!ES.IsCallable(resolver)) {
-        throw new TypeError('not a valid resolver');
-      }
-      var promise = emulateES6construct(this, Promise, Promise$prototype, {
-        _promise: {
-          result: void 0,
-          state: PROMISE_PENDING,
-          fulfillReactions: [],
-          rejectReactions: []
+    var Promise = (function () {
+      var PromiseShim = function Promise(resolver) {
+        if (!(this instanceof PromiseShim)) {
+          throw new TypeError('Constructor Promise requires "new"');
         }
-      });
-      var resolvingFunctions = createResolvingFunctions(promise);
-      var reject = resolvingFunctions.reject;
-      try {
-        resolver(resolvingFunctions.resolve, reject);
-      } catch (e) {
-        reject(e);
-      }
-      return promise;
-    };
+        if (this && this._promise) {
+          throw new TypeError('Bad construction');
+        }
+        // see https://bugs.ecmascript.org/show_bug.cgi?id=2482
+        if (!ES.IsCallable(resolver)) {
+          throw new TypeError('not a valid resolver');
+        }
+        var promise = emulateES6construct(this, PromiseShim, Promise$prototype, {
+          _promise: {
+            result: void 0,
+            state: PROMISE_PENDING,
+            fulfillReactions: [],
+            rejectReactions: []
+          }
+        });
+        var resolvingFunctions = createResolvingFunctions(promise);
+        var reject = resolvingFunctions.reject;
+        try {
+          resolver(resolvingFunctions.resolve, reject);
+        } catch (e) {
+          reject(e);
+        }
+        return promise;
+      };
+      return PromiseShim;
+    }());
     var Promise$prototype = Promise.prototype;
 
     var _promiseAllResolver = function (index, values, capability, remaining) {
