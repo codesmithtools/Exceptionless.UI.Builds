@@ -98472,9 +98472,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.billing')
-    .controller('ChangePlanDialog', ['$modalInstance', 'adminService', 'Common', '$ExceptionlessClient', 'notificationService', 'organizationService', 'stripe', 'STRIPE_PUBLISHABLE_KEY', 'userService', 'data', function ($modalInstance, adminService, Common, $ExceptionlessClient, notificationService, organizationService, stripe, STRIPE_PUBLISHABLE_KEY, userService, organizationId) {
+    .controller('ChangePlanDialog', ['$modalInstance', 'adminService', 'Common', '$ExceptionlessClient', '$intercom', 'INTERCOM_APPID', 'notificationService', 'organizationService', 'stripe', 'STRIPE_PUBLISHABLE_KEY', 'userService', '$window', 'data', function ($modalInstance, adminService, Common, $ExceptionlessClient, $intercom, INTERCOM_APPID, notificationService, organizationService, stripe, STRIPE_PUBLISHABLE_KEY, userService, $window, organizationId) {
       var source = 'exceptionless.billing.ChangePlanDialog';
       var contactSupport = 'Please contact support for more information.';
+      var freePlanId = 'EX_FREE';
 
       var vm = this;
       function cancel() {
@@ -98552,12 +98553,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         vm.paymentMessage = null;
-        if (vm.currentOrganization.plan_id === 'EX_FREE' && vm.currentPlan.id === 'EX_FREE') {
+        if (vm.currentOrganization.plan_id === freePlanId && vm.currentPlan.id === freePlanId) {
           cancel();
           return;
         }
 
-        if (hasAdminRole() || vm.currentPlan.id === 'EX_FREE') {
+        if (hasAdminRole() || vm.currentPlan.id === freePlanId) {
           return changePlan(hasAdminRole()).then(onSuccess, onFailure);
         }
 
@@ -98702,12 +98703,25 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return !!STRIPE_PUBLISHABLE_KEY;
       }
 
+      function isCancellingPlan() {
+        return vm.currentPlan && vm.currentPlan.id === freePlanId && vm.currentOrganization.plan_id !== freePlanId;
+      }
+
       function isNewCard() {
         return vm.card && vm.card.mode === 'new';
       }
 
       function isPaidPlan() {
         return vm.currentPlan && vm.currentPlan.price !== 0;
+      }
+
+      function showIntercom() {
+        $ExceptionlessClient.submitFeatureUsage(source + '.showIntercom');
+        if (INTERCOM_APPID) {
+          $intercom.showNewMessage();
+        } else {
+          $window.open('http://exceptionless.com/contact/', '_blank');
+        }
       }
 
       vm.cancel = cancel;
@@ -98720,12 +98734,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.hasAdminRole = hasAdminRole;
       vm.hasExistingCard = hasExistingCard;
       vm.isBillingEnabled = isBillingEnabled;
+      vm.isCancellingPlan = isCancellingPlan;
       vm.isNewCard = isNewCard;
       vm.isPaidPlan = isPaidPlan;
       vm.organizations = [];
       vm.paymentMessage = !isBillingEnabled() ? 'Billing is currently disabled.' : null;
       vm.plans = [];
       vm.save = save;
+      vm.showIntercom = showIntercom;
       vm.stripe = {};
 
       $ExceptionlessClient.submitFeatureUsage(source);
@@ -103373,13 +103389,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app')
-    .controller('App', ['$scope', '$state', '$stateParams', '$window', 'authService', 'billingService', '$ExceptionlessClient', 'filterService', 'hotkeys', 'INTERCOM_APPID', '$intercom', 'locker', 'notificationService', 'projectService', 'signalRService', 'stateService', 'STRIPE_PUBLISHABLE_KEY', 'SYSTEM_NOTIFICATION_MESSAGE', 'urlService', 'userService', function ($scope, $state, $stateParams, $window, authService, billingService, $ExceptionlessClient, filterService, hotkeys, INTERCOM_APPID, $intercom, locker, notificationService, projectService, signalRService, stateService, STRIPE_PUBLISHABLE_KEY, SYSTEM_NOTIFICATION_MESSAGE, urlService, userService) {
+    .controller('App', ['$scope', '$state', '$stateParams', '$window', 'authService', 'billingService', '$ExceptionlessClient', 'filterService', 'hotkeys', 'INTERCOM_APPID', '$intercom', 'locker', 'notificationService', 'organizationService', 'signalRService', 'stateService', 'STRIPE_PUBLISHABLE_KEY', 'SYSTEM_NOTIFICATION_MESSAGE', 'urlService', 'userService', function ($scope, $state, $stateParams, $window, authService, billingService, $ExceptionlessClient, filterService, hotkeys, INTERCOM_APPID, $intercom, locker, notificationService, organizationService, signalRService, stateService, STRIPE_PUBLISHABLE_KEY, SYSTEM_NOTIFICATION_MESSAGE, urlService, userService) {
       var source = 'app.App';
       var _store = locker.driver('local').namespace('app');
       var vm = this;
 
       function canChangePlan() {
-        return !!STRIPE_PUBLISHABLE_KEY && vm.projects && vm.projects.length > 0;
+        return !!STRIPE_PUBLISHABLE_KEY && vm.organizations && vm.organizations.length > 0;
       }
 
       function changePlan(organizationId) {
@@ -103402,13 +103418,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return urlService.buildFilterUrl({ route: 'new', projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
       }
 
-      function getProjects() {
+      function getOrganizations() {
         function onSuccess(response) {
-          vm.projects = response.data.plain();
+          vm.organizations = response.data.plain();
           return response;
         }
 
-        return projectService.getAll().then(onSuccess);
+        return organizationService.getAll().then(onSuccess);
       }
 
       function getUser(data) {
@@ -103526,7 +103542,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.getRecentUrl = getRecentUrl;
       vm.getFrequentUrl = getFrequentUrl;
       vm.getNewUrl = getNewUrl;
-      vm.getProjects = getProjects;
+      vm.getOrganizations = getOrganizations;
       vm.getUser = getUser;
       vm.getSystemNotificationMessage = getSystemNotificationMessage;
       vm.hasAdminRole = hasAdminRole;
@@ -103536,12 +103552,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.isIntercomEnabled = isIntercomEnabled;
       vm.isSideNavCollapsed = _store.get('sideNavCollapsed') === true;
       vm.isTypeMenuActive = isTypeMenuActive;
-      vm.projects = [];
+      vm.organizations = [];
       vm.showIntercom = showIntercom;
       vm.toggleSideNavCollapsed = toggleSideNavCollapsed;
       vm.user = {};
 
-      getUser().then(getProjects).then(startSignalR);
+      getUser().then(getOrganizations).then(startSignalR);
     }]);
 }());
 
@@ -106804,7 +106820,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/app.tpl.html',
-    "<div class=\"app-header-fixed app-aside-fixed\" ng-class=\"{'app-aside-folded': appVm.isSideNavCollapsed}\"> <div ng-include=\"'app/blocks/header.tpl.html'\" class=\"app-header navbar\"></div> <div ng-include=\"'app/blocks/sidebar.tpl.html'\" class=\"app-aside hidden-xs bg-dark\"></div> <div class=\"app-content\" refresh-on=\"UserChanged\" refresh-action=\"appVm.getUser(data)\" refresh-debounce=\"1000\"> <div refresh-on=\"ProjectChanged\" refresh-action=\"appVm.getProjects()\" refresh-debounce=\"10000\"></div> <button type=\"button\" role=\"button\" class=\"off-screen-toggle hide\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\"></button> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"appVm.hasSystemNotificationMessage()\"> <div ng-bind-html=\"appVm.getSystemNotificationMessage()\"></div> </div> <rate-limit></rate-limit> <div class=\"app-content-body fade-in\" ui-view autoscroll=\"true\"></div> </div> <div class=\"app-footer wrapper b-t bg-light\"> <span class=\"pull-right\"> <a href=\"https://github.com/exceptionless/Exceptionless.UI/releases\" target=\"_blank\">@@version</a> <a href=\"javascript:void(0);\" ui-scroll=\"app\" class=\"m-l-sm text-muted\"><i class=\"fa fa-long-arrow-up\"></i></a> </span> &copy; 2015 <a href=\"http://exceptionless.io\">Exceptionless</a> </div> <intercom ng-if=\"appVm.isIntercomEnabled()\"></intercom> </div>"
+    "<div class=\"app-header-fixed app-aside-fixed\" ng-class=\"{'app-aside-folded': appVm.isSideNavCollapsed}\"> <div ng-include=\"'app/blocks/header.tpl.html'\" class=\"app-header navbar\"></div> <div ng-include=\"'app/blocks/sidebar.tpl.html'\" class=\"app-aside hidden-xs bg-dark\"></div> <div class=\"app-content\" refresh-on=\"UserChanged\" refresh-action=\"appVm.getUser(data)\" refresh-debounce=\"1000\"> <div refresh-on=\"OrganizationChanged\" refresh-action=\"appVm.getOrganizations()\" refresh-debounce=\"5000\"></div> <button type=\"button\" role=\"button\" class=\"off-screen-toggle hide\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\"></button> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"appVm.hasSystemNotificationMessage()\"> <div ng-bind-html=\"appVm.getSystemNotificationMessage()\"></div> </div> <rate-limit></rate-limit> <div class=\"app-content-body fade-in\" ui-view autoscroll=\"true\"></div> </div> <div class=\"app-footer wrapper b-t bg-light\"> <span class=\"pull-right\"> <a href=\"https://github.com/exceptionless/Exceptionless.UI/releases\" target=\"_blank\">@@version</a> <a href=\"javascript:void(0);\" ui-scroll=\"app\" class=\"m-l-sm text-muted\"><i class=\"fa fa-long-arrow-up\"></i></a> </span> &copy; 2015 <a href=\"http://exceptionless.io\">Exceptionless</a> </div> <intercom ng-if=\"appVm.isIntercomEnabled()\"></intercom> </div>"
   );
 
 
@@ -106984,7 +107000,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/billing/change-plan-dialog.tpl.html',
-    "<form name=\"vm.changePlanForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"modal-header dialog-header-notify\"> <button type=\"button\" role=\"button\" class=\"close\" ng-click=\"vm.cancel()\">&times;</button> <h4 class=\"modal-title\"><i class=\"fa fa-credit-card fa-fw\"></i> Exceptionless Plan</h4> </div> <div class=\"modal-body\"> <div class=\"alert alert-danger\" role=\"alert\" ng-if=\"vm.paymentMessage\"> <span class=\"glyphicon glyphicon-exclamation-sign\" aria-hidden=\"true\"></span> {{vm.paymentMessage}} </div> <div class=\"form-group\" ng-if=\"vm.organizations.length > 1\"> <label for=\"organization\">Organization to change</label> <select id=\"organization\" class=\"form-control\" ng-change=\"vm.changeOrganization()\" ng-model=\"vm.currentOrganization\" ng-disabled=\"!vm.isBillingEnabled()\" ng-options=\"organization.name for organization in vm.organizations track by organization.id\"></select> </div> <p><strong>{{vm.currentOrganization.name}}</strong> is currently on the <strong>{{vm.currentOrganization.plan_name}}</strong> plan.</p> <div class=\"form-group\"> <label for=\"plan\">Select new plan (<a href=\"http://exceptionless.io/pricing\" target=\"_blank\">view plan information</a>)</label> <select id=\"plan\" class=\"form-control\" ng-init=\"vm.currentPlan = vm.plans[0]\" ng-model=\"vm.currentPlan\" ng-disabled=\"!vm.isBillingEnabled()\" ng-options=\"plan.description for plan in vm.plans track by plan.id\" autofocus></select> </div> <div ng-if=\"vm.isPaidPlan() && !vm.hasAdminRole()\"> <h4>Credit Card</h4> <div class=\"row\" ng-if=\"vm.hasExistingCard()\"> <div class=\"form-group col-sm-6\"> <div class=\"radio\"> <label class=\"i-checks\"> <input type=\"radio\" class=\"form-control\" ng-model=\"vm.card.mode\" ng-disabled=\"!vm.isBillingEnabled()\" value=\"existing\"> <i></i> Use credit card ending in {{vm.currentOrganization.card_last4}} </label> </div> </div> <div class=\"form-group col-sm-6\"> <div class=\"radio\"> <label class=\"i-checks\"> <input type=\"radio\" class=\"form-control\" ng-model=\"vm.card.mode\" ng-disabled=\"!vm.isBillingEnabled()\" value=\"new\"> <i></i> Use a new credit card </label> </div> </div> </div> <div ng-if=\"vm.isNewCard()\"> <div class=\"row\"> <div class=\"form-group col-xs-8\"> <label for=\"cardNumber\">Card number</label> <div class=\"input-group\"> <input id=\"cardNumber\" type=\"text\" class=\"form-control\" placeholder=\"•••• •••• •••• ••••\" x-autocompletetype=\"cc-number\" ng-model=\"vm.card.number\" payments-validate=\"card\" payments-format=\"card\" payments-type-model=\"vm.card.type\" ng-disabled=\"!vm.isBillingEnabled()\" ng-required=\"true\"> <span class=\"input-group-addon\"><img ng-src=\"/img/cards/{{ vm.card.type ? vm.card.type : 'placeholder' }}.png\" alt=\"Card Type\"></span> </div> </div> <div class=\"form-group col-xs-4\"> <label for=\"cardExpiry\">Expires</label> <input id=\"cardExpiry\" type=\"text\" class=\"form-control\" placeholder=\"MM / YY\" x-autocompletetype=\"cc-exp\" ng-model=\"vm.card.expiry\" ng-disabled=\"!vm.isBillingEnabled()\" payments-validate=\"expiry\" payments-format=\"expiry\" ng-required=\"true\"> </div> </div> <div class=\"row\"> <div class=\"form-group col-xs-8\"> <label for=\"cardName\">Name on card</label> <input id=\"cardName\" type=\"text\" class=\"form-control\" placeholder=\"Name on card\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck ng-model=\"vm.card.name\" ng-disabled=\"!vm.isBillingEnabled()\" ng-required=\"true\"> </div> <div class=\"form-group col-xs-4\"> <label for=\"cardCVC\">Card code</label> <input id=\"cardCVC\" type=\"text\" class=\"form-control\" placeholder=\"CVC\" x-autocompletetype=\"cc-csc\" autocomplete=\"off\" ng-model=\"vm.card.cvc\" ng-disabled=\"!vm.isBillingEnabled()\" payments-validate=\"cvc\" payments-format=\"cvc\" payments-type-model=\"vm.card.type\" ng-required=\"true\"> </div> </div> </div> </div> <div class=\"form-group\" ng-if=\"!vm.hasExistingCard()\"> <label for=\"couponId\">Coupon code</label> <input id=\"couponId\" type=\"text\" class=\"form-control\" placeholder=\"Coupon Code\" ng-model=\"vm.coupon\" ng-disabled=\"!vm.isBillingEnabled()\"> </div> </div> <div class=\"modal-footer\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" ng-click=\"vm.cancel()\">Cancel</button> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.save(vm.changePlanForm.$valid)\" promise-button-busy-text=\"Changing Plan\">Change Plan</button> </div> </form>"
+    "<form name=\"vm.changePlanForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"modal-header dialog-header-notify\"> <button type=\"button\" role=\"button\" class=\"close\" ng-click=\"vm.cancel()\">&times;</button> <h4 class=\"modal-title\"><i class=\"fa fa-credit-card fa-fw\"></i> Exceptionless Plan</h4> </div> <div class=\"modal-body\"> <div class=\"alert alert-danger\" role=\"alert\" ng-if=\"vm.paymentMessage\"> <span class=\"glyphicon glyphicon-exclamation-sign\" aria-hidden=\"true\"></span> {{vm.paymentMessage}} </div> <div class=\"form-group\" ng-if=\"vm.organizations.length > 1\"> <label for=\"organization\">Organization to change</label> <select id=\"organization\" class=\"form-control\" ng-change=\"vm.changeOrganization()\" ng-model=\"vm.currentOrganization\" ng-disabled=\"!vm.isBillingEnabled()\" ng-options=\"organization.name for organization in vm.organizations track by organization.id\"></select> </div> <p><strong>{{vm.currentOrganization.name}}</strong> is currently on the <strong>{{vm.currentOrganization.plan_name}}</strong> plan.</p> <div class=\"form-group\"> <label for=\"plan\">Select new plan (<a href=\"http://exceptionless.io/pricing\" target=\"_blank\">view plan information</a>)</label> <select id=\"plan\" class=\"form-control\" ng-init=\"vm.currentPlan = vm.plans[0]\" ng-model=\"vm.currentPlan\" ng-disabled=\"!vm.isBillingEnabled()\" ng-options=\"plan.description for plan in vm.plans track by plan.id\" autofocus></select> </div> <div ng-if=\"vm.isPaidPlan()\"> <div ng-if=\"!vm.hasAdminRole()\"> <h4>Credit Card</h4> <div class=\"row\" ng-if=\"vm.hasExistingCard()\"> <div class=\"form-group col-sm-6\"> <div class=\"radio\"> <label class=\"i-checks\"> <input type=\"radio\" class=\"form-control\" ng-model=\"vm.card.mode\" ng-disabled=\"!vm.isBillingEnabled()\" value=\"existing\"> <i></i> Use credit card ending in {{vm.currentOrganization.card_last4}} </label> </div> </div> <div class=\"form-group col-sm-6\"> <div class=\"radio\"> <label class=\"i-checks\"> <input type=\"radio\" class=\"form-control\" ng-model=\"vm.card.mode\" ng-disabled=\"!vm.isBillingEnabled()\" value=\"new\"> <i></i> Use a new credit card </label> </div> </div> </div> <div ng-if=\"vm.isNewCard()\"> <div class=\"row\"> <div class=\"form-group col-xs-8\"> <label for=\"cardNumber\">Card number</label> <div class=\"input-group\"> <input id=\"cardNumber\" type=\"text\" class=\"form-control\" placeholder=\"•••• •••• •••• ••••\" x-autocompletetype=\"cc-number\" ng-model=\"vm.card.number\" payments-validate=\"card\" payments-format=\"card\" payments-type-model=\"vm.card.type\" ng-disabled=\"!vm.isBillingEnabled()\" ng-required=\"true\"> <span class=\"input-group-addon\"><img ng-src=\"/img/cards/{{ vm.card.type ? vm.card.type : 'placeholder' }}.png\" alt=\"Card Type\"></span> </div> </div> <div class=\"form-group col-xs-4\"> <label for=\"cardExpiry\">Expires</label> <input id=\"cardExpiry\" type=\"text\" class=\"form-control\" placeholder=\"MM / YY\" x-autocompletetype=\"cc-exp\" ng-model=\"vm.card.expiry\" ng-disabled=\"!vm.isBillingEnabled()\" payments-validate=\"expiry\" payments-format=\"expiry\" ng-required=\"true\"> </div> </div> <div class=\"row\"> <div class=\"form-group col-xs-8\"> <label for=\"cardName\">Name on card</label> <input id=\"cardName\" type=\"text\" class=\"form-control\" placeholder=\"Name on card\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck ng-model=\"vm.card.name\" ng-disabled=\"!vm.isBillingEnabled()\" ng-required=\"true\"> </div> <div class=\"form-group col-xs-4\"> <label for=\"cardCVC\">Card code</label> <input id=\"cardCVC\" type=\"text\" class=\"form-control\" placeholder=\"CVC\" x-autocompletetype=\"cc-csc\" autocomplete=\"off\" ng-model=\"vm.card.cvc\" ng-disabled=\"!vm.isBillingEnabled()\" payments-validate=\"cvc\" payments-format=\"cvc\" payments-type-model=\"vm.card.type\" ng-required=\"true\"> </div> </div> </div> </div> <div class=\"form-group\" ng-if=\"!vm.hasExistingCard()\"> <label for=\"couponId\">Coupon code</label> <input id=\"couponId\" type=\"text\" class=\"form-control\" placeholder=\"Coupon Code\" ng-model=\"vm.coupon\" ng-disabled=\"!vm.isBillingEnabled()\"> </div> </div> <div ng-if=\"vm.isCancellingPlan()\"> <p><strong>Help us improve Exceptionless!</strong></p> <p> We hate to see you downgrade, but we'll be more than happy to take care of that for you. Use the <a ng-click=\"vm.showIntercom()\">Contact Us</a> button below to let us know why you're downgrading, so we can serve you better in the future. </p> </div> </div> <div class=\"modal-footer\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" ng-click=\"vm.cancel()\">Cancel</button> <span ng-if=\"vm.isCancellingPlan()\"> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" ng-click=\"vm.showIntercom()\">Contact Us</button> </span> <span ng-if=\"!vm.isCancellingPlan()\"> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.save(vm.changePlanForm.$valid)\" promise-button-busy-text=\"Changing Plan\">Change Plan</button> </span> </div> </form>"
   );
 
 
@@ -107024,7 +107040,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/project-filter/project-filter-directive.tpl.html',
-    "<ul class=\"nav navbar-nav\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get()\" refresh-throttle=\"10000\"> <li class=\"dropdown\" dropdown> <a class=\"dropdown-toggle\" dropdown-toggle refresh-on=\"filterChanged\" refresh-action=\"vm.getFilterName()\"> <span>{{vm.filterName}}</span> <b class=\"caret\"></b> </a> <div class=\"dropdown-menu w-xl project-filter-dropdown-menu\" ng-style=\"{'max-height': vm.filterDropDownMaxHeight + 'px'}\"> <div class=\"panel bg-dark\"> <div class=\"list-group\"> <div ng-repeat=\"organization in vm.organizations | orderBy: 'name' track by organization.id\"> <a class=\"media list-group-item\" ng-if=\"$first\" ng-href=\"{{vm.getAllProjectsUrl()}}\" auto-active>All Projects</a> <a class=\"media list-group-item\" ng-href=\"{{vm.getOrganizationUrl(organization)}}\" auto-active>{{organization.name}} <span class=\"icon-right\" ui-sref=\"app.organization.manage({ id: organization.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> <a class=\"media list-group-item project-name\" ng-href=\"{{vm.getProjectUrl(project)}}\" auto-active ng-repeat=\"project in vm.getProjectsByOrganizationId(organization.id) | orderBy: 'name' track by project.id\">{{project.name}} <span class=\"icon-right\" ui-sref=\"app.project.manage({ id: project.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> </div> <a class=\"list-group-footer media list-group-item\" ui-sref=\"app.project.add\" auto-active>Add New Project</a> </div> </div> </div> </li> </ul>"
+    "<ul class=\"nav navbar-nav\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get()\" refresh-throttle=\"5000\"> <li class=\"dropdown\" dropdown> <a class=\"dropdown-toggle\" dropdown-toggle refresh-on=\"filterChanged\" refresh-action=\"vm.getFilterName()\"> <span>{{vm.filterName}}</span> <b class=\"caret\"></b> </a> <div class=\"dropdown-menu w-xl project-filter-dropdown-menu\" ng-style=\"{'max-height': vm.filterDropDownMaxHeight + 'px'}\"> <div class=\"panel bg-dark\"> <div class=\"list-group\"> <div ng-repeat=\"organization in vm.organizations | orderBy: 'name' track by organization.id\"> <a class=\"media list-group-item\" ng-if=\"$first\" ng-href=\"{{vm.getAllProjectsUrl()}}\" auto-active>All Projects</a> <a class=\"media list-group-item\" ng-href=\"{{vm.getOrganizationUrl(organization)}}\" auto-active>{{organization.name}} <span class=\"icon-right\" ui-sref=\"app.organization.manage({ id: organization.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> <a class=\"media list-group-item project-name\" ng-href=\"{{vm.getProjectUrl(project)}}\" auto-active ng-repeat=\"project in vm.getProjectsByOrganizationId(organization.id) | orderBy: 'name' track by project.id\">{{project.name}} <span class=\"icon-right\" ui-sref=\"app.project.manage({ id: project.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> </div> <a class=\"list-group-footer media list-group-item\" ui-sref=\"app.project.add\" auto-active>Add New Project</a> </div> </div> </div> </li> </ul>"
   );
 
 
