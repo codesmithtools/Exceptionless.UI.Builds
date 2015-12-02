@@ -105010,7 +105010,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless',
     'exceptionless.simple-error'
   ])
-    .directive('simpleStackTrace', ['$ExceptionlessClient', '$sanitize', 'simpleErrorService', function ($ExceptionlessClient, $sanitize, simpleErrorService) {
+    .directive('simpleStackTrace', ['$ExceptionlessClient', '$sanitize', '$sce', 'simpleErrorService', function ($ExceptionlessClient, $sanitize, $sce, simpleErrorService) {
       function buildStackFrames(exceptions) {
         var frames = '';
         for (var index = 0; index < exceptions.length; index++) {
@@ -105076,10 +105076,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         scope: {
           exception: "="
         },
-        template: '<pre class="stack-trace" bind-html-unsafe="vm.stackTrace"></pre>',
+        template: '<pre class="stack-trace" ng-bind-html="vm.stackTrace"></pre>',
         controller: [function () {
           var vm = this;
-          vm.stackTrace = buildStackTrace(simpleErrorService.getExceptions(vm.exception));
+          vm.stackTrace = $sce.trustAsHtml(buildStackTrace(simpleErrorService.getExceptions(vm.exception)));
         }],
         controllerAs: 'vm'
       };
@@ -105191,7 +105191,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless',
     'exceptionless.error'
   ])
-  .directive('stackTrace', ['$ExceptionlessClient', '$sanitize', 'errorService', function ($ExceptionlessClient, $sanitize, errorService) {
+  .directive('stackTrace', ['$ExceptionlessClient', '$sanitize', '$sce', 'errorService', function ($ExceptionlessClient, $sanitize, $sce, errorService) {
     function buildParameter(parameter) {
       var result = '';
 
@@ -105343,10 +105343,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       scope: {
         exception: "="
       },
-      template: '<pre class="stack-trace" bind-html-unsafe="vm.stackTrace"></pre>',
+      template: '<pre class="stack-trace" ng-bind-html="vm.stackTrace"></pre>',
       controller: [function () {
         var vm = this;
-        vm.stackTrace = buildStackTrace(errorService.getExceptions(vm.exception));
+        vm.stackTrace = $sce.trustAsHtml(buildStackTrace(errorService.getExceptions(vm.exception)));
       }],
       controllerAs: 'vm'
     };
