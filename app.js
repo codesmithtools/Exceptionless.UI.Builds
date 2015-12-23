@@ -102617,31 +102617,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 (function () {
   'use strict';
 
-  angular.module('exceptionless.feature', [])
-    .factory('featureService', [function () {
-      var isPremium = true;
-
-      function hasPremium() {
-        return isPremium;
-      }
-
-      function setPremium(value) {
-        isPremium = value === true;
-      }
-
-      var service = {
-        hasPremium: hasPremium,
-        setPremium: setPremium
-      };
-
-      return service;
-    }
-    ]);
-}());
-
-(function () {
-  'use strict';
-
   angular.module('exceptionless.filter', [
     'angular-locker',
 
@@ -107445,7 +107420,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.account')
-    .controller('account.Manage', ['$stateParams', '$timeout', 'authService', 'billingService', 'FACEBOOK_APPID', 'featureService', 'GOOGLE_APPID', 'GITHUB_APPID', 'LIVE_APPID', 'notificationService', 'projectService', 'userService', function ($stateParams, $timeout, authService, billingService, FACEBOOK_APPID, featureService, GOOGLE_APPID, GITHUB_APPID, LIVE_APPID, notificationService, projectService, userService) {
+    .controller('account.Manage', ['$stateParams', '$timeout', 'authService', 'billingService', 'FACEBOOK_APPID', 'GOOGLE_APPID', 'GITHUB_APPID', 'LIVE_APPID', 'notificationService', 'projectService', 'userService', function ($stateParams, $timeout, authService, billingService, FACEBOOK_APPID, GOOGLE_APPID, GITHUB_APPID, LIVE_APPID, notificationService, projectService, userService) {
       var _canSaveEmailAddress = true;
       var vm = this;
 
@@ -107575,7 +107550,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function hasPremiumFeatures() {
-        return featureService.hasPremium();
+        return vm.currentProject && vm.currentProject.has_premium_features;
       }
 
       function hasProjects() {
@@ -108695,7 +108670,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.organization')
-    .controller('organization.Manage', ['$state', '$stateParams', '$window', 'billingService', 'dialogService', 'organizationService', 'projectService', 'userService', 'notificationService', 'featureService', 'dialogs', 'STRIPE_PUBLISHABLE_KEY', function ($state, $stateParams, $window, billingService, dialogService, organizationService, projectService, userService, notificationService, featureService, dialogs, STRIPE_PUBLISHABLE_KEY) {
+    .controller('organization.Manage', ['$state', '$stateParams', '$window', 'billingService', 'dialogService', 'organizationService', 'projectService', 'userService', 'notificationService', 'dialogs', 'STRIPE_PUBLISHABLE_KEY', function ($state, $stateParams, $window, billingService, dialogService, organizationService, projectService, userService, notificationService, dialogs, STRIPE_PUBLISHABLE_KEY) {
       var _ignoreRefresh = false;
       var _organizationId = $stateParams.id;
       var vm = this;
@@ -108769,7 +108744,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function hasPremiumFeatures() {
-        return featureService.hasPremium();
+        return vm.organization && vm.organization.has_premium_features;
       }
 
       function leaveOrganization(currentUser){
@@ -109156,7 +109131,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.project')
-    .controller('project.Manage', ['$state', '$stateParams', 'billingService', 'projectService', 'tokenService', 'webHookService', 'notificationService', 'featureService', 'dialogs', 'dialogService', function ($state, $stateParams, billingService, projectService, tokenService, webHookService, notificationService, featureService, dialogs, dialogService) {
+    .controller('project.Manage', ['$state', '$stateParams', 'billingService', 'projectService', 'tokenService', 'webHookService', 'notificationService', 'dialogs', 'dialogService', function ($state, $stateParams, billingService, projectService, tokenService, webHookService, notificationService, dialogs, dialogService) {
       var _ignoreRefresh = false;
       var _projectId = $stateParams.id;
       var vm = this;
@@ -109281,7 +109256,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function hasPremiumFeatures() {
-        return featureService.hasPremium();
+        return vm.project && vm.project.has_premium_features;
       }
 
       function hasTokens() {
@@ -109555,7 +109530,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless.dialog',
     'exceptionless.event',
     'exceptionless.events',
-    'exceptionless.feature',
     'exceptionless.filter',
     'exceptionless.organization-notifications',
     'exceptionless.promise-button',
@@ -109587,7 +109561,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.stack')
-    .controller('Stack', ['$ExceptionlessClient', '$filter', '$state', '$stateParams', 'billingService', 'dialogs', 'dialogService', 'eventService', 'featureService', 'filterService', 'notificationService', 'projectService', 'stackService', 'statService', function ($ExceptionlessClient, $filter, $state, $stateParams, billingService, dialogs, dialogService, eventService, featureService, filterService, notificationService, projectService, stackService, statService) {
+    .controller('Stack', ['$ExceptionlessClient', '$filter', '$state', '$stateParams', 'billingService', 'dialogs', 'dialogService', 'eventService', 'filterService', 'notificationService', 'projectService', 'stackService', 'statService', function ($ExceptionlessClient, $filter, $state, $stateParams, billingService, dialogs, dialogService, eventService, filterService, notificationService, projectService, stackService, statService) {
       var source = 'app.stack.Stack';
       var _stackId = $stateParams.id;
       var vm = this;
@@ -109726,7 +109700,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       function promoteToExternal() {
         $ExceptionlessClient.createFeatureUsage(source + '.promoteToExternal').setProperty('id', _stackId).submit();
-        if (!featureService.hasPremium()) {
+        if (vm.project && !vm.project.has_premium_features) {
           var message = 'Promote to External is a premium feature used to promote an error stack to an external system. Please upgrade your plan to enable this feature.';
           return billingService.confirmUpgradePlan(message, vm.stack.organization_id).then(function () {
             return promoteToExternal();
