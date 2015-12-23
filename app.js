@@ -101706,7 +101706,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.billing')
-    .controller('ChangePlanDialog', ['$modalInstance', 'adminService', 'Common', '$ExceptionlessClient', '$intercom', 'INTERCOM_APPID', 'notificationService', 'organizationService', 'stripe', 'STRIPE_PUBLISHABLE_KEY', 'userService', '$window', 'data', function ($modalInstance, adminService, Common, $ExceptionlessClient, $intercom, INTERCOM_APPID, notificationService, organizationService, stripe, STRIPE_PUBLISHABLE_KEY, userService, $window, organizationId) {
+    .controller('ChangePlanDialog', ['$uibModalInstance', 'adminService', 'Common', '$ExceptionlessClient', '$intercom', 'INTERCOM_APPID', 'notificationService', 'organizationService', 'stripe', 'STRIPE_PUBLISHABLE_KEY', 'userService', '$window', 'data', function ($uibModalInstance, adminService, Common, $ExceptionlessClient, $intercom, INTERCOM_APPID, notificationService, organizationService, stripe, STRIPE_PUBLISHABLE_KEY, userService, $window, organizationId) {
       var source = 'exceptionless.billing.ChangePlanDialog';
       var contactSupport = 'Please contact support for more information.';
       var freePlanId = 'EX_FREE';
@@ -101719,7 +101719,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           .setProperty('IsNewCard', isNewCard())
           .submit();
 
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function createStripeToken() {
@@ -101762,7 +101762,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             .setProperty('IsNewCard', isNewCard())
             .submit();
 
-          $modalInstance.close(vm.currentPlan);
+          $uibModalInstance.close(vm.currentPlan);
           notificationService.success('Thanks! Your billing plan has been successfully changed.');
         }
 
@@ -102003,13 +102003,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.date-filter')
-    .controller('CustomDateRangeDialog', ['$ExceptionlessClient', '$modalInstance', 'data', function ($ExceptionlessClient, $modalInstance, data) {
+    .controller('CustomDateRangeDialog', ['$ExceptionlessClient', '$uibModalInstance', 'data', function ($ExceptionlessClient, $uibModalInstance, data) {
       var source = 'exceptionless.date-filter.CustomDateRangeDialog';
       var vm = this;
 
       function cancel() {
         $ExceptionlessClient.submitFeatureUsage(source + '.cancel');
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function save() {
@@ -102030,7 +102030,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.save').setProperty('Range', vm.range).submit();
-        $modalInstance.close(vm.range);
+        $uibModalInstance.close(vm.range);
       }
 
       vm.cancel = cancel;
@@ -102302,13 +102302,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.dialog')
-    .controller('confirmDialog', ['$modalInstance', '$translate', 'data', function ($modalInstance, $translate, data) {
+    .controller('confirmDialog', ['$uibModalInstance', '$translate', 'data', function ($uibModalInstance, $translate, data) {
       function cancel() {
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function confirm() {
-        $modalInstance.close('confirm');
+        $uibModalInstance.close('confirm');
       }
 
       var vm = this;
@@ -106514,13 +106514,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.web-hook')
-    .controller('AddWebHookDialog', ['$ExceptionlessClient', '$modalInstance', function ($ExceptionlessClient, $modalInstance) {
+    .controller('AddWebHookDialog', ['$ExceptionlessClient', '$uibModalInstance', function ($ExceptionlessClient, $uibModalInstance) {
       var source = 'exceptionless.web-hook.AddWebHookDialog';
       var vm = this;
 
       function cancel() {
         $ExceptionlessClient.submitFeatureUsage(source + '.cancel');
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function getEventTypes() {
@@ -106568,7 +106568,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.save').setProperty('WebHook', vm.data).submit();
-        $modalInstance.close(vm.data);
+        $uibModalInstance.close(vm.data);
       }
 
       vm.addWebHookForm = {};
@@ -108406,14 +108406,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.organization')
-    .controller('AddOrganizationDialog', ['$ExceptionlessClient', '$modalInstance', '$timeout', function ($ExceptionlessClient, $modalInstance, $timeout) {
+    .controller('AddOrganizationDialog', ['$ExceptionlessClient', '$uibModalInstance', '$timeout', function ($ExceptionlessClient, $uibModalInstance, $timeout) {
       var source = 'app.organization.AddOrganizationDialog';
       var _canSave = true;
       var vm = this;
 
       function cancel() {
         $ExceptionlessClient.submitFeatureUsage(source + '.cancel');
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function save(isRetrying) {
@@ -108440,7 +108440,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.save').setProperty('name', vm.data.name).submit();
-        $modalInstance.close(vm.data.name);
+        $uibModalInstance.close(vm.data.name);
       }
 
       vm.addOrganizationForm = {};
@@ -108589,13 +108589,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.organization')
-    .controller('AddUserDialog', ['$ExceptionlessClient', '$modalInstance', function ($ExceptionlessClient, $modalInstance) {
+    .controller('AddUserDialog', ['$ExceptionlessClient', '$uibModalInstance', function ($ExceptionlessClient, $uibModalInstance) {
       var source = 'app.organization.AddUserDialog';
       var vm = this;
 
       function cancel() {
         $ExceptionlessClient.submitFeatureUsage(source + '.cancel');
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function save(isValid) {
@@ -108604,7 +108604,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.save').setProperty('email', vm.data.email).submit();
-        $modalInstance.close(vm.data.email);
+        $uibModalInstance.close(vm.data.email);
       }
 
       vm.cancel = cancel;
@@ -109126,13 +109126,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.project')
-    .controller('AddConfigurationDialog', ['$ExceptionlessClient', '$modalInstance', function ($ExceptionlessClient, $modalInstance, configuration) {
+    .controller('AddConfigurationDialog', ['$ExceptionlessClient', '$uibModalInstance', function ($ExceptionlessClient, $uibModalInstance, configuration) {
       var source = 'app.project.AddConfigurationDialog';
       var vm = this;
 
       function cancel() {
         $ExceptionlessClient.submitFeatureUsage(source + '.cancel');
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function save(isValid) {
@@ -109141,7 +109141,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.save').setProperty('configuration', vm.data).submit();
-        $modalInstance.close(vm.data);
+        $uibModalInstance.close(vm.data);
       }
 
       vm.cancel = cancel;
@@ -109991,13 +109991,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.stack')
-    .controller('AddReferenceDialog', ['$ExceptionlessClient', '$modalInstance', function ($ExceptionlessClient, $modalInstance) {
+    .controller('AddReferenceDialog', ['$ExceptionlessClient', '$uibModalInstance', function ($ExceptionlessClient, $uibModalInstance) {
       var source = 'app.stack.AddReferenceDialog';
       var vm = this;
 
       function cancel() {
         $ExceptionlessClient.submitFeatureUsage(source + '.cancel');
-        $modalInstance.dismiss('cancel');
+        $uibModalInstance.dismiss('cancel');
       }
 
       function save(isValid) {
@@ -110006,7 +110006,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.save').setProperty('url', vm.data.url).submit();
-        $modalInstance.close(vm.data.url);
+        $uibModalInstance.close(vm.data.url);
       }
 
       vm.cancel = cancel;
