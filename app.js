@@ -107605,7 +107605,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function getRequestUrl() {
-        var request = vm.event.data['@request'];
+        var request = vm.event.data ? vm.event.data['@request'] : null;
         return request ? urlService.buildUrl(request.is_secure, request.host, request.port, request.path, request.query_string) : null;
       }
 
