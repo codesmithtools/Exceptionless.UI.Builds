@@ -69716,7 +69716,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.4.8
+ * @license AngularJS v1.4.9
  * (c) 2010-2015 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -107576,6 +107576,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         function onSuccess(response) {
           vm.project = response.data.plain();
           vm.project.promoted_tabs = vm.project.promoted_tabs || [];
+
           return vm.project;
         }
 
@@ -107629,24 +107630,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return vm.event.data && vm.event.data['@user'] && vm.event.data['@user'].name;
       }
 
-      function hasIPAddress() {
-        return hasRequestInfo() && vm.event.data['@request'].client_ip_address && vm.event.data['@request'].client_ip_address.length > 0;
-      }
-
       function hasLevel() {
         return vm.event.data && vm.event.data['@level'];
       }
 
-      function hasReferrer() {
-        return vm.event.data && vm.event.data['@request'] && vm.event.data['@request'].referrer;
-      }
-
       function hasRequestInfo() {
         return vm.event.data && vm.event.data['@request'];
-      }
-
-      function hasUserAgent() {
-        return vm.event.data && vm.event.data['@request'] && vm.event.data['@request'].user_agent;
       }
 
       function hasUserEmail() {
@@ -107748,7 +107737,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.hasIdentity = hasIdentity;
       vm.hasUserName = hasUserName;
       vm.hasLevel = hasLevel;
-      vm.hasReferrer = hasReferrer;
       vm.hasRequestInfo = hasRequestInfo;
       vm.hasTags = hasTags;
       vm.hasUserDescription = hasUserDescription;
@@ -110094,7 +110082,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/tabs/request.tpl.html',
-    "<h3 class=\"visible-print\">Request</h3> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} (<timeago date=\"vm.event.date\"></timeago>)</td> </tr> <tr ng-if=\"vm.event.data['@request'].http_method\"> <th>HTTP Method</th> <td>{{::vm.event.data['@request'].http_method}}</td> </tr> <tr ng-if=\"vm.getRequestUrl()\"> <th>URL</th> <td><a ng-href=\"{{::vm.getRequestUrl()}}\" target=\"_blank\" truncate>{{::vm.getRequestUrl()}}</a></td> </tr> <tr> <th>Referrer</th> <td> <span ng-if=\"vm.hasReferrer()\"> <a ng-href=\"{{::vm.event.data['@request'].referrer}}\" target=\"_blank\" truncate>{{::vm.event.data['@request'].referrer}}</a> </span> <em ng-if=\"!vm.hasReferrer()\">None</em> </td> </tr> <tr ng-if=\"vm.hasIPAddress()\"> <th>Client IP</th> <td>{{::vm.event.data['@request'].client_ip_address}}</td> </tr> <tr ng-if=\"vm.event.data['@request'].user_agent\"> <th>User Agent</th> <td><span truncate lines=\"2\">{{::vm.event.data['@request'].user_agent}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasRequestInfo() && vm.event.data['@request'].data['@device']\"> <th>Device</th> <td>{{::vm.event.data['@request'].data['@device']}}</td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasRequestInfo() && vm.event.data['@request'].data['@browser']\"> <th>Browser</th> <td>{{::vm.event.data['@request'].data['@browser']}} <abbr ng-if=\"vm.event.data['@request'].data['@browser_major_version']\" title=\"{{::vm.event.data['@request'].data['@browser_version']}}\">{{::vm.event.data['@request'].data['@browser_major_version']}}</abbr></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasRequestInfo() && vm.event.data['@request'].data['@os']\"> <th>Browser OS</th> <td>{{::vm.event.data['@request'].data['@os']}} <abbr ng-if=\"vm.event.data['@request'].data['@os_major_version']\" title=\"{{::vm.event.data['@request'].data['@os_version']}}\">{{::vm.event.data['@request'].data['@os_major_version']}}</abbr></td> </tr> </table> <extended-data-item can-promote=\"false\" title=\"'Post Data'\" data=\"vm.event.data['@request'].post_data\"></extended-data-item> <div ng-if=\"vm.hasCookies()\"> <h4>Cookie Values</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <thead> <tr> <th>Name</th> <th>Value</th> </tr> </thead> <tbody> <tr ng-repeat=\"(key, value) in vm.event.data['@request'].cookies track by key\"> <td>{{::key}}</td> <td><span truncate lines=\"3\">{{::value}}</span></td> </tr> </tbody> </table> </div> <extended-data-item can-promote=\"false\" title=\"'Additional Data'\" data=\"vm.event.data['@request'].data\" excluded-keys=\"vm.excludedAdditionalData\"></extended-data-item>"
+    "<h3 class=\"visible-print\">Request</h3> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} (<timeago date=\"vm.event.date\"></timeago>)</td> </tr> <tr ng-if=\"vm.event.data['@request'].http_method\"> <th>HTTP Method</th> <td>{{::vm.event.data['@request'].http_method}}</td> </tr> <tr ng-if=\"vm.getRequestUrl()\"> <th>URL</th> <td><a ng-href=\"{{::vm.getRequestUrl()}}\" target=\"_blank\" truncate>{{::vm.getRequestUrl()}}</a></td> </tr> <tr> <th>Referrer</th> <td> <span ng-if=\"vm.event.data['@request'].referrer\"> <a ng-href=\"{{::vm.event.data['@request'].referrer}}\" target=\"_blank\" truncate>{{::vm.event.data['@request'].referrer}}</a> </span> <em ng-if=\"!vm.event.data['@request'].referrer\">None</em> </td> </tr> <tr ng-if=\"vm.event.data['@request'].client_ip_address\"> <th>Client IP</th> <td>{{::vm.event.data['@request'].client_ip_address}}</td> </tr> <tr ng-if=\"vm.event.data['@request'].user_agent\"> <th>User Agent</th> <td><span truncate lines=\"2\">{{::vm.event.data['@request'].user_agent}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.data['@request'].data['@device']\"> <th>Device</th> <td>{{::vm.event.data['@request'].data['@device']}}</td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.data['@request'].data['@browser']\"> <th>Browser</th> <td>{{::vm.event.data['@request'].data['@browser']}} <abbr ng-if=\"vm.event.data['@request'].data['@browser_major_version']\" title=\"{{::vm.event.data['@request'].data['@browser_version']}}\">{{::vm.event.data['@request'].data['@browser_major_version']}}</abbr></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.data['@request'].data['@os']\"> <th>Browser OS</th> <td>{{::vm.event.data['@request'].data['@os']}} <abbr ng-if=\"vm.event.data['@request'].data['@os_major_version']\" title=\"{{::vm.event.data['@request'].data['@os_version']}}\">{{::vm.event.data['@request'].data['@os_major_version']}}</abbr></td> </tr> </table> <extended-data-item can-promote=\"false\" title=\"'Post Data'\" data=\"vm.event.data['@request'].post_data\"></extended-data-item> <div ng-if=\"vm.hasCookies()\"> <h4>Cookie Values</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <thead> <tr> <th>Name</th> <th>Value</th> </tr> </thead> <tbody> <tr ng-repeat=\"(key, value) in vm.event.data['@request'].cookies track by key\"> <td>{{::key}}</td> <td><span truncate lines=\"3\">{{::value}}</span></td> </tr> </tbody> </table> </div> <extended-data-item can-promote=\"false\" title=\"'Additional Data'\" data=\"vm.event.data['@request'].data\" excluded-keys=\"vm.excludedAdditionalData\"></extended-data-item>"
   );
 
 
