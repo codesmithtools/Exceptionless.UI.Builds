@@ -14015,9 +14015,11 @@ return exports;
         options = {
           groupMeridiems: true,
           spaceBeforeMeridiem: true,
-          showDate: true,
           showDayOfWeek: false,
+          hideTime: false,
+          hideYear: false,
           implicitMinutes: true,
+          implicitDate: false,
           implicitYear: true,
           yearFormat: 'YYYY',
           monthFormat: 'MMM',
@@ -14033,13 +14035,19 @@ return exports;
         };
         Twix._extend(options, inopts || {});
         fs = [];
-        if (inopts && (inopts.twentyFourHour != null)) {
-          options.hourFormat = inopts.twentyFourHour ? options.hourFormat.replace('h', 'H') : options.hourFormat.replace('H', 'h');
-        }
         needsMeridiem = options.hourFormat && options.hourFormat[0] === 'h';
+        if (options.showTime != null) {
+          options.hideTime = !options.showTime;
+        }
+        if (options.showYear != null) {
+          options.hideYear = !options.showYear;
+        }
+        if (options.showDate != null) {
+          options.implicitDate = !options.showDate;
+        }
         goesIntoTheMorning = options.lastNightEndsAt > 0 && !this.allDay && this.end().startOf('d').valueOf() === this.start().add(1, 'd').startOf('d').valueOf() && this._start.hours() > 12 && this._end.hours() < options.lastNightEndsAt;
-        needDate = options.showDate || (!this.isSame('d') && !goesIntoTheMorning);
-        if (this.allDay && this.isSame('d') && (!options.showDate || options.explicitAllDay)) {
+        needDate = !options.hideDate && (!options.implicitDate || this.start().startOf('d').valueOf() !== moment().startOf('d').valueOf() || !(this.isSame('d') || goesIntoTheMorning));
+        if (this.allDay && this.isSame('d') && (options.implicitDate || options.explicitAllDay)) {
           fs.push({
             name: 'all day simple',
             fn: function() {
@@ -14049,7 +14057,7 @@ return exports;
             slot: 0
           });
         }
-        if (needDate && (!options.implicitYear || this._start.year() !== moment().year() || !this.isSame('y'))) {
+        if (needDate && !options.hideYear && (!options.implicitYear || this._start.year() !== moment().year() || !this.isSame('y'))) {
           fs.push({
             name: 'year',
             fn: function(date) {
@@ -14102,7 +14110,7 @@ return exports;
             slot: 1
           });
         }
-        if (options.groupMeridiems && needsMeridiem && !this.allDay) {
+        if (options.groupMeridiems && needsMeridiem && !this.allDay && !options.hideTime) {
           fs.push({
             name: 'meridiem',
             fn: function(t) {
@@ -14112,7 +14120,7 @@ return exports;
             pre: options.spaceBeforeMeridiem ? ' ' : ''
           });
         }
-        if (!this.allDay) {
+        if (!this.allDay && !options.hideTime) {
           fs.push({
             name: 'time',
             fn: function(date) {
@@ -55648,7 +55656,7 @@ angular.module('ngAnimate', [])
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.1.1 - 2016-01-25
+ * Version: 1.1.2 - 2016-02-01
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module("ui.bootstrap.tpls", ["uib/template/accordion/accordion-group.html","uib/template/accordion/accordion.html","uib/template/alert/alert.html","uib/template/carousel/carousel.html","uib/template/carousel/slide.html","uib/template/datepicker/datepicker.html","uib/template/datepicker/day.html","uib/template/datepicker/month.html","uib/template/datepicker/popup.html","uib/template/datepicker/year.html","uib/template/modal/backdrop.html","uib/template/modal/window.html","uib/template/pager/pager.html","uib/template/pagination/pagination.html","uib/template/tooltip/tooltip-html-popup.html","uib/template/tooltip/tooltip-popup.html","uib/template/tooltip/tooltip-template-popup.html","uib/template/popover/popover-html.html","uib/template/popover/popover-template.html","uib/template/popover/popover.html","uib/template/progressbar/bar.html","uib/template/progressbar/progress.html","uib/template/progressbar/progressbar.html","uib/template/rating/rating.html","uib/template/tabs/tab.html","uib/template/tabs/tabset.html","uib/template/timepicker/timepicker.html","uib/template/typeahead/typeahead-match.html","uib/template/typeahead/typeahead-popup.html"]);
@@ -55847,6 +55855,10 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
           }
         }
       };
+
+      var id = 'accordiongroup-' + scope.$id + '-' + Math.floor(Math.random() * 10000);
+      scope.headingId = id + '-tab';
+      scope.panelId = id + '-panel';
     }
   };
 })
@@ -56338,7 +56350,7 @@ function($animateCss) {
 
 angular.module('ui.bootstrap.dateparser', [])
 
-.service('uibDateParser', ['$log', '$locale', 'orderByFilter', function($log, $locale, orderByFilter) {
+.service('uibDateParser', ['$log', '$locale', 'dateFilter', 'orderByFilter', function($log, $locale, dateFilter, orderByFilter) {
   // Pulled from https://github.com/mbostock/d3/blob/master/src/format/requote.js
   var SPECIAL_CHARACTERS_REGEXP = /[\\\^\$\*\+\?\|\[\]\(\)\.\{\}]/g;
 
@@ -56349,115 +56361,164 @@ angular.module('ui.bootstrap.dateparser', [])
     localeId = $locale.id;
 
     this.parsers = {};
+    this.formatters = {};
 
     formatCodeToRegex = [
       {
         key: 'yyyy',
         regex: '\\d{4}',
-        apply: function(value) { this.year = +value; }
+        apply: function(value) { this.year = +value; },
+        formatter: function(date) {
+          var _date = new Date();
+          _date.setFullYear(Math.abs(date.getFullYear()));
+          return dateFilter(_date, 'yyyy');
+        }
       },
       {
         key: 'yy',
         regex: '\\d{2}',
-        apply: function(value) { this.year = +value + 2000; }
+        apply: function(value) { this.year = +value + 2000; },
+        formatter: function(date) {
+          var _date = new Date();
+          _date.setFullYear(Math.abs(date.getFullYear()));
+          return dateFilter(_date, 'yy');
+        }
       },
       {
         key: 'y',
         regex: '\\d{1,4}',
-        apply: function(value) { this.year = +value; }
+        apply: function(value) { this.year = +value; },
+        formatter: function(date) {
+          var _date = new Date();
+          _date.setFullYear(Math.abs(date.getFullYear()));
+          return dateFilter(_date, 'y');
+        }
       },
       {
         key: 'M!',
         regex: '0?[1-9]|1[0-2]',
-        apply: function(value) { this.month = value - 1; }
+        apply: function(value) { this.month = value - 1; },
+        formatter: function(date) {
+          var value = date.getMonth();
+          if (/^[0-9]$/.test(value)) {
+            return dateFilter(date, 'MM');
+          }
+
+          return dateFilter(date, 'M');
+        }
       },
       {
         key: 'MMMM',
         regex: $locale.DATETIME_FORMATS.MONTH.join('|'),
-        apply: function(value) { this.month = $locale.DATETIME_FORMATS.MONTH.indexOf(value); }
+        apply: function(value) { this.month = $locale.DATETIME_FORMATS.MONTH.indexOf(value); },
+        formatter: function(date) { return dateFilter(date, 'MMMM'); }
       },
       {
         key: 'MMM',
         regex: $locale.DATETIME_FORMATS.SHORTMONTH.join('|'),
-        apply: function(value) { this.month = $locale.DATETIME_FORMATS.SHORTMONTH.indexOf(value); }
+        apply: function(value) { this.month = $locale.DATETIME_FORMATS.SHORTMONTH.indexOf(value); },
+        formatter: function(date) { return dateFilter(date, 'MMM'); }
       },
       {
         key: 'MM',
         regex: '0[1-9]|1[0-2]',
-        apply: function(value) { this.month = value - 1; }
+        apply: function(value) { this.month = value - 1; },
+        formatter: function(date) { return dateFilter(date, 'MM'); }
       },
       {
         key: 'M',
         regex: '[1-9]|1[0-2]',
-        apply: function(value) { this.month = value - 1; }
+        apply: function(value) { this.month = value - 1; },
+        formatter: function(date) { return dateFilter(date, 'M'); }
       },
       {
         key: 'd!',
         regex: '[0-2]?[0-9]{1}|3[0-1]{1}',
-        apply: function(value) { this.date = +value; }
+        apply: function(value) { this.date = +value; },
+        formatter: function(date) {
+          var value = date.getDate();
+          if (/^[1-9]$/.test(value)) {
+            return dateFilter(date, 'dd');
+          }
+
+          return dateFilter(date, 'd');
+        }
       },
       {
         key: 'dd',
         regex: '[0-2][0-9]{1}|3[0-1]{1}',
-        apply: function(value) { this.date = +value; }
+        apply: function(value) { this.date = +value; },
+        formatter: function(date) { return dateFilter(date, 'dd'); }
       },
       {
         key: 'd',
         regex: '[1-2]?[0-9]{1}|3[0-1]{1}',
-        apply: function(value) { this.date = +value; }
+        apply: function(value) { this.date = +value; },
+        formatter: function(date) { return dateFilter(date, 'd'); }
       },
       {
         key: 'EEEE',
-        regex: $locale.DATETIME_FORMATS.DAY.join('|')
+        regex: $locale.DATETIME_FORMATS.DAY.join('|'),
+        formatter: function(date) { return dateFilter(date, 'EEEE'); }
       },
       {
         key: 'EEE',
-        regex: $locale.DATETIME_FORMATS.SHORTDAY.join('|')
+        regex: $locale.DATETIME_FORMATS.SHORTDAY.join('|'),
+        formatter: function(date) { return dateFilter(date, 'EEE'); }
       },
       {
         key: 'HH',
         regex: '(?:0|1)[0-9]|2[0-3]',
-        apply: function(value) { this.hours = +value; }
+        apply: function(value) { this.hours = +value; },
+        formatter: function(date) { return dateFilter(date, 'HH'); }
       },
       {
         key: 'hh',
         regex: '0[0-9]|1[0-2]',
-        apply: function(value) { this.hours = +value; }
+        apply: function(value) { this.hours = +value; },
+        formatter: function(date) { return dateFilter(date, 'hh'); }
       },
       {
         key: 'H',
         regex: '1?[0-9]|2[0-3]',
-        apply: function(value) { this.hours = +value; }
+        apply: function(value) { this.hours = +value; },
+        formatter: function(date) { return dateFilter(date, 'H'); }
       },
       {
         key: 'h',
         regex: '[0-9]|1[0-2]',
-        apply: function(value) { this.hours = +value; }
+        apply: function(value) { this.hours = +value; },
+        formatter: function(date) { return dateFilter(date, 'h'); }
       },
       {
         key: 'mm',
         regex: '[0-5][0-9]',
-        apply: function(value) { this.minutes = +value; }
+        apply: function(value) { this.minutes = +value; },
+        formatter: function(date) { return dateFilter(date, 'mm'); }
       },
       {
         key: 'm',
         regex: '[0-9]|[1-5][0-9]',
-        apply: function(value) { this.minutes = +value; }
+        apply: function(value) { this.minutes = +value; },
+        formatter: function(date) { return dateFilter(date, 'm'); }
       },
       {
         key: 'sss',
         regex: '[0-9][0-9][0-9]',
-        apply: function(value) { this.milliseconds = +value; }
+        apply: function(value) { this.milliseconds = +value; },
+        formatter: function(date) { return dateFilter(date, 'sss'); }
       },
       {
         key: 'ss',
         regex: '[0-5][0-9]',
-        apply: function(value) { this.seconds = +value; }
+        apply: function(value) { this.seconds = +value; },
+        formatter: function(date) { return dateFilter(date, 'ss'); }
       },
       {
         key: 's',
         regex: '[0-9]|[1-5][0-9]',
-        apply: function(value) { this.seconds = +value; }
+        apply: function(value) { this.seconds = +value; },
+        formatter: function(date) { return dateFilter(date, 's'); }
       },
       {
         key: 'a',
@@ -56470,7 +56531,8 @@ angular.module('ui.bootstrap.dateparser', [])
           if (value === 'PM') {
             this.hours += 12;
           }
-        }
+        },
+        formatter: function(date) { return dateFilter(date, 'a'); }
       },
       {
         key: 'Z',
@@ -56482,38 +56544,47 @@ angular.module('ui.bootstrap.dateparser', [])
             minutes = matches[3];
           this.hours += toInt(sign + hours);
           this.minutes += toInt(sign + minutes);
+        },
+        formatter: function(date) {
+          return dateFilter(date, 'Z');
         }
       },
       {
         key: 'ww',
-        regex: '[0-4][0-9]|5[0-3]'
+        regex: '[0-4][0-9]|5[0-3]',
+        formatter: function(date) { return dateFilter(date, 'ww'); }
       },
       {
         key: 'w',
-        regex: '[0-9]|[1-4][0-9]|5[0-3]'
+        regex: '[0-9]|[1-4][0-9]|5[0-3]',
+        formatter: function(date) { return dateFilter(date, 'w'); }
       },
       {
         key: 'GGGG',
-        regex: $locale.DATETIME_FORMATS.ERANAMES.join('|').replace(/\s/g, '\\s')
+        regex: $locale.DATETIME_FORMATS.ERANAMES.join('|').replace(/\s/g, '\\s'),
+        formatter: function(date) { return dateFilter(date, 'GGGG'); }
       },
       {
         key: 'GGG',
-        regex: $locale.DATETIME_FORMATS.ERAS.join('|')
+        regex: $locale.DATETIME_FORMATS.ERAS.join('|'),
+        formatter: function(date) { return dateFilter(date, 'GGG'); }
       },
       {
         key: 'GG',
-        regex: $locale.DATETIME_FORMATS.ERAS.join('|')
+        regex: $locale.DATETIME_FORMATS.ERAS.join('|'),
+        formatter: function(date) { return dateFilter(date, 'GG'); }
       },
       {
         key: 'G',
-        regex: $locale.DATETIME_FORMATS.ERAS.join('|')
+        regex: $locale.DATETIME_FORMATS.ERAS.join('|'),
+        formatter: function(date) { return dateFilter(date, 'G'); }
       }
     ];
   };
 
   this.init();
 
-  function createParser(format) {
+  function createParser(format, func) {
     var map = [], regex = format.split('');
 
     // check for literal values
@@ -56561,7 +56632,8 @@ angular.module('ui.bootstrap.dateparser', [])
 
         map.push({
           index: index,
-          apply: data.apply,
+          key: data.key,
+          apply: data[func],
           matcher: data.regex
         });
       }
@@ -56572,6 +56644,41 @@ angular.module('ui.bootstrap.dateparser', [])
       map: orderByFilter(map, 'index')
     };
   }
+
+  this.filter = function(date, format) {
+    if (!angular.isDate(date) || isNaN(date) || !format) {
+      return '';
+    }
+
+    format = $locale.DATETIME_FORMATS[format] || format;
+
+    if ($locale.id !== localeId) {
+      this.init();
+    }
+
+    if (!this.formatters[format]) {
+      this.formatters[format] = createParser(format, 'formatter');
+    }
+
+    var parser = this.formatters[format],
+      map = parser.map;
+
+    var _format = format;
+
+    return map.reduce(function(str, mapper, i) {
+      var match = _format.match(new RegExp('(.*)' + mapper.key));
+      if (match && angular.isString(match[1])) {
+        str += match[1];
+        _format = _format.replace(match[1] + mapper.key, '');
+      }
+
+      if (mapper.apply) {
+        return str + mapper.apply.call(null, date);
+      }
+
+      return str;
+    }, '');
+  };
 
   this.parse = function(input, format, baseDate) {
     if (!angular.isString(input) || !format) {
@@ -56586,7 +56693,7 @@ angular.module('ui.bootstrap.dateparser', [])
     }
 
     if (!this.parsers[format]) {
-      this.parsers[format] = createParser(format);
+      this.parsers[format] = createParser(format, 'apply');
     }
 
     var parser = this.parsers[format],
@@ -56674,7 +56781,7 @@ angular.module('ui.bootstrap.dateparser', [])
   this.timezoneToOffset = timezoneToOffset;
   this.addDateMinutes = addDateMinutes;
   this.convertTimezoneToLocal = convertTimezoneToLocal;
-  
+
   function toTimezone(date, timezone) {
     return date && timezone ? convertTimezoneToLocal(date, timezone) : date;
   }
@@ -57360,65 +57467,171 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   // Modes chain
   this.modes = ['day', 'month', 'year'];
 
-  // Interpolated configuration attributes
-  angular.forEach(['formatDay', 'formatMonth', 'formatYear', 'formatDayHeader', 'formatDayTitle', 'formatMonthTitle'], function(key) {
-    self[key] = angular.isDefined($attrs[key]) ? $interpolate($attrs[key])($scope.$parent) : datepickerConfig[key];
-  });
+  if ($attrs.datepickerOptions) {
+    angular.forEach([
+      'formatDay',
+      'formatDayHeader',
+      'formatDayTitle',
+      'formatMonth',
+      'formatMonthTitle',
+      'formatYear',
+      'initDate',
+      'maxDate',
+      'maxMode',
+      'minDate',
+      'minMode',
+      'showWeeks',
+      'shortcutPropagation',
+      'startingDay',
+      'yearColumns',
+      'yearRows'
+    ], function(key) {
+      switch (key) {
+        case 'formatDay':
+        case 'formatDayHeader':
+        case 'formatDayTitle':
+        case 'formatMonth':
+        case 'formatMonthTitle':
+        case 'formatYear':
+          self[key] = angular.isDefined($scope.datepickerOptions[key]) ? $interpolate($scope.datepickerOptions[key])($scope.$parent) : datepickerConfig[key];
+          break;
+        case 'showWeeks':
+        case 'shortcutPropagation':
+        case 'yearColumns':
+        case 'yearRows':
+          self[key] = angular.isDefined($scope.datepickerOptions[key]) ?
+            $scope.datepickerOptions[key] : datepickerConfig[key];
+          break;
+        case 'startingDay':
+          if (angular.isDefined($scope.datepickerOptions.startingDay)) {
+            self.startingDay = $scope.datepickerOptions.startingDay;
+          } else if (angular.isNumber(datepickerConfig.startingDay)) {
+            self.startingDay = datepickerConfig.startingDay;
+          } else {
+            self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
+          }
 
-  // Evaled configuration attributes
-  angular.forEach(['showWeeks', 'yearRows', 'yearColumns', 'shortcutPropagation'], function(key) {
-    self[key] = angular.isDefined($attrs[key]) ?
-      $scope.$parent.$eval($attrs[key]) : datepickerConfig[key];
-  });
+          break;
+        case 'maxDate':
+        case 'minDate':
+          if ($scope.datepickerOptions[key]) {
+            $scope.$watch(function() { return $scope.datepickerOptions[key]; }, function(value) {
+              if (value) {
+                if (angular.isDate(value)) {
+                  self[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
+                } else {
+                  self[key] = new Date(dateFilter(value, 'medium'));
+                }
+              } else {
+                self[key] = null;
+              }
 
-  if (angular.isDefined($attrs.startingDay)) {
-    self.startingDay = $scope.$parent.$eval($attrs.startingDay);
-  } else if (angular.isNumber(datepickerConfig.startingDay)) {
-    self.startingDay = datepickerConfig.startingDay;
+              self.refreshView();
+            });
+          } else {
+            self[key] = datepickerConfig[key] ? dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) : null;
+          }
+
+          break;
+        case 'maxMode':
+        case 'minMode':
+          if ($scope.datepickerOptions[key]) {
+            $scope.$watch(function() { return $scope.datepickerOptions[key]; }, function(value) {
+              self[key] = $scope[key] = angular.isDefined(value) ? value : datepickerOptions[key];
+              if (key === 'minMode' && self.modes.indexOf($scope.datepickerMode) < self.modes.indexOf(self[key]) ||
+                key === 'maxMode' && self.modes.indexOf($scope.datepickerMode) > self.modes.indexOf(self[key])) {
+                $scope.datepickerMode = self[key];
+              }
+            });
+          } else {
+            self[key] = $scope[key] = datepickerConfig[key] || null;
+          }
+
+          break;
+        case 'initDate':
+          if ($scope.datepickerOptions.initDate) {
+            this.activeDate = dateParser.fromTimezone($scope.datepickerOptions.initDate, ngModelOptions.timezone) || new Date();
+            $scope.$watch(function() { return $scope.datepickerOptions.initDate; }, function(initDate) {
+              if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
+                self.activeDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
+                self.refreshView();
+              }
+            });
+          } else {
+            this.activeDate = new Date();
+          }
+      }
+    });
   } else {
-    self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
-  }
+    // Interpolated configuration attributes
+    angular.forEach(['formatDay', 'formatMonth', 'formatYear', 'formatDayHeader', 'formatDayTitle', 'formatMonthTitle'], function(key) {
+      self[key] = angular.isDefined($attrs[key]) ? $interpolate($attrs[key])($scope.$parent) : datepickerConfig[key];
+    });
 
-  // Watchable date attributes
-  angular.forEach(['minDate', 'maxDate'], function(key) {
-    if ($attrs[key]) {
-      watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
-        self[key] = value ? angular.isDate(value) ? dateParser.fromTimezone(new Date(value), ngModelOptions.timezone) : new Date(dateFilter(value, 'medium')) : null;
-        self.refreshView();
-      }));
+    // Evaled configuration attributes
+    angular.forEach(['showWeeks', 'yearRows', 'yearColumns', 'shortcutPropagation'], function(key) {
+      self[key] = angular.isDefined($attrs[key]) ?
+        $scope.$parent.$eval($attrs[key]) : datepickerConfig[key];
+    });
+
+    if (angular.isDefined($attrs.startingDay)) {
+      self.startingDay = $scope.$parent.$eval($attrs.startingDay);
+    } else if (angular.isNumber(datepickerConfig.startingDay)) {
+      self.startingDay = datepickerConfig.startingDay;
     } else {
-      self[key] = datepickerConfig[key] ? dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) : null;
+      self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
     }
-  });
 
-  angular.forEach(['minMode', 'maxMode'], function(key) {
-    if ($attrs[key]) {
-      watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
-        self[key] = $scope[key] = angular.isDefined(value) ? value : $attrs[key];
-        if (key === 'minMode' && self.modes.indexOf($scope.datepickerMode) < self.modes.indexOf(self[key]) ||
-          key === 'maxMode' && self.modes.indexOf($scope.datepickerMode) > self.modes.indexOf(self[key])) {
-          $scope.datepickerMode = self[key];
+    // Watchable date attributes
+    angular.forEach(['minDate', 'maxDate'], function(key) {
+      if ($attrs[key]) {
+        watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
+          if (value) {
+            if (angular.isDate(value)) {
+              self[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
+            } else {
+              self[key] = new Date(dateFilter(value, 'medium'));
+            }
+          } else {
+            self[key] = null;
+          }
+
+          self.refreshView();
+        }));
+      } else {
+        self[key] = datepickerConfig[key] ? dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) : null;
+      }
+    });
+
+    angular.forEach(['minMode', 'maxMode'], function(key) {
+      if ($attrs[key]) {
+        watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
+          self[key] = $scope[key] = angular.isDefined(value) ? value : $attrs[key];
+          if (key === 'minMode' && self.modes.indexOf($scope.datepickerMode) < self.modes.indexOf(self[key]) ||
+            key === 'maxMode' && self.modes.indexOf($scope.datepickerMode) > self.modes.indexOf(self[key])) {
+            $scope.datepickerMode = self[key];
+          }
+        }));
+      } else {
+        self[key] = $scope[key] = datepickerConfig[key] || null;
+      }
+    });
+
+    if (angular.isDefined($attrs.initDate)) {
+      this.activeDate = dateParser.fromTimezone($scope.$parent.$eval($attrs.initDate), ngModelOptions.timezone) || new Date();
+      watchListeners.push($scope.$parent.$watch($attrs.initDate, function(initDate) {
+        if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
+          self.activeDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
+          self.refreshView();
         }
       }));
     } else {
-      self[key] = $scope[key] = datepickerConfig[key] || null;
+      this.activeDate = new Date();
     }
-  });
+  }
 
   $scope.datepickerMode = $scope.datepickerMode || datepickerConfig.datepickerMode;
   $scope.uniqueId = 'datepicker-' + $scope.$id + '-' + Math.floor(Math.random() * 10000);
-
-  if (angular.isDefined($attrs.initDate)) {
-    this.activeDate = dateParser.fromTimezone($scope.$parent.$eval($attrs.initDate), ngModelOptions.timezone) || new Date();
-    watchListeners.push($scope.$parent.$watch($attrs.initDate, function(initDate) {
-      if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
-        self.activeDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
-        self.refreshView();
-      }
-    }));
-  } else {
-    this.activeDate = new Date();
-  }
 
   $scope.disabled = angular.isDefined($attrs.disabled) || false;
   if (angular.isDefined($attrs.ngDisabled)) {
@@ -57483,7 +57696,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     model = dateParser.fromTimezone(model, ngModelOptions.timezone);
     var dt = {
       date: date,
-      label: dateFilter(date, format.replace(/d!/, 'dd')).replace(/M!/, 'MM'),
+      label: dateParser.filter(date, format),
       selected: model && this.compare(date, model) === 0,
       disabled: this.isDisabled(date),
       current: this.compare(date, new Date()) === 0,
@@ -57830,6 +58043,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     },
     scope: {
       datepickerMode: '=?',
+      datepickerOptions: '=?',
       dateDisabled: '&',
       customClass: '&',
       shortcutPropagation: '&?'
@@ -58070,11 +58284,14 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
           scope.date = value;
           return value;
         }
-        scope.date = dateParser.fromTimezone(value, ngModelOptions.timezone);
-        dateFormat = dateFormat.replace(/M!/, 'MM')
-            .replace(/d!/, 'dd');
 
-        return dateFilter(scope.date, dateFormat);
+        scope.date = dateParser.fromTimezone(value, ngModelOptions.timezone);
+
+        if (angular.isNumber(scope.date)) {
+          scope.date = new Date(scope.date);
+        }
+
+        return dateParser.filter(scope.date, dateFormat);
       });
     } else {
       ngModel.$formatters.push(function(value) {
@@ -58142,7 +58359,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
     if (angular.isDefined(dt)) {
       scope.date = dt;
     }
-    var date = scope.date ? dateFilter(scope.date, dateFormat) : null; // Setting to NULL is necessary for form validators to function
+    var date = scope.date ? dateParser.filter(scope.date, dateFormat) : null; // Setting to NULL is necessary for form validators to function
     element.val(date);
     ngModel.$setViewValue(date);
 
@@ -59160,7 +59377,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
               $modalStack.loadFocusElementList(modal);
               var focusChanged = false;
               if (evt.shiftKey) {
-                if ($modalStack.isFocusInFirstItem(evt)) {
+                if ($modalStack.isFocusInFirstItem(evt) || $modalStack.isModalFocused(evt, modal)) {
                   focusChanged = $modalStack.focusLastFocusableElement();
                 }
               } else {
@@ -59299,6 +59516,16 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
         if (focusableElementList.length > 0) {
           focusableElementList[focusableElementList.length - 1].focus();
           return true;
+        }
+        return false;
+      };
+
+      $modalStack.isModalFocused = function(evt, modalWindow) {
+        if (evt && modalWindow) {
+          var modalDomEl = modalWindow.value.modalDomEl;
+          if (modalDomEl && modalDomEl.length) {
+            return (evt.target || evt.srcElement) === modalDomEl[0];
+          }
         }
         return false;
       };
@@ -60304,18 +60531,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
             }
 
             appendToBody = angular.isDefined(appendToBodyVal) ? appendToBodyVal : appendToBody;
-
-            // if a tooltip is attached to <body> we need to remove it on
-            // location change as its parent scope will probably not be destroyed
-            // by the change.
-            if (appendToBody) {
-              scope.$on('$locationChangeSuccess', function closeTooltipOnLocationChangeSuccess() {
-                if (ttScope.isOpen) {
-                  hide();
-                }
-              });
-            }
-
+            
             // Make sure tooltip is destroyed and removed.
             scope.$on('$destroy', function onDestroyTooltip() {
               unregisterTriggers();
@@ -61692,10 +61908,11 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
             if (showHint) {
               var firstLabel = scope.matches[0].label;
-              if (inputValue.length > 0 && firstLabel.slice(0, inputValue.length).toUpperCase() === inputValue.toUpperCase()) {
+              if (angular.isString(inputValue) &&
+                inputValue.length > 0 &&
+                firstLabel.slice(0, inputValue.length).toUpperCase() === inputValue.toUpperCase()) {
                 hintInputElem.val(inputValue + firstLabel.slice(inputValue.length));
-              }
-              else {
+              } else {
                 hintInputElem.val('');
               }
             }
@@ -62094,13 +62311,13 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 angular.module("uib/template/accordion/accordion-group.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("uib/template/accordion/accordion-group.html",
     "<div class=\"panel\" ng-class=\"panelClass || 'panel-default'\">\n" +
-    "  <div class=\"panel-heading\" ng-keypress=\"toggleOpen($event)\">\n" +
+    "  <div role=\"tab\" id=\"{{::headingId}}\" aria-selected=\"{{isOpen}}\" class=\"panel-heading\" ng-keypress=\"toggleOpen($event)\">\n" +
     "    <h4 class=\"panel-title\">\n" +
-    "      <a href tabindex=\"0\" class=\"accordion-toggle\" ng-click=\"toggleOpen()\" uib-accordion-transclude=\"heading\"><span ng-class=\"{'text-muted': isDisabled}\">{{heading}}</span></a>\n" +
+    "      <a role=\"button\" data-toggle=\"collapse\" href aria-expanded=\"{{isOpen}}\" aria-controls=\"{{::panelId}}\" tabindex=\"0\" class=\"accordion-toggle\" ng-click=\"toggleOpen()\" uib-accordion-transclude=\"heading\"><span ng-class=\"{'text-muted': isDisabled}\">{{heading}}</span></a>\n" +
     "    </h4>\n" +
     "  </div>\n" +
-    "  <div class=\"panel-collapse collapse\" uib-collapse=\"!isOpen\">\n" +
-    "	  <div class=\"panel-body\" ng-transclude></div>\n" +
+    "  <div id=\"{{::panelId}}\" aria-labelledby=\"{{::headingId}}\" aria-hidden=\"{{!isOpen}}\" role=\"tabpanel\" class=\"panel-collapse collapse\" uib-collapse=\"!isOpen\">\n" +
+    "    <div class=\"panel-body\" ng-transclude></div>\n" +
     "  </div>\n" +
     "</div>\n" +
     "");
@@ -62108,7 +62325,7 @@ angular.module("uib/template/accordion/accordion-group.html", []).run(["$templat
 
 angular.module("uib/template/accordion/accordion.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("uib/template/accordion/accordion.html",
-    "<div class=\"panel-group\" ng-transclude></div>");
+    "<div role=\"tablist\" class=\"panel-group\" ng-transclude></div>");
 }]);
 
 angular.module("uib/template/alert/alert.html", []).run(["$templateCache", function($templateCache) {
@@ -111099,7 +111316,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
   'use strict';
 
   $templateCache.put('app/account/manage.tpl.html',
-    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"avatar\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\" active=\"vm.tabNotificationsActive\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\" active=\"vm.tabPasswordActive\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" active=\"vm.tabExternalActive\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
+    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"avatar\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\" active=\"vm.tabNotificationsActive\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\" active=\"vm.tabPasswordActive\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" active=\"vm.tabExternalActive\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
   );
 
 
@@ -111129,7 +111346,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/auth/signup.tpl.html',
-    "<div> <rate-limit></rate-limit> <div class=\"container w-auto-xs\"> <div class=\"text-center m-t\"> <a href=\"http://exceptionless.io\"> <img src=\"/img/exceptionless-350.png\" alt=\"logo\"> </a> </div> <div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading text-center\"><strong>Signup for a FREE account in seconds</strong></div> <div class=\"panel-body\"> <form name=\"vm.signupForm\" role=\"form\" class=\"form-horizontal form-validation\" autocomplete=\"on\"> <div class=\"form-horizontal col-sm-offset-2\"> <h4 ng-if=\"vm.isExternalLoginEnabled()\">Login with</h4> <div class=\"form-group\" style=\"margin-left:0px\" ng-if=\"vm.isExternalLoginEnabled()\"> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <div class=\"form-group\" ng-if=\"vm.isExternalLoginEnabled()\"> <div class=\"col-sm-10 horizontal-divider\"> <p>OR</p> <span></span> </div> </div> <h4>Create an account</h4> </div> <div class=\"form-group\"> <label for=\"name\" class=\"col-sm-2 control-label\">Name</label> <div class=\"col-sm-10\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Your first and last name\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck ng-model=\"vm.user.name\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"vm.signupForm.name.$error\" ng-if=\"vm.signupForm.$submitted || vm.signupForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </div> <div class=\"form-group\"> <label for=\"email\" class=\"col-sm-2 control-label\">Email</label> <div class=\"col-sm-10\"> <div ng-class=\"{'input-group': vm.signupForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" placeholder=\"Email address (no spam)\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck ng-model=\"vm.user.email\" ng-model-options=\"{ debounce: 500 }\" email-address-available-validator ng-required=\"true\"> <span class=\"input-group-addon\" ng-if=\"vm.signupForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.signupForm.email.$error\" ng-if=\"vm.signupForm.$submitted || vm.signupForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> </div> </div> <div class=\"form-group\"> <label for=\"password\" class=\"col-sm-2 control-label\">Password</label> <div class=\"col-sm-10\"> <input id=\"password\" name=\"password\" type=\"password\" class=\"form-control\" placeholder=\"Password\" ng-model=\"vm.user.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.signupForm.password.$error\" ng-if=\"vm.signupForm.$submitted || vm.signupForm.password.$touched\"> <small ng-message=\"required\">Password is required.</small> <small ng-message=\"minlength\">Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Password must be less than 101 characters long.</small> </div> </div> </div> <div class=\"form-group\"> <div class=\"col-sm-offset-2 col-sm-10\"> <input type=\"submit\" role=\"button\" ng-click=\"vm.signup()\" class=\"btn btn-primary btn-lg\" value=\"Create My Account\"> <p>Already have an account? <a ui-sref=\"auth.login({ token: vm.token })\">Log In</a></p> </div> </div> </form> </div> </div> <div class=\"text-center\"> By signing up, you agree to our <a href=\"http://exceptionless.io/privacy\" target=\"_blank\">Privacy Policy</a> and <a href=\"http://exceptionless.io/terms\" target=\"_blank\">Terms of Service</a>. </div> </div> </div> </div> </div> </div>"
+    "<div> <rate-limit></rate-limit> <div class=\"container w-auto-xs\"> <div class=\"text-center m-t\"> <a href=\"http://exceptionless.io\"> <img src=\"/img/exceptionless-350.png\" alt=\"logo\"> </a> </div> <div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading text-center\"><strong>Signup for a FREE account in seconds</strong></div> <div class=\"panel-body\"> <form name=\"vm.signupForm\" role=\"form\" class=\"form-horizontal form-validation\" autocomplete=\"on\"> <div class=\"form-horizontal col-sm-offset-2\"> <h4 ng-if=\"vm.isExternalLoginEnabled()\">Login with</h4> <div class=\"form-group\" style=\"margin-left:0px\" ng-if=\"vm.isExternalLoginEnabled()\"> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <div class=\"form-group\" ng-if=\"vm.isExternalLoginEnabled()\"> <div class=\"col-sm-10 horizontal-divider\"> <p>OR</p> <span></span> </div> </div> <h4>Create an account</h4> </div> <div class=\"form-group\"> <label for=\"name\" class=\"col-sm-2 control-label\">Name</label> <div class=\"col-sm-10\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Your first and last name\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck ng-model=\"vm.user.name\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"vm.signupForm.name.$error\" ng-if=\"vm.signupForm.$submitted || vm.signupForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </div> <div class=\"form-group\"> <label for=\"email\" class=\"col-sm-2 control-label\">Email</label> <div class=\"col-sm-10\"> <div ng-class=\"{'input-group': vm.signupForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" placeholder=\"Email address (no spam)\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck ng-model=\"vm.user.email\" ng-model-options=\"{ debounce: 1000 }\" email-address-available-validator ng-required=\"true\"> <span class=\"input-group-addon\" ng-if=\"vm.signupForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.signupForm.email.$error\" ng-if=\"vm.signupForm.$submitted || vm.signupForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> </div> </div> <div class=\"form-group\"> <label for=\"password\" class=\"col-sm-2 control-label\">Password</label> <div class=\"col-sm-10\"> <input id=\"password\" name=\"password\" type=\"password\" class=\"form-control\" placeholder=\"Password\" ng-model=\"vm.user.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.signupForm.password.$error\" ng-if=\"vm.signupForm.$submitted || vm.signupForm.password.$touched\"> <small ng-message=\"required\">Password is required.</small> <small ng-message=\"minlength\">Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Password must be less than 101 characters long.</small> </div> </div> </div> <div class=\"form-group\"> <div class=\"col-sm-offset-2 col-sm-10\"> <input type=\"submit\" role=\"button\" ng-click=\"vm.signup()\" class=\"btn btn-primary btn-lg\" value=\"Create My Account\"> <p>Already have an account? <a ui-sref=\"auth.login({ token: vm.token })\">Log In</a></p> </div> </div> </form> </div> </div> <div class=\"text-center\"> By signing up, you agree to our <a href=\"http://exceptionless.io/privacy\" target=\"_blank\">Privacy Policy</a> and <a href=\"http://exceptionless.io/terms\" target=\"_blank\">Terms of Service</a>. </div> </div> </div> </div> </div> </div>"
   );
 
 
