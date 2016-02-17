@@ -109142,7 +109142,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.sessionEvents = {
         get: function (options) {
           function optionsCallback(options) {
-            options.filter = '-type:heartbeat -type:sessionend';
+            options.filter = '-type:heartbeat';
             options.time = null;
             return options;
           }
@@ -111546,7 +111546,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/tabs/session.tpl.html',
-    "<div ng-if=\"!vm.project.has_premium_features\"> <div class=\"alert alert-danger alert-banner m-b-none hidden-print\"> <h4><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">{{vm.project.organization_name}}</a> is attempting to use a premium feature.</h4> <p><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">Upgrade now</a> to enable sessions and other premium features!</p> </div> <br> </div> <h3 class=\"visible-print\">Session Events</h3> <events settings=\"vm.sessionEvents\"></events>"
+    "<div ng-if=\"!vm.project.has_premium_features\"> <div class=\"alert alert-danger alert-banner m-b-none hidden-print\"> <h4><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">{{vm.project.organization_name}}</a> is attempting to use a premium feature.</h4> <p><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">Upgrade now</a> to enable sessions and other premium features!</p> </div> <br> </div> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> </table> <h3 class=\"visible-print\">Session Events</h3> <events settings=\"vm.sessionEvents\"></events>"
   );
 
 
