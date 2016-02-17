@@ -105302,16 +105302,59 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 graph: graph
               };
 
+              if (scope.features.xAxis.element) {
+                xAxisConfig.element = scope.features.xAxis.element;
+              }
+
+              if (scope.features.xAxis.orientation) {
+                xAxisConfig.orientation = scope.features.xAxis.orientation;
+              }
+
+              if (scope.features.xAxis.pixelsPerTick) {
+                xAxisConfig.pixelsPerTick = scope.features.xAxis.pixelsPerTick;
+              }
+
+              var timeFixture = scope.features.xAxis.timeFixture;
+              if (timeFixture) {
+                if (scope.features.xAxis.overrideTimeFixtureCustomFormatters) {
+                  timeFixture.units[2].formatter = function(date) { return moment(date).format('MMM YYYY'); }; // month
+                  timeFixture.units[3].formatter = function(date) { return moment(date).format('MMM D'); }; // week
+                  timeFixture.units[4].formatter = function(date) { return moment(date).format('MMM D'); }; // day
+                  timeFixture.units[5].formatter = function(date) { return moment(date).format('ha'); }; // 6 hours
+                  timeFixture.units[6].formatter = function(date) { return moment(date).format('h:mma'); }; // hour
+                  timeFixture.units[7].formatter = function(date) { return moment(date).format('h:mma'); }; // 15 minute
+                  timeFixture.units[8].formatter = function(date) { return moment(date).format('h:mma'); }; // minute
+                  timeFixture.units[8].formatter = function(date) { return moment(date).format('h:mma'); }; // second
+                  timeFixture.units[8].formatter = function(date) { return moment(date).format('h:mma'); }; // decisecond
+                  timeFixture.units[8].formatter = function(date) { return moment(date).format('h:mma'); }; // centisecond
+                }
+
+                xAxisConfig.timeFixture = timeFixture;
+              }
+
               if (scope.features.xAxis.timeUnit) {
                 var time = new Rickshaw.Fixtures.Time();
                 xAxisConfig.timeUnit = time.unit(scope.features.xAxis.timeUnit);
+              }
+
+              if (scope.features.xAxis.ticks) {
+                xAxisConfig.ticks = scope.features.xAxis.ticks;
+              }
+
+              if (scope.features.xAxis.tickValues) {
+                xAxisConfig.tickValues = scope.features.xAxis.tickValues;
+              }
+
+              if (scope.features.xAxis.tickSize) {
+                xAxisConfig.tickSize = scope.features.xAxis.tickSize;
               }
 
               if (scope.features.xAxis.ticksTreatment) {
                 xAxisConfig.ticksTreatment = scope.features.xAxis.ticksTreatment;
               }
 
-              var xAxis = new Rickshaw.Graph.Axis.Time(xAxisConfig);
+              var useStandardXAxis = xAxisConfig.orientation || xAxisConfig.pixelsPerTick || xAxisConfig.ticks || xAxisConfig.tickValues || xAxisConfig.tickSize || xAxisConfig.element;
+              var xAxis = useStandardXAxis ? new Rickshaw.Graph.Axis.X(xAxisConfig) : new Rickshaw.Graph.Axis.Time(xAxisConfig);
               xAxis.render();
             }
 
@@ -105320,8 +105363,32 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 graph: graph
               };
 
+              if (scope.features.yAxis.element) {
+                yAxisConfig.element = scope.features.yAxis.element;
+              }
+
+              if (scope.features.yAxis.orientation) {
+                yAxisConfig.orientation = scope.features.yAxis.orientation;
+              }
+
+              if (scope.features.yAxis.pixelsPerTick) {
+                yAxisConfig.pixelsPerTick = scope.features.yAxis.pixelsPerTick;
+              }
+
               if (scope.features.yAxis.ticks) {
                 yAxisConfig.ticks = scope.features.yAxis.ticks;
+              }
+
+              if (scope.features.yAxis.tickValues) {
+                yAxisConfig.tickValues = scope.features.yAxis.tickValues;
+              }
+
+              if (scope.features.yAxis.tickSize) {
+                yAxisConfig.tickSize = scope.features.yAxis.tickSize;
+              }
+
+              if (scope.features.yAxis.ticksTreatment) {
+                yAxisConfig.ticksTreatment = scope.features.yAxis.ticksTreatment;
               }
 
               if (scope.features.yAxis.tickFormat) {
@@ -107582,6 +107649,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     }]);
 }());
 
+/* global Rickshaw:false */
 (function () {
   'use strict';
 
@@ -107645,8 +107713,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         features: {
           hover: {
             render: function (args) {
-              var date = moment.unix(args.domainX).utc();
-              var formattedDate = date.hours() === 0 ? $filter('date')(date.toDate(), 'mediumDate') : $filter('date')(date.toDate(), 'medium');
+              var date = moment.unix(args.domainX);
+              var formattedDate = date.hours() === 0 && date.minutes() === 0 ? date.format('ddd, MMM D, YYYY') : date.format('ddd, MMM D, YYYY h:mma');
               var content = '<div class="date">' + formattedDate + '</div>';
               args.detail.sort(function (a, b) {
                 return a.order - b.order;
@@ -107689,6 +107757,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
               return false;
             }
+          },
+          xAxis: {
+            timeFixture: new Rickshaw.Fixtures.Time.Local(),
+            overrideTimeFixtureCustomFormatters: true
           },
           yAxis: {
             ticks: 5,
@@ -110540,6 +110612,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     }]);
 }());
 
+/* global Rickshaw:false */
 (function () {
   'use strict';
 
@@ -110582,8 +110655,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         features: {
           hover: {
             render: function (args) {
-              var date = moment.unix(args.domainX).utc();
-              var formattedDate = date.hours() === 0 ? $filter('date')(date.toDate(), 'mediumDate') : $filter('date')(date.toDate(), 'medium');
+              var date = moment.unix(args.domainX);
+              var formattedDate = date.hours() === 0 && date.minutes() === 0 ? date.format('ddd, MMM D, YYYY') : date.format('ddd, MMM D, YYYY h:mma');
               var content = '<div class="date">' + formattedDate + '</div>';
               args.detail.sort(function (a, b) {
                 return a.order - b.order;
@@ -110627,6 +110700,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
               return false;
             }
+          },
+          xAxis: {
+            timeFixture: new Rickshaw.Fixtures.Time.Local(),
+            overrideTimeFixtureCustomFormatters: true
           },
           yAxis: {
             ticks: 5,
@@ -110836,6 +110913,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   }]);
 }());
 
+/* global Rickshaw:false */
 (function () {
   'use strict';
 
@@ -111149,8 +111227,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         features: {
           hover: {
             render: function (args) {
-              var date = moment.unix(args.domainX).utc();
-              var formattedDate = date.hours() === 0 ? $filter('date')(date.toDate(), 'mediumDate') : $filter('date')(date.toDate(), 'medium');
+              var date = moment.unix(args.domainX);
+              var formattedDate = date.hours() === 0 && date.minutes() === 0 ? date.format('ddd, MMM D, YYYY') : date.format('ddd, MMM D, YYYY h:mma');
               var content = '<div class="date">' + formattedDate + '</div>';
               args.detail.sort(function (a, b) {
                 return a.order - b.order;
@@ -111195,6 +111273,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
               return false;
             }
+          },
+          xAxis: {
+            timeFixture: new Rickshaw.Fixtures.Time.Local(),
+            overrideTimeFixtureCustomFormatters: true
           },
           yAxis: {
             ticks: 5,
