@@ -108695,10 +108695,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless.error',
     'exceptionless.event',
     'exceptionless.events',
+    'exceptionless.filter',
     'exceptionless.organization-notifications',
     'exceptionless.link',
     'exceptionless.notification',
     'exceptionless.object-dump',
+    'exceptionless.refresh',
     'exceptionless.simple-error',
     'exceptionless.simple-stack-trace',
     'exceptionless.stack-trace',
@@ -108726,7 +108728,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.event')
-    .controller('Event', ['$ExceptionlessClient', '$scope', '$state', '$stateParams', 'errorService', 'eventService', 'hotkeys', 'linkService', 'notificationService', 'projectService', 'urlService', function ($ExceptionlessClient, $scope, $state, $stateParams, errorService, eventService, hotkeys, linkService, notificationService, projectService, urlService) {
+    .controller('Event', ['$ExceptionlessClient', '$scope', '$state', '$stateParams', 'errorService', 'eventService', 'filterService', 'hotkeys', 'linkService', 'notificationService', 'projectService', 'urlService', function ($ExceptionlessClient, $scope, $state, $stateParams, errorService, eventService, filterService, hotkeys, linkService, notificationService, projectService, urlService) {
       var source = 'app.event.Event';
       var _eventId = $stateParams.id;
       var _knownDataKeys = ['error', 'simple_error', 'request', 'environment', 'user', 'user_description', 'sessionend', 'session_id', 'version'];
@@ -108849,6 +108851,23 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         vm.tabs = tabs;
+      }
+
+      function canRefresh(data) {
+        if (!!data && data.type === 'PersistentEvent') {
+          // Refresh if the event id is set (non bulk) and the deleted event matches one of the events.
+          if (data.id === vm.event.id) {
+            return true;
+          }
+
+          return filterService.includedInProjectOrOrganizationFilter({ organizationId: data.organization_id, projectId: data.project_id });
+        }
+
+        if (!!data && data.type === 'Stack') {
+          return filterService.includedInProjectOrOrganizationFilter({ organizationId: data.organization_id, projectId: data.project_id });
+        }
+
+        return false;
       }
 
       function demoteTab(tabName) {
@@ -109110,12 +109129,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       $scope.$on('$destroy', removeHotKeys);
 
+      vm.canRefresh = canRefresh;
       vm.demoteTab = demoteTab;
       vm.event = {};
       vm.excludedAdditionalData = ['@browser', '@browser_version', '@browser_major_version', '@device', '@os', '@os_version', '@os_major_version', '@is_bot'];
       vm.getCurrentTab = getCurrentTab;
       vm.getDuration = getDuration;
       vm.getErrorType = getErrorType;
+      vm.getEvent = getEvent;
       vm.getLocation = getLocation;
       vm.getMessage = getMessage;
       vm.getRequestUrl = getRequestUrl;
@@ -111531,7 +111552,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/tabs/overview.tpl.html',
-    "<table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.event.reference_id\"> <th>Reference</th> <td>{{vm.event.reference_id}}</td> </tr> <tr ng-repeat=\"reference in vm.references | orderBy: 'name'\"> <th>{{reference.name}}</th> <td><a ui-sref=\"app.event-reference({ referenceId: reference.id })\">{{reference.id}}</a></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasLevel()\"> <th>Level</th> <td><span class=\"label label-default\" ng-class=\"{ 'label-success': vm.isLevelSuccess(), 'label-info': vm.isLevelInfo(), 'label-warning': vm.isLevelWarning(), 'label-danger': vm.isLevelError() }\">{{::vm.event.data['@level']}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"!vm.isError()\"> <th>Event Type</th> <td><span truncate>{{::vm.event.type}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.isError()\"> <th>Error Type</th> <td><span truncate>{{::vm.getErrorType()}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.source\"> <th>Source</th> <td><span truncate lines=\"2\">{{::vm.event.source}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.message || vm.getMessage()\"> <th>Message</th> <td><span truncate lines=\"4\">{{::vm.event.message || vm.getMessage()}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasVersion()\"> <th>Version</th> <td>{{::vm.getVersion()}}</td> </tr> <tr ng-if=\"vm.getLocation()\"> <th>Geo</th> <td><span truncate>{{::vm.getLocation()}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.event.tags track by tag\">{{tag}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.code\"> <th>Code</th> <td><span truncate>{{::vm.event.code}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.getRequestUrl()\"> <th>URL</th> <td><a ng-href=\"{{::vm.getRequestUrl()}}\" target=\"_blank\" truncate>{{::vm.getRequestUrl()}}</a></td> </tr> </table> <div ng-if=\"vm.hasUserEmail() || vm.hasUserDescription() || vm.hasIdentity() || vm.hasUserName()\"> <h4>User Info</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr ng-if=\"vm.hasUserEmail()\"> <th>User Email</th> <td><a ng-href=\"mailto:{{::vm.event.data['@user_description'].email_address}}\" truncate>{{::vm.event.data['@user_description'].email_address}}</a> </td> </tr> <tr ng-if=\"vm.hasIdentity()\"> <th>User Identity</th> <td><span truncate>{{::vm.event.data['@user'].identity}}</span></td> </tr> <tr ng-if=\"vm.hasUserName()\"> <th>User Name</th> <td><span truncate>{{::vm.event.data['@user'].name}}</span></td> </tr> <tr ng-if=\"vm.hasUserDescription()\"> <th>User Description</th> <td><span truncate lines=\"2\">{{::vm.event.data['@user_description'].description}}</span></td> </tr> </table> </div> <div class=\"hidden-print\" ng-if=\"vm.isError()\"> <h4>Stack Trace</h4> <stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@error']\" ng-if=\"vm.event.data['@error']\"></stack-trace> <simple-stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@simple_error']\" ng-if=\"vm.event.data['@simple_error']\"></simple-stack-trace> </div>"
+    "<table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.getEvent()\" refresh-throttle=\"10000\"> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.event.reference_id\"> <th>Reference</th> <td>{{vm.event.reference_id}}</td> </tr> <tr ng-repeat=\"reference in vm.references | orderBy: 'name'\"> <th>{{reference.name}}</th> <td><a ui-sref=\"app.event-reference({ referenceId: reference.id })\">{{reference.id}}</a></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasLevel()\"> <th>Level</th> <td><span class=\"label label-default\" ng-class=\"{ 'label-success': vm.isLevelSuccess(), 'label-info': vm.isLevelInfo(), 'label-warning': vm.isLevelWarning(), 'label-danger': vm.isLevelError() }\">{{::vm.event.data['@level']}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"!vm.isError()\"> <th>Event Type</th> <td><span truncate>{{::vm.event.type}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.isError()\"> <th>Error Type</th> <td><span truncate>{{::vm.getErrorType()}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.source\"> <th>Source</th> <td><span truncate lines=\"2\">{{::vm.event.source}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.message || vm.getMessage()\"> <th>Message</th> <td><span truncate lines=\"4\">{{::vm.event.message || vm.getMessage()}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasVersion()\"> <th>Version</th> <td>{{::vm.getVersion()}}</td> </tr> <tr ng-if=\"vm.getLocation()\"> <th>Geo</th> <td><span truncate>{{::vm.getLocation()}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.event.tags track by tag\">{{tag}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.code\"> <th>Code</th> <td><span truncate>{{::vm.event.code}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.getRequestUrl()\"> <th>URL</th> <td><a ng-href=\"{{::vm.getRequestUrl()}}\" target=\"_blank\" truncate>{{::vm.getRequestUrl()}}</a></td> </tr> </table> <div ng-if=\"vm.hasUserEmail() || vm.hasUserDescription() || vm.hasIdentity() || vm.hasUserName()\"> <h4>User Info</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr ng-if=\"vm.hasUserEmail()\"> <th>User Email</th> <td><a ng-href=\"mailto:{{::vm.event.data['@user_description'].email_address}}\" truncate>{{::vm.event.data['@user_description'].email_address}}</a> </td> </tr> <tr ng-if=\"vm.hasIdentity()\"> <th>User Identity</th> <td><span truncate>{{::vm.event.data['@user'].identity}}</span></td> </tr> <tr ng-if=\"vm.hasUserName()\"> <th>User Name</th> <td><span truncate>{{::vm.event.data['@user'].name}}</span></td> </tr> <tr ng-if=\"vm.hasUserDescription()\"> <th>User Description</th> <td><span truncate lines=\"2\">{{::vm.event.data['@user_description'].description}}</span></td> </tr> </table> </div> <div class=\"hidden-print\" ng-if=\"vm.isError()\"> <h4>Stack Trace</h4> <stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@error']\" ng-if=\"vm.event.data['@error']\"></stack-trace> <simple-stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@simple_error']\" ng-if=\"vm.event.data['@simple_error']\"></simple-stack-trace> </div>"
   );
 
 
