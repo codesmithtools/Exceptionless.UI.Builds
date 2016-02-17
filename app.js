@@ -111053,7 +111053,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
         function onFailure(response) {
           $ExceptionlessClient.createFeatureUsage(source + '.updateIsCritical.error').setProperty('id', _stackId).setProperty('response', response).submit();
-          notificationService.error('An error occurred while marking future occurrences as ' + isCritical() ? 'not critical.' : 'critical.');
+          notificationService.error('An error occurred while marking future occurrences as ' + (isCritical() ? 'not critical.' : 'critical.'));
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.updateIsCritical').setProperty('id', _stackId).submit();
@@ -111092,12 +111092,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       function updateIsHidden() {
         function onSuccess() {
           $ExceptionlessClient.createFeatureUsage(source + '.updateIsHidden.success').setProperty('id', _stackId).submit();
-          notificationService.info('Successfully queued the stack to be marked as' + isHidden() ? 'shown.' : 'hidden.');
+          notificationService.info('Successfully queued the stack to be marked as ' + (isHidden() ? 'shown.' : 'hidden.'));
         }
 
         function onFailure(response) {
           $ExceptionlessClient.createFeatureUsage(source + '.updateIsHidden.error').setProperty('id', _stackId).setProperty('response', response).submit();
-          notificationService.error('An error occurred while marking this stack as ' + isHidden() ? 'shown.' : 'hidden.');
+          notificationService.error('An error occurred while marking this stack as ' + (isHidden() ? 'shown.' : 'hidden.'));
         }
 
         $ExceptionlessClient.createFeatureUsage(source + '.updateIsHidden').setProperty('id', _stackId).submit();
