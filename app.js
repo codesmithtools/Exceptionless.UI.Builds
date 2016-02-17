@@ -110796,6 +110796,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             });
           }
 
+          function getDuration(ev) {
+            if (ev.data.session_end) {
+              return ev.value || 0;
+            }
+
+            return moment().diff(ev.date, 'seconds');
+          }
+
           function hasEvents() {
             return vm.events && vm.events.length > 0;
           }
@@ -110852,6 +110860,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           vm.canRefresh = canRefresh;
           vm.events = [];
           vm.get = get;
+          vm.getDuration = getDuration;
           vm.hasEvents = hasEvents;
           vm.hasFilter = filterService.hasFilter;
           vm.hasSelection = hasSelection;
@@ -111652,7 +111661,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/session/sessions-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th>Summary</th> <th class=\"date\">Created</th> <th class=\"date\">Duration</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td ng-click=\"vm.open(event.id, $event)\"> <div> <span ng-if=\"!event.data.session_end\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <summary source=\"event\" show-type=\"vm.showType\"></summary> </div> </td> <td ng-click=\"vm.open(event.id, $event)\"><abbr title=\"{{::event.date | date : 'medium'}}\"> <timeago date=\"event.date\"></timeago> </abbr></td> <td ng-click=\"vm.open(event.id, $event)\"><abbr title=\"{{event.data.value || 0}} seconds\"> <duration value=\"event.data.value\"></duration> </abbr></td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td colspan=\"3\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No sessions were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"text-center\" ng-class=\"vm.previous || vm.next ? 'col-sm-8 col-xs-8': 'col-sm-12 col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th>Summary</th> <th class=\"date\">Created</th> <th class=\"date\">Duration</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td ng-click=\"vm.open(event.id, $event)\"> <div> <span ng-if=\"!event.data.session_end\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <summary source=\"event\" show-type=\"vm.showType\"></summary> </div> </td> <td ng-click=\"vm.open(event.id, $event)\"><abbr title=\"{{::event.date | date : 'medium'}}\"> <timeago date=\"event.date\"></timeago> </abbr></td> <td ng-click=\"vm.open(event.id, $event)\"><abbr title=\"{{vm.getDuration(event)}} seconds\"> <duration value=\"vm.getDuration(event)\"></duration> </abbr></td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td colspan=\"3\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No sessions were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"text-center\" ng-class=\"vm.previous || vm.next ? 'col-sm-8 col-xs-8': 'col-sm-12 col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
