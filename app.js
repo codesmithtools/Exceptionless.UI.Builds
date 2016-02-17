@@ -110819,7 +110819,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
           function getDuration(ev) {
             if (ev.data.session_end) {
-              return ev.value || 0;
+              return ev.data.value || 0;
             }
 
             return moment().diff(ev.date, 'seconds');
