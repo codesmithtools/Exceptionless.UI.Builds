@@ -103001,7 +103001,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               var duration = moment.duration(scope.value, scope.period || 'seconds');
               element.text(duration.humanize());
             } else {
-              element.text('Never');
+              element.text('never');
             }
           }
 
@@ -103144,6 +103144,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless.notification',
     'exceptionless.pagination',
     'exceptionless.refresh',
+    'exceptionless.relative-time',
     'exceptionless.summary',
     'exceptionless.timeago'
   ]);
@@ -103320,6 +103321,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           vm.open = open;
           vm.nextPage = nextPage;
           vm.previousPage = previousPage;
+          vm.relativeTo = function() { return vm.settings.relativeTo; };
           vm.save = save;
           vm.selectedIds = [];
           vm.showType = vm.settings.summary ? vm.settings.summary.showType : !filterService.getEventType();
@@ -105203,6 +105205,45 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
     };
   }]);
+}());
+
+(function () {
+  'use strict';
+
+  angular.module('exceptionless.relative-time', [])
+    .directive('relativeTime', ['$interval', function ($interval) {
+      return {
+        restrict: 'AE',
+        scope: {
+          to: '=',
+          date: '='
+        },
+        link: function (scope, element) {
+          function setRelativeTimeText() {
+            var to = moment(scope.to);
+            var date = moment(scope.date);
+
+            var isValid = !!scope.to && to.isValid() && to.year() > 1 && !!scope.date && date.isValid() && date.year() > 1;
+            element.text((isValid ? date.to(to, true) : 'never'));
+          }
+
+          setRelativeTimeText();
+          scope.$watch('to', function(value) {
+            setRelativeTimeText();
+          });
+
+          scope.$watch('date', function(value) {
+            setRelativeTimeText();
+          });
+
+          // TODO: implement smarter delay logic. We shouldn't be updating stuff it the interval period is a hour, day, month, year..
+          var interval = $interval(setRelativeTimeText, 60 * 1000);
+          scope.$on('$destroy', function () {
+            $interval.cancel(interval);
+          });
+        }
+      };
+    }]);
 }());
 
 (function () {
@@ -108943,6 +108984,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
         function onSuccess(response) {
           vm.event = response.data.plain();
+          vm.sessionEvents.relativeTo = vm.event.date;
 
           var links = linkService.getLinks(response.headers('link'));
           vm.previous = links['previous'] ? links['previous'].split('/').pop() : null;
@@ -111552,7 +111594,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/tabs/overview.tpl.html',
-    "<table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.getEvent()\" refresh-throttle=\"10000\"> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.event.reference_id\"> <th>Reference</th> <td>{{vm.event.reference_id}}</td> </tr> <tr ng-repeat=\"reference in vm.references | orderBy: 'name'\"> <th>{{reference.name}}</th> <td><a ui-sref=\"app.event-reference({ referenceId: reference.id })\">{{reference.id}}</a></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasLevel()\"> <th>Level</th> <td><span class=\"label label-default\" ng-class=\"{ 'label-success': vm.isLevelSuccess(), 'label-info': vm.isLevelInfo(), 'label-warning': vm.isLevelWarning(), 'label-danger': vm.isLevelError() }\">{{::vm.event.data['@level']}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"!vm.isError()\"> <th>Event Type</th> <td><span truncate>{{::vm.event.type}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.isError()\"> <th>Error Type</th> <td><span truncate>{{::vm.getErrorType()}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.source\"> <th>Source</th> <td><span truncate lines=\"2\">{{::vm.event.source}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.message || vm.getMessage()\"> <th>Message</th> <td><span truncate lines=\"4\">{{::vm.event.message || vm.getMessage()}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.hasVersion()\"> <th>Version</th> <td>{{::vm.getVersion()}}</td> </tr> <tr ng-if=\"vm.getLocation()\"> <th>Geo</th> <td><span truncate>{{::vm.getLocation()}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.event.tags track by tag\">{{tag}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.code\"> <th>Code</th> <td><span truncate>{{::vm.event.code}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.getRequestUrl()\"> <th>URL</th> <td><a ng-href=\"{{::vm.getRequestUrl()}}\" target=\"_blank\" truncate>{{::vm.getRequestUrl()}}</a></td> </tr> </table> <div ng-if=\"vm.hasUserEmail() || vm.hasUserDescription() || vm.hasIdentity() || vm.hasUserName()\"> <h4>User Info</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr ng-if=\"vm.hasUserEmail()\"> <th>User Email</th> <td><a ng-href=\"mailto:{{::vm.event.data['@user_description'].email_address}}\" truncate>{{::vm.event.data['@user_description'].email_address}}</a> </td> </tr> <tr ng-if=\"vm.hasIdentity()\"> <th>User Identity</th> <td><span truncate>{{::vm.event.data['@user'].identity}}</span></td> </tr> <tr ng-if=\"vm.hasUserName()\"> <th>User Name</th> <td><span truncate>{{::vm.event.data['@user'].name}}</span></td> </tr> <tr ng-if=\"vm.hasUserDescription()\"> <th>User Description</th> <td><span truncate lines=\"2\">{{::vm.event.data['@user_description'].description}}</span></td> </tr> </table> </div> <div class=\"hidden-print\" ng-if=\"vm.isError()\"> <h4>Stack Trace</h4> <stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@error']\" ng-if=\"vm.event.data['@error']\"></stack-trace> <simple-stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@simple_error']\" ng-if=\"vm.event.data['@simple_error']\"></simple-stack-trace> </div>"
+    "<table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.getEvent()\" refresh-throttle=\"10000\"> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.event.reference_id\"> <th>Reference</th> <td>{{vm.event.reference_id}}</td> </tr> <tr ng-repeat=\"reference in vm.references | orderBy: 'name'\"> <th>{{reference.name}}</th> <td><a ui-sref=\"app.event-reference({ referenceId: reference.id })\">{{reference.id}}</a></td> </tr> <tr ng-if=\"vm.hasLevel()\"> <th>Level</th> <td><span class=\"label label-default\" ng-class=\"{ 'label-success': vm.isLevelSuccess(), 'label-info': vm.isLevelInfo(), 'label-warning': vm.isLevelWarning(), 'label-danger': vm.isLevelError() }\">{{::vm.event.data['@level']}}</span></td> </tr> <tr ng-if=\"!vm.isError()\"> <th>Event Type</th> <td><span truncate>{{::vm.event.type}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.isError()\"> <th>Error Type</th> <td><span truncate>{{::vm.getErrorType()}}</span></td> </tr> <tr ng-if=\"vm.event.source\"> <th>Source</th> <td><span truncate lines=\"2\">{{::vm.event.source}}</span></td> </tr> <tr ng-if=\"!vm.isSessionStart() && vm.event.value\"> <th>Value</th> <td>{{::vm.event.value}}</td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.event.message || vm.getMessage()\"> <th>Message</th> <td><span truncate lines=\"4\">{{::vm.event.message || vm.getMessage()}}</span></td> </tr> <tr ng-if=\"vm.hasVersion()\"> <th>Version</th> <td>{{::vm.getVersion()}}</td> </tr> <tr ng-if=\"vm.getLocation()\"> <th>Geo</th> <td><span truncate>{{::vm.getLocation()}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.event.tags track by tag\">{{tag}}</span></td> </tr> <tr class=\"hidden-print\" ng-if=\"vm.getRequestUrl()\"> <th>URL</th> <td><a ng-href=\"{{::vm.getRequestUrl()}}\" target=\"_blank\" truncate>{{::vm.getRequestUrl()}}</a></td> </tr> </table> <div ng-if=\"vm.hasUserEmail() || vm.hasUserDescription() || vm.hasIdentity() || vm.hasUserName()\"> <h4>User Info</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr ng-if=\"vm.hasUserEmail()\"> <th>User Email</th> <td><a ng-href=\"mailto:{{::vm.event.data['@user_description'].email_address}}\" truncate>{{::vm.event.data['@user_description'].email_address}}</a> </td> </tr> <tr ng-if=\"vm.hasIdentity()\"> <th>User Identity</th> <td><span truncate>{{::vm.event.data['@user'].identity}}</span></td> </tr> <tr ng-if=\"vm.hasUserName()\"> <th>User Name</th> <td><span truncate>{{::vm.event.data['@user'].name}}</span></td> </tr> <tr ng-if=\"vm.hasUserDescription()\"> <th>User Description</th> <td><span truncate lines=\"2\">{{::vm.event.data['@user_description'].description}}</span></td> </tr> </table> </div> <div class=\"hidden-print\" ng-if=\"vm.isError()\"> <h4>Stack Trace</h4> <stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@error']\" ng-if=\"vm.event.data['@error']\"></stack-trace> <simple-stack-trace class=\"stack-trace-mini\" exception=\"vm.event.data['@simple_error']\" ng-if=\"vm.event.data['@simple_error']\"></simple-stack-trace> </div>"
   );
 
 
@@ -111567,7 +111609,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/tabs/session.tpl.html',
-    "<div ng-if=\"!vm.project.has_premium_features\"> <div class=\"alert alert-danger alert-banner m-b-none hidden-print\"> <h4><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">{{vm.project.organization_name}}</a> is attempting to use a premium feature.</h4> <p><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">Upgrade now</a> to enable sessions and other premium features!</p> </div> <br> </div> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> </table> <h3 class=\"visible-print\">Session Events</h3> <events settings=\"vm.sessionEvents\"></events>"
+    "<div class=\"hidden-print\"> <div ng-if=\"!vm.project.has_premium_features\"> <div class=\"alert alert-danger alert-banner m-b-none\"> <h4><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">{{vm.project.organization_name}}</a> is attempting to use a premium feature.</h4> <p><a ng-click=\"appVm.changePlan(vm.project.organization_id)\">Upgrade now</a> to enable sessions and other premium features!</p> </div> <br> </div> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tr> <th>Occurred On</th> <td>{{::vm.event.date | date: 'medium'}} ( <timeago date=\"vm.event.date\"></timeago> ) </td> </tr> <tr ng-if=\"vm.isSessionStart()\"> <th>Duration</th> <td> <span ng-if=\"!vm.event.data.sessionend\" class=\"glyphicon glyphicon-one-fine-dot glyphicon-green\" title=\"Online\"></span> <abbr title=\"{{vm.getDuration()}} seconds\"><duration value=\"vm.getDuration()\"></duration></abbr> <span ng-if=\"vm.event.data.sessionend\"> (ended <timeago date=\"vm.event.data.sessionend\"></timeago>) </span> </td> </tr> </table> <h3>Session Events</h3> <events settings=\"vm.sessionEvents\"></events> </div>"
   );
 
 
@@ -111727,7 +111769,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/events/events-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th class=\"selection hidden-xs\" ng-if=\"vm.actions.length > 0\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th class=\"date\">Date</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"> <abbr title=\"{{::event.date | date : 'medium'}}\"> <timeago date=\"event.date\"></timeago> </abbr> </td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No events were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\" ng-if=\"vm.actions.length > 0\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th class=\"selection hidden-xs\" ng-if=\"vm.actions.length > 0\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th ng-class=\"vm.relativeTo() ? 'relative-date' : 'date'\">Date</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"> <abbr title=\"{{::event.date | date : 'medium'}}\"> <span ng-if=\"vm.relativeTo()\">after <relative-time to=\"vm.relativeTo()\" date=\"event.date\"></relative-time></span> <timeago date=\"event.date\" ng-if=\"!vm.relativeTo()\"></timeago> </abbr> </td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No events were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\" ng-if=\"vm.actions.length > 0\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
