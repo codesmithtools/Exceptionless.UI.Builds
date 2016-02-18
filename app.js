@@ -102131,6 +102131,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     function authenticate(provider, userData) {
       function onSuccess() {
         $rootScope.$emit('auth:login', {});
+        // TODO: Figure out a way to submit a session start event here.
       }
 
       return $auth.authenticate(provider, userData || {}).then(onSuccess);
@@ -102161,16 +102162,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     }
 
     function login(user) {
-      function onSuccess() {
-         $ExceptionlessClient.config.setUserIdentity({ identity: user.email, data: { InviteToken: user.invite_token }});
-         $rootScope.$emit('auth:login', {});
-      }
-
-      return $auth.login(user).then(onSuccess);
+      return $auth.login(user).then(function () {
+        onLoginSuccess(user);
+      });
     }
 
     function logout(withRedirect, params) {
       function onSuccess() {
+        $ExceptionlessClient.submitSessionEnd();
         $ExceptionlessClient.config.setUserIdentity();
         $rootScope.$emit('auth:logout', {});
 
@@ -102184,6 +102183,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       return $auth.logout().then(onSuccess);
     }
 
+    function onLoginSuccess(user) {
+      $ExceptionlessClient.config.setUserIdentity({ identity: user.email, data: { InviteToken: user.invite_token }});
+      $ExceptionlessClient.submitSessionStart();
+      $rootScope.$emit('auth:login', {});
+    }
+
     function resetPassword(resetPasswordModel) {
       return Restangular.one('auth', 'reset-password').customPOST(resetPasswordModel);
     }
@@ -102191,6 +102196,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     function signup(user) {
       function onSuccess(response) {
         $auth.setToken(response);
+        onLoginSuccess(user);
         return response;
       }
 
@@ -108023,7 +108029,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       function authenticate(provider) {
         function onSuccess() {
-          $ExceptionlessClient.createFeatureUsage(source + '.authenticate.success').setProperty('InviteToken', vm.token).submit();
+          $ExceptionlessClient.createFeatureUsage(source + '.authenticate').setProperty('InviteToken', vm.token).submit();
         }
 
         function onFailure(response) {
@@ -108031,7 +108037,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error(getMessage(response));
         }
 
-        $ExceptionlessClient.createFeatureUsage(source + '.authenticate').setProperty('InviteToken', vm.token).submit();
         return authService.authenticate(provider, { InviteToken: vm.token }).then(onSuccess, onFailure).then(redirectOnSignup);
       }
 
@@ -108060,15 +108065,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         function onSuccess() {
-          $ExceptionlessClient.createFeatureUsage(source + '.login.success').setUserIdentity(vm.loginForm.email).submit();
+          $ExceptionlessClient.submitFeatureUsage(source + '.login');
         }
 
         function onFailure(response) {
-          $ExceptionlessClient.createFeatureUsage(source + '.login.error').setUserIdentity(vm.loginForm.email).submit();
+          $ExceptionlessClient.createFeatureUsage(source + '.login.error').setUserIdentity(vm.user.email).submit();
           notificationService.error(getMessage(response));
         }
 
-        $ExceptionlessClient.createFeatureUsage(source + '.login').setUserIdentity(vm.loginForm.email).submit();
         return authService.login(vm.user).then(onSuccess, onFailure).then(redirectOnSignup);
       }
 
@@ -108195,7 +108199,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       function authenticate(provider) {
         function onSuccess() {
-          $ExceptionlessClient.createFeatureUsage(source + '.authenticate.success').setProperty('InviteToken', vm.token).submit();
+          $ExceptionlessClient.createFeatureUsage(source + '.authenticate').setProperty('InviteToken', vm.token).submit();
         }
 
         function onFailure(response) {
@@ -108203,7 +108207,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error(getMessage(response));
         }
 
-        $ExceptionlessClient.createFeatureUsage(source + '.authenticate').setProperty('InviteToken', vm.token).submit();
         return authService.authenticate(provider, { InviteToken: vm.token }).then(onSuccess, onFailure).then(redirectOnSignup);
       }
 
@@ -108271,7 +108274,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         function onSuccess() {
-          $ExceptionlessClient.createFeatureUsage(source + '.signup.success').setUserIdentity(vm.user.email).submit();
+          $ExceptionlessClient.submitFeatureUsage(source + '.signup');
         }
 
         function onFailure(response) {
@@ -108279,7 +108282,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           notificationService.error(getMessage(response));
         }
 
-        $ExceptionlessClient.createFeatureUsage(source + '.signup').setUserIdentity(vm.user.email).submit();
         return authService.signup(vm.user).then(onSuccess, onFailure).then(redirectOnSignup).then(resetCanSignup, resetCanSignup);
       }
 
