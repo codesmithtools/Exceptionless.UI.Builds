@@ -101656,7 +101656,11 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       controller: 'app.Dashboard',
       controllerAs: 'vm',
       templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
+      onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
+        if ($stateParams.type === 'session') {
+          return $state.go('app.session-project-dashboard', $stateParams);
+        }
+
         filterService.setProjectId($stateParams.projectId, true);
         filterService.setEventType($stateParams.type, true);
       }],
@@ -101691,7 +101695,11 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       controller: 'app.Dashboard',
       controllerAs: 'vm',
       templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
+      onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
+        if ($stateParams.type === 'session') {
+          return $state.go('app.session-organization-dashboard', $stateParams);
+        }
+
         filterService.setOrganizationId($stateParams.organizationId, true);
         filterService.setEventType($stateParams.type, true);
       }],
