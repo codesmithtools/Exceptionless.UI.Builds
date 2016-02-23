@@ -110765,7 +110765,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 return a.order - b.order;
               }).forEach(function (d) {
                 var swatch = '<span class="detail-swatch" style="background-color: ' + d.series.color.replace('0.5', '1') + '"></span>';
-                content += swatch + $filter('number')(d.value.data.sessions) + ' ' + d.series.name + ' <br />';
+                content += swatch + $filter('number')(d.name === 'Users' ? d.value.data.users : d.value.data.sessions) + ' ' + d.series.name + ' <br />';
               }, this);
 
               var xLabel = document.createElement('div');
