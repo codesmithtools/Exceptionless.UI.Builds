@@ -107767,22 +107767,20 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.canRefresh = canRefresh;
       vm.chart = {
         options: {
+          padding: { top: 0.085 },
           renderer: 'stack',
-          stroke: true,
-          padding: {
-            top: 0.085
-          },
-          series: [
-            {
+          series: [{
               name: 'Unique',
               color: 'rgba(60, 116, 0, .9)',
               stroke: 'rgba(0, 0, 0, 0.15)'
             }, {
               name: 'Total',
-              color: 'rgba(124, 194, 49, .9)',
+              color: 'rgba(124, 194, 49, .7)',
               stroke: 'rgba(0, 0, 0, 0.15)'
             }
-          ]
+          ],
+          stroke: true,
+          unstack: true
         },
         features: {
           hover: {
@@ -110741,19 +110739,20 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       vm.chart = {
         options: {
+          padding: { top: 0.085 },
           renderer: 'stack',
-          stroke: true,
-          padding: {top: 0.085},
           series: [{
               name: 'Users',
               color: 'rgba(60, 116, 0, .9)',
               stroke: 'rgba(0, 0, 0, 0.15)'
             }, {
               name: 'Sessions',
-              color: 'rgba(124, 194, 49, .9)',
+              color: 'rgba(124, 194, 49, .7)',
               stroke: 'rgba(0, 0, 0, 0.15)'
             }
-          ]
+          ],
+          stroke: true,
+          unstack: true
         },
         features: {
           hover: {
@@ -111327,14 +111326,15 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       vm.chart = {
         options: {
+          padding: { top: 0.085 },
           renderer: 'stack',
-          stroke: true,
-          padding: {top: 0.085},
           series: [{
             name: 'Occurrences',
             color: 'rgba(124, 194, 49, .9)',
             stroke: 'rgba(0, 0, 0, 0.15)'
-          }]
+          }],
+          stroke: true,
+          unstack: true
         },
         features: {
           hover: {
