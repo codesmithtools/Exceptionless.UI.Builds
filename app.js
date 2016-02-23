@@ -71617,7 +71617,7 @@ function verifyQ (assertQConstructor) {
 },{"./provider":5,"angular-assert-q-constructor":1}]},{},[7])(7)
 });
 /*!
- * angular-translate - v2.9.1 - 2016-02-13
+ * angular-translate - v2.9.2 - 2016-02-21
  * 
  * Copyright (c) 2016 The angular-translate team, Pascal Precht; Licensed MIT
  */
@@ -71922,13 +71922,23 @@ function $translateSanitizationProvider () {
     return $sanitize(value);
   };
 
-  var mapInterpolationParameters = function (value, iteratee) {
+  var mapInterpolationParameters = function (value, iteratee, stack) {
     if (angular.isObject(value)) {
       var result = angular.isArray(value) ? [] : {};
 
+      if (!stack) {
+        stack = [];
+      } else {
+        if (stack.indexOf(value) > -1) {
+          throw new Error('pascalprecht.translate.$translateSanitization: Error cannot interpolate parameter due recursive object');
+        }
+      }
+
+      stack.push(value);
       angular.forEach(value, function (propertyValue, propertyKey) {
-        result[propertyKey] = mapInterpolationParameters(propertyValue, iteratee);
+        result[propertyKey] = mapInterpolationParameters(propertyValue, iteratee, stack);
       });
+      stack.splice(-1, 1); // remove last
 
       return result;
     } else if (angular.isNumber(value)) {
@@ -71999,7 +72009,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         }
       };
 
-  var version = '2.9.1';
+  var version = '2.9.2';
 
   // tries to determine the browsers language
   var getFirstBrowserLanguage = function () {
@@ -73024,7 +73034,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           };
           promiseResolved.displayName = 'promiseResolved';
 
-          promiseToWaitFor['finally'](promiseResolved, deferred.reject);
+          promiseToWaitFor['finally'](promiseResolved);
         }
         return deferred.promise;
       };
@@ -73717,15 +73727,22 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           langPromises[key]['finally'](function () {
             clearNextLangAndPromise(key);
           });
-        } else if ($nextLang === key && langPromises[key]) {
+        } else if (langPromises[key]) {
           // we are already loading this asynchronously
           // resolve our new deferred when the old langPromise is resolved
           langPromises[key].then(function (translation) {
+            if (!$uses) {
+              useLanguage(translation.key);
+            }
             deferred.resolve(translation.key);
             return translation;
           }, function (key) {
-            deferred.reject(key);
-            return $q.reject(key);
+            // find first available fallback language if that request has failed
+            if (!$uses && $fallbackLanguage && $fallbackLanguage.length > 0) {
+              return $translate.use($fallbackLanguage[0]).then(deferred.resolve, deferred.reject);
+            } else {
+              return deferred.reject(key);
+            }
           });
         } else {
           deferred.resolve(key);
@@ -110706,6 +110723,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           }
 
           vm.chart.options.series[0].data = vm.stats.timeline.map(function (item) {
+            return {x: moment.utc(item.date).unix(), y: item.users, data: item};
+          });
+
+          vm.chart.options.series[1].data = vm.stats.timeline.map(function (item) {
             return {x: moment.utc(item.date).unix(), y: item.sessions, data: item};
           });
         }
@@ -110724,10 +110745,15 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           stroke: true,
           padding: {top: 0.085},
           series: [{
-            name: 'Sessions',
-            color: 'rgba(124, 194, 49, .9)',
-            stroke: 'rgba(0, 0, 0, 0.15)'
-          }]
+              name: 'Users',
+              color: 'rgba(60, 116, 0, .9)',
+              stroke: 'rgba(0, 0, 0, 0.15)'
+            }, {
+              name: 'Sessions',
+              color: 'rgba(124, 194, 49, .9)',
+              stroke: 'rgba(0, 0, 0, 0.15)'
+            }
+          ]
         },
         features: {
           hover: {
@@ -111733,7 +111759,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/session/dashboard.tpl.html',
-    "<organization-notifications requires-premium=\"true\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get()\" refresh-if=\"vm.canRefresh(data)\" refresh-throttle=\"10000\"> <div class=\"col\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"wrapper-md\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-area-chart fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Sessions</span> <span class=\"sub\">{{vm.stats.sessions || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-users fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Users</span> <span class=\"sub\">{{vm.stats.users || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-clock-o fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Average Duration</span> <span class=\"sub\"><duration value=\"vm.stats.avg_duration\"></duration></span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-bar-chart-o\"></i>Sessions</div> <div class=\"panel-body\"> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-area-chart\"></i>Recent Sessions</div> <sessions settings=\"vm.recentSessions\"></sessions> </div> </div> </div> </div>"
+    "<organization-notifications requires-premium=\"true\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get()\" refresh-if=\"vm.canRefresh(data)\" refresh-throttle=\"10000\"> <div class=\"col\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"wrapper-md\"> <div class=\"row\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-area-chart fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Sessions</span> <span class=\"sub\">{{vm.stats.sessions || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-line-chart fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Per Hour</span> <span class=\"sub\">{{vm.stats.avg_per_hour || 0 | number : 1}}</span> </div> </div> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-users fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Users</span> <span class=\"sub\">{{vm.stats.users || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-clock-o fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Average Duration</span> <span class=\"sub\"><duration value=\"vm.stats.avg_duration\"></duration></span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-bar-chart-o\"></i>Sessions</div> <div class=\"panel-body\"> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-area-chart\"></i>Recent Sessions</div> <sessions settings=\"vm.recentSessions\"></sessions> </div> </div> </div> </div>"
   );
 
 
