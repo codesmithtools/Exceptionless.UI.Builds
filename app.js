@@ -105391,7 +105391,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               var timeFixture = scope.features.xAxis.timeFixture;
               if (timeFixture) {
                 if (scope.features.xAxis.overrideTimeFixtureCustomFormatters) {
-                  timeFixture.units[2].formatter = function(date) { return moment(date).format('MMM YYYY'); }; // month
+                  timeFixture.units[2].formatter = function(date) { return moment(date).format('MMM'); }; // month
                   timeFixture.units[3].formatter = function(date) { return moment(date).format('MMM D'); }; // week
                   timeFixture.units[4].formatter = function(date) { return moment(date).format('MMM D'); }; // day
                   timeFixture.units[5].formatter = function(date) { return moment(date).format('ha'); }; // 6 hours
@@ -107792,7 +107792,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 return a.order - b.order;
               }).forEach(function (d) {
                 var swatch = '<span class="detail-swatch" style="background-color: ' + d.series.color.replace('0.5', '1') + '"></span>';
-                content += swatch + $filter('number')(d.name === 'Total' ? d.value.data.total : d.value.data.unique) + ' ' + d.series.name + ' <br />';
+                content += swatch + $filter('number')(d.formattedYValue) + ' ' + d.series.name + ' <br />';
               }, this);
 
               var xLabel = document.createElement('div');
@@ -109364,6 +109364,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.organization', [
+    'angular-rickshaw',
     'ngMessages',
     'ui.bootstrap',
     'ui.router',
@@ -109382,6 +109383,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'exceptionless.project',
     'exceptionless.projects',
     'exceptionless.refresh',
+    'exceptionless.timeago',
     'exceptionless.token',
     'exceptionless.user',
     'exceptionless.users',
@@ -109706,11 +109708,13 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 }());
 
+/* global Rickshaw:false */
 (function () {
   'use strict';
 
   angular.module('app.organization')
-    .controller('organization.Manage', ['$state', '$stateParams', '$window', 'billingService', 'dialogService', 'organizationService', 'projectService', 'userService', 'notificationService', 'dialogs', 'STRIPE_PUBLISHABLE_KEY', function ($state, $stateParams, $window, billingService, dialogService, organizationService, projectService, userService, notificationService, dialogs, STRIPE_PUBLISHABLE_KEY) {
+    .controller('organization.Manage', ['$ExceptionlessClient', 'filterService', '$filter', '$state', '$stateParams', '$window', 'billingService', 'dialogService', 'organizationService', 'projectService', 'userService', 'notificationService', 'dialogs', 'STRIPE_PUBLISHABLE_KEY', function ($ExceptionlessClient, filterService, $filter, $state, $stateParams, $window, billingService, dialogService, organizationService, projectService, userService, notificationService, dialogs, STRIPE_PUBLISHABLE_KEY) {
+      var source = 'organization.Manage';
       var _ignoreRefresh = false;
       var _organizationId = $stateParams.id;
       var vm = this;
@@ -109769,6 +109773,22 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       function getOrganization() {
         function onSuccess(response) {
           vm.organization = response.data.plain();
+
+          vm.chart.options.series[0].data = vm.organization.usage.map(function (item) {
+            return {x: moment.utc(item.date).unix(), y: item.total - item.blocked - item.too_big, data: item};
+          });
+
+          vm.chart.options.series[1].data = vm.organization.usage.map(function (item) {
+            return {x: moment.utc(item.date).unix(), y: item.blocked, data: item};
+          });
+
+          vm.chart.options.series[2].data = vm.organization.usage.map(function (item) {
+            return {x: moment.utc(item.date).unix(), y: item.too_big, data: item};
+          });
+
+          vm.chart.options.series[3].data = vm.organization.usage.map(function (item) {
+            return {x: moment.utc(item.date).unix(), y: item.limit, data: item};
+          });
         }
 
         function onFailure() {
@@ -109777,6 +109797,21 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         return organizationService.getById(_organizationId, false).then(onSuccess, onFailure);
+      }
+
+      function getRemainingEventLimit() {
+        if (!vm.organization.max_events_per_month) {
+          return 0;
+        }
+
+        var bonusEvents = moment.utc().isBefore(moment.utc(vm.organization.bonus_expiration)) ? vm.organization.bonus_events_per_month : 0;
+        var usage = vm.organization.usage && vm.organization.usage[vm.organization.usage.length - 1];
+        if (usage && moment.utc(usage.date).isSame(moment.utc().startOf('month'))) {
+          var remaining = usage.limit - usage.total;
+          return remaining > 0 ? remaining : 0;
+        }
+
+        return vm.organization.max_events_per_month + bonusEvents;
       }
 
       function hasAdminRole(user) {
@@ -109845,7 +109880,92 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.addUser = addUser;
       vm.canChangePlan = canChangePlan;
       vm.changePlan = changePlan;
+      vm.chart = {
+        options: {
+          padding: { top: 0.085 },
+          renderer: 'multi',
+          series: [{
+            name: 'Allowed',
+            color: '#a4d56f',
+            renderer: 'stack'
+          }, {
+            name: 'Blocked',
+            color: '#e2e2e2',
+            renderer: 'stack'
+          }, {
+            name: 'Too Big',
+            color: '#ccc',
+            renderer: 'stack'
+          }, {
+            name: 'Limit',
+            color: '#a94442',
+            renderer: 'line'
+          }]
+        },
+        features: {
+          hover: {
+            render: function (args) {
+              var date = moment.unix(args.domainX);
+              var formattedDate = date.hours() === 0 && date.minutes() === 0 ? date.format('ddd, MMM D, YYYY') : date.format('ddd, MMM D, YYYY h:mma');
+              var content = '<div class="date">' + formattedDate + '</div>';
+              args.detail.sort(function (a, b) {
+                return a.order - b.order;
+              }).forEach(function (d) {
+                var swatch = '<span class="detail-swatch" style="background-color: ' + d.series.color.replace('0.5', '1') + '"></span>';
+                content += swatch + $filter('number')(d.formattedYValue) + ' ' + d.series.name + '<br />';
+              }, this);
+
+              content += '<span class="detail-swatch"></span>' + $filter('number')(args.detail[0].value.data.total) + ' Total<br />';
+
+              var xLabel = document.createElement('div');
+              xLabel.className = 'x_label';
+              xLabel.innerHTML = content;
+              this.element.appendChild(xLabel);
+
+              // If left-alignment results in any error, try right-alignment.
+              var leftAlignError = this._calcLayoutError([xLabel]);
+              if (leftAlignError > 0) {
+                xLabel.classList.remove('left');
+                xLabel.classList.add('right');
+
+                // If right-alignment is worse than left alignment, switch back.
+                var rightAlignError = this._calcLayoutError([xLabel]);
+                if (rightAlignError > leftAlignError) {
+                  xLabel.classList.remove('right');
+                  xLabel.classList.add('left');
+                }
+              }
+
+              this.show();
+            }
+          },
+          range: {
+            onSelection: function (position) {
+              var start = moment.unix(position.coordMinX).utc().local();
+              var end = moment.unix(position.coordMaxX).utc().local();
+
+              filterService.setTime(start.format('YYYY-MM-DDTHH:mm:ss') + '-' + end.format('YYYY-MM-DDTHH:mm:ss'));
+              $ExceptionlessClient.createFeatureUsage(source + '.chart.range.onSelection')
+                .setProperty('start', start)
+                .setProperty('end', end)
+                .submit();
+
+              return false;
+            }
+          },
+          xAxis: {
+            timeFixture: new Rickshaw.Fixtures.Time.Local(),
+            overrideTimeFixtureCustomFormatters: true
+          },
+          yAxis: {
+            ticks: 5,
+            tickFormat: 'formatKMBT',
+            ticksTreatment: 'glow'
+          }
+        }
+      };
       vm.get = get;
+      vm.getRemainingEventLimit = getRemainingEventLimit;
       vm.hasAdminRole = hasAdminRole;
       vm.hasPremiumFeatures = hasPremiumFeatures;
       vm.invoices = {
@@ -109858,6 +109978,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         organizationId: _organizationId
       };
       vm.leaveOrganization = leaveOrganization;
+      // NOTE: this is currently the end of each month until we change our system to use the plan changed date.
+      vm.next_billing_date = moment().startOf('month').add(1, 'months').toDate();
       vm.organization = {};
       vm.organizationForm = {};
       vm.projects = {
@@ -110764,7 +110886,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 return a.order - b.order;
               }).forEach(function (d) {
                 var swatch = '<span class="detail-swatch" style="background-color: ' + d.series.color.replace('0.5', '1') + '"></span>';
-                content += swatch + $filter('number')(d.name === 'Users' ? d.value.data.users : d.value.data.sessions) + ' ' + d.series.name + ' <br />';
+                content += swatch + $filter('number')(d.formattedYValue) + ' ' + d.series.name + ' <br />';
               }, this);
 
               var xLabel = document.createElement('div');
@@ -111346,7 +111468,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 return a.order - b.order;
               }).forEach(function (d) {
                 var swatch = '<span class="detail-swatch" style="background-color: ' + d.series.color.replace('0.5', '1') + '"></span>';
-                content += swatch + $filter('number')(d.value.data.total) + ' ' + d.series.name + ' <br />';
+                content += swatch + $filter('number')(d.formattedYValue) + ' ' + d.series.name + ' <br />';
               }, this);
 
               var xLabel = document.createElement('div');
@@ -111694,7 +111816,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/organization/manage/manage.tpl.html',
-    "<organization-notifications organization-id=\"vm.organization.id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-th-list\"></i> Manage {{ vm.organization.name ? 'Organization \"' + vm.organization.name + '\"' : 'Organization'}}</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"vm.organizationForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group m-b-none\"> <label for=\"name\">Organization Name</label> <div ng-class=\"{'input-group': vm.organizationForm.$pending }\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Organization Name\" ng-model=\"vm.organization.name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.save(vm.organizationForm.$valid)\" organization-name-available-validator ng-required=\"true\" autofocus> <span class=\"input-group-addon\" ng-if=\"vm.organizationForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.organizationForm.name.$error\" ng-if=\"vm.organizationForm.$submitted || vm.organizationForm.name.$touched\"> <small ng-message=\"required\">Organization Name is required.</small> <small ng-message=\"unique\">A organizations with this name already exists.</small> </div> </div> </form> </uib-tab> <uib-tab heading=\"Projects\" active=\"vm.tabProjectsActive\"> <projects settings=\"vm.projects\"></projects> <a ui-sref=\"app.project.add\" class=\"btn btn-primary\" role=\"button\">Add New Project</a> </uib-tab> <uib-tab heading=\"Users\" active=\"vm.tabUsersActive\"> <users settings=\"vm.users\"></users> <button type=\"button\" role=\"button\" ng-click=\"vm.addUser()\" class=\"btn btn-primary\">Invite User</button> </uib-tab> <uib-tab heading=\"Billing\" active=\"vm.tabBillingActive\"> <p>You are currently on the <strong>{{vm.organization.plan_name}}</strong> plan. <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Change your plan or billing information.</a></p> <invoices settings=\"vm.invoices\"></invoices> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.organization-dashboard({ organizationId: vm.organization.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-remove\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\"> <li><a ng-click=\"vm.leaveOrganization(appVm.user)\" role=\"button\">Leave Organization</a></li> <li><a ng-click=\"vm.removeOrganization()\" role=\"button\">Delete Organization</a></li> </ul> </div> </footer> </div> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.organization.id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-th-list\"></i> Manage {{ vm.organization.name ? 'Organization \"' + vm.organization.name + '\"' : 'Organization'}}</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"vm.organizationForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group m-b-none\"> <label for=\"name\">Organization Name</label> <div ng-class=\"{'input-group': vm.organizationForm.$pending }\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Organization Name\" ng-model=\"vm.organization.name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.save(vm.organizationForm.$valid)\" organization-name-available-validator ng-required=\"true\" autofocus> <span class=\"input-group-addon\" ng-if=\"vm.organizationForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.organizationForm.name.$error\" ng-if=\"vm.organizationForm.$submitted || vm.organizationForm.name.$touched\"> <small ng-message=\"required\">Organization Name is required.</small> <small ng-message=\"unique\">A organizations with this name already exists.</small> </div> </div> </form> <h4 style=\"margin-top: 20px\">Monthly Usage</h4> <p> You are currently on the <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\"><strong>{{vm.organization.plan_name}}</strong> plan</a> with <span ng-if=\"vm.getRemainingEventLimit() > 0\">~</span><b ng-class=\"{'text-warning': vm.getRemainingEventLimit() === 0}\">{{vm.getRemainingEventLimit()}}</b> events remaining until this billing period's limit is reset on <b>{{vm.next_billing_date | date: 'longDate'}}</b> (<timeago date=\"vm.next_billing_date\"></timeago>). <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Click here to change your plan or billing information.</a> </p> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> <br class=\"clearfix\"> <h6><em>The usage data above is refreshed periodically and may not reflect current totals.</em></h6> </uib-tab> <uib-tab heading=\"Projects\" active=\"vm.tabProjectsActive\"> <projects settings=\"vm.projects\"></projects> <a ui-sref=\"app.project.add\" class=\"btn btn-primary\" role=\"button\">Add New Project</a> </uib-tab> <uib-tab heading=\"Users\" active=\"vm.tabUsersActive\"> <users settings=\"vm.users\"></users> <button type=\"button\" role=\"button\" ng-click=\"vm.addUser()\" class=\"btn btn-primary\">Invite User</button> </uib-tab> <uib-tab heading=\"Billing\" active=\"vm.tabBillingActive\"> <p>You are currently on the <strong>{{vm.organization.plan_name}}</strong> plan. <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Change your plan or billing information.</a></p> <invoices settings=\"vm.invoices\"></invoices> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.organization-dashboard({ organizationId: vm.organization.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-remove\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\"> <li><a ng-click=\"vm.leaveOrganization(appVm.user)\" role=\"button\">Leave Organization</a></li> <li><a ng-click=\"vm.removeOrganization()\" role=\"button\">Delete Organization</a></li> </ul> </div> </footer> </div> </div> </div> </div>"
   );
 
 
