@@ -106612,7 +106612,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         },
         template: '<ng-include src="templateUrl" />',
         link: function (scope, element, attrs) {
-          var level =  scope.source && scope.source.data.level ? scope.source.data.level.toLowerCase() : null;
+          var level =  scope.source && scope.source.data.Level ? scope.source.data.Level.toLowerCase() : null;
           scope.isLevelSuccess = level === 'trace' || level === 'debug';
           scope.isLevelInfo = level === 'info';
           scope.isLevelWarning = level === 'warn';
@@ -111934,7 +111934,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/events/events-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th class=\"selection hidden-xs\" ng-if=\"vm.actions.length > 0\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th ng-class=\"vm.relativeTo() ? 'relative-date' : 'date'\">{{::vm.timeHeaderText}}</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"> <span ng-if=\"vm.hideSessionStartTime && event.data.type === 'session'\">--</span> <span ng-if=\"!vm.hideSessionStartTime || event.data.type !== 'session'\"> <abbr title=\"{{::event.date | date : 'medium'}}\"> <span ng-if=\"vm.relativeTo()\">after <relative-time to=\"vm.relativeTo()\" date=\"event.date\"></relative-time></span> <span ng-if=\"!vm.relativeTo()\"><timeago date=\"event.date\"></timeago></span> </abbr> </span> </td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No events were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\" ng-if=\"vm.actions.length > 0\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th class=\"selection hidden-xs\" ng-if=\"vm.actions.length > 0\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th ng-class=\"vm.relativeTo() ? 'relative-date' : 'date'\">{{::vm.timeHeaderText}}</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"> <span ng-if=\"vm.hideSessionStartTime && event.data.Type === 'session'\">--</span> <span ng-if=\"!vm.hideSessionStartTime || event.data.Type !== 'session'\"> <abbr title=\"{{::event.date | date : 'medium'}}\"> <span ng-if=\"vm.relativeTo()\">after <relative-time to=\"vm.relativeTo()\" date=\"event.date\"></relative-time></span> <span ng-if=\"!vm.relativeTo()\"><timeago date=\"event.date\"></timeago></span> </abbr> </span> </td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No events were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\" ng-if=\"vm.actions.length > 0\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -111984,47 +111984,47 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/summary/templates/event-error-summary.tpl.html',
-    "<div> <strong> <abbr title=\"{{::source.data.type_full_name}}\">{{::source.data.type}}</abbr> <span ng-if=\"!source.data.method\">:</span> </strong> <span ng-if=\"source.data.method\"> in <strong> <abbr title=\"{{::source.data.method_full_name}}\">{{::source.data.method}}</abbr> </strong> </span> <a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.message}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.path}}</span> </div>"
+    "<div> <strong> <abbr title=\"{{::source.data.TypeFullName}}\">{{::source.data.Type}}</abbr> <span ng-if=\"!source.data.Method\">:</span> </strong> <span ng-if=\"source.data.Method\"> in <strong> <abbr title=\"{{::source.data.MethodFullName}}\">{{::source.data.Method}}</abbr> </strong> </span> <a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Message}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.Path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.Path}}</span> </div>"
   );
 
 
   $templateCache.put('components/summary/templates/event-feature-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>Feature</strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.source}}</a>"
+    "<span ng-if=\"showType\"><strong>Feature</strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Source}}</a>"
   );
 
 
   $templateCache.put('components/summary/templates/event-log-summary.tpl.html',
-    "<span ng-if=\"source.data.level\" class=\"label label-default\" ng-class=\"{ 'label-success': isLevelSuccess, 'label-info': isLevelInfo, 'label-warning': isLevelWarning, 'label-danger': isLevelError }\">{{::source.data.level}}</span><strong ng-if=\"showType\">Log</strong><span ng-if=\"showType && source.data.source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.source\">{{::source.data.source}}</strong><span ng-if=\"showType || source.data.source\">:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.message}}</a>"
+    "<span ng-if=\"source.data.level\" class=\"label label-default\" ng-class=\"{ 'label-success': isLevelSuccess, 'label-info': isLevelInfo, 'label-warning': isLevelWarning, 'label-danger': isLevelError }\">{{::source.data.Level}}</span><strong ng-if=\"showType\">Log</strong><span ng-if=\"showType && source.data.Source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.Source\">{{::source.data.Source}}</strong><span ng-if=\"showType || source.data.Source\">:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Message}}</a>"
   );
 
 
   $templateCache.put('components/summary/templates/event-notfound-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>404</strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.source}}</a>"
+    "<span ng-if=\"showType\"><strong>404</strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Source}}</a>"
   );
 
 
   $templateCache.put('components/summary/templates/event-session-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>Session<span ng-if=\"source.data.type === 'sessionend'\"> End</span><span ng-if=\"source.data.type === 'heartbeat'\"> Heartbeat</span></strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::(source.data.name || source.data.identity || source.data.session_id)}}<span ng-if=\"source.data.name && source.data.identity\" class=\"text-muted\"> ({{::source.data.identity}})</span></a>"
+    "<span ng-if=\"showType\"><strong>Session<span ng-if=\"source.data.Type === 'sessionend'\"> End</span><span ng-if=\"source.data.Type === 'heartbeat'\"> Heartbeat</span></strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::(source.data.Name || source.data.Identity || source.data.SessionId)}}<span ng-if=\"source.data.Name && source.data.Identity\" class=\"text-muted\"> ({{::source.data.Identity}})</span></a>"
   );
 
 
   $templateCache.put('components/summary/templates/event-simple-summary.tpl.html',
-    "<div> <strong> <abbr title=\"{{::source.data.type_full_name}}\">{{::source.data.type}}</abbr>: </strong> <a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.message}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.path}}</span> </div>"
+    "<div> <strong> <abbr title=\"{{::source.data.TypeFullName}}\">{{::source.data.Type}}</abbr>: </strong> <a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Message}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.Path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.Path}}</span> </div>"
   );
 
 
   $templateCache.put('components/summary/templates/event-summary.tpl.html',
-    "<strong ng-if=\"showType\">{{::source.data.type}}</strong><span ng-if=\"showType && source.data.source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.source\">{{::source.data.source}}</strong><span ng-if=\"showType || source.data.source\">:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.message}}</a>"
+    "<strong ng-if=\"showType\">{{::source.data.Type}}</strong><span ng-if=\"showType && source.data.Source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.Source\">{{::source.data.Source}}</strong><span ng-if=\"showType || source.data.Source\">:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Message}}</a>"
   );
 
 
   $templateCache.put('components/summary/templates/stack-error-summary.tpl.html',
-    "<div> <strong> <abbr title=\"{{::source.data.type_full_name}}\">{{::source.data.type}}</abbr> <span ng-if=\"!source.data.method\">:</span> </strong> <span ng-if=\"source.data.method\"> in <strong> <abbr title=\"{{::source.data.method_full_name}}\">{{::source.data.method}}</abbr> </strong> </span> <a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.data.title}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.path}}</span> </div>"
+    "<div> <strong> <abbr title=\"{{::source.data.TypeFullName}}\">{{::source.data.Type}}</abbr> <span ng-if=\"!source.data.Method\">:</span> </strong> <span ng-if=\"source.data.Method\"> in <strong> <abbr title=\"{{::source.data.MethodFullName}}\">{{::source.data.Method}}</abbr> </strong> </span> <a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.data.Title}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.Path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.Path}}</span> </div>"
   );
 
 
   $templateCache.put('components/summary/templates/stack-feature-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>Feature</strong>:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.data.title}}</a>"
+    "<span ng-if=\"showType\"><strong>Feature</strong>:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.data.Title}}</a>"
   );
 
 
@@ -112034,22 +112034,22 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/summary/templates/stack-notfound-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>404</strong>:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{source.data.title}}</a>"
+    "<span ng-if=\"showType\"><strong>404</strong>:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{source.data.Title}}</a>"
   );
 
 
   $templateCache.put('components/summary/templates/stack-session-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>Session</strong>:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{source.data.title}}</a>"
+    "<span ng-if=\"showType\"><strong>Session</strong>:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{source.data.Title}}</a>"
   );
 
 
   $templateCache.put('components/summary/templates/stack-simple-summary.tpl.html',
-    "<div> <strong> <abbr title=\"{{::source.data.type_full_name}}\">{{::source.data.type}}</abbr>: </strong> <a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.data.title}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.path}}</span> </div>"
+    "<div> <strong> <abbr title=\"{{::source.data.TypeFullName}}\">{{::source.data.Type}}</abbr>: </strong> <a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.data.Title}}</a> </div> <div class=\"hidden-xs error-path\" ng-if=\"source.data.Path\"><i class=\"fa fa-caret-right\"></i> <span truncate>{{::source.data.Path}}</span> </div>"
   );
 
 
   $templateCache.put('components/summary/templates/stack-summary.tpl.html',
-    "<strong ng-if=\"showType\">{{::source.data.type}}</strong><span ng-if=\"showType && source.data.source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.source\">{{::source.data.source}}</strong><span ng-if=\"showType || source.data.source\">:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.title}}</a>"
+    "<strong ng-if=\"showType\">{{::source.data.Type}}</strong><span ng-if=\"showType && source.data.Source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.Source\">{{::source.data.Source}}</strong><span ng-if=\"showType || source.data.Source\">:&nbsp;</span><a ui-sref=\"app.stack({ id: source.id })\" truncate lines=\"2\">{{::source.title}}</a>"
   );
 
 
