@@ -12487,7 +12487,7 @@ return exports;
 
 }));
 /**
-* @version: 2.1.18
+* @version: 2.1.19
 * @author: Dan Grossman http://www.dangrossman.info/
 * @copyright: Copyright (c) 2012-2015 Dan Grossman. All rights reserved.
 * @license: Licensed under the MIT license. See http://www.opensource.org/licenses/mit-license.php
@@ -12586,7 +12586,7 @@ return exports;
         options = $.extend(this.element.data(), options);
 
         //html template for the picker UI
-        if (typeof options.template !== 'string' && !(options.template instanceof jQuery))
+        if (typeof options.template !== 'string' && !(options.template instanceof $))
             options.template = '<div class="daterangepicker dropdown-menu">' +
                 '<div class="calendar left">' +
                     '<div class="daterangepicker_input">' +
@@ -108469,7 +108469,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           showType: '='
         },
         template: '<ng-include src="templateUrl" />',
-        link: function (scope, element, attrs) {
+        link: function (scope) {
           var level =  scope.source && scope.source.data.Level ? scope.source.data.Level.toLowerCase() : null;
           scope.isLevelSuccess = level === 'trace' || level === 'debug';
           scope.isLevelInfo = level === 'info';
@@ -113899,7 +113899,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/summary/templates/event-log-summary.tpl.html',
-    "<span ng-if=\"source.data.level\" class=\"label label-default\" ng-class=\"{ 'label-success': isLevelSuccess, 'label-info': isLevelInfo, 'label-warning': isLevelWarning, 'label-danger': isLevelError }\">{{::source.data.Level}}</span><strong ng-if=\"showType\">Log</strong><span ng-if=\"showType && source.data.Source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.Source\">{{::source.data.Source}}</strong><span ng-if=\"showType || source.data.Source\">:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Message}}</a>"
+    "<span ng-if=\"source.data.Level\" class=\"label label-default\" ng-class=\"{ 'label-success': isLevelSuccess, 'label-info': isLevelInfo, 'label-warning': isLevelWarning, 'label-danger': isLevelError }\">{{::source.data.Level}}</span><strong ng-if=\"showType\">Log</strong><span ng-if=\"showType && source.data.Source\">&nbsp;in&nbsp;</span><strong ng-if=\"source.data.Source\">{{::source.data.Source}}</strong><span ng-if=\"showType || source.data.Source\">:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::source.data.Message}}</a>"
   );
 
 
