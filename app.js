@@ -103500,7 +103500,9 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
     });
 
+    var title = 'Dashboard';
     $stateProvider.state('app.dashboard', {
+      title: title,
       url: '/dashboard',
       controller: 'app.Dashboard',
       controllerAs: 'vm',
@@ -103512,6 +103514,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-dashboard', {
+      title: title,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/dashboard',
       controller: 'app.Dashboard',
       controllerAs: 'vm',
@@ -103527,6 +103530,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-type-dashboard', {
+      title: title,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/dashboard',
       controller: 'app.Dashboard',
       controllerAs: 'vm',
@@ -103550,6 +103554,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-dashboard', {
+      title: title,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/dashboard',
       controller: 'app.Dashboard',
       controllerAs: 'vm',
@@ -103566,6 +103571,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-type-dashboard', {
+      title: title,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/dashboard',
       controller: 'app.Dashboard',
       controllerAs: 'vm',
@@ -103589,6 +103595,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.type-dashboard', {
+      title: title,
       url: '/type/:type/dashboard',
       controller: 'app.Dashboard',
       controllerAs: 'vm',
@@ -103603,7 +103610,9 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }]
     });
 
+    var frequentTitle = 'Most Frequent';
     $stateProvider.state('app.frequent', {
+      title: frequentTitle,
       url: '/frequent',
       controller: 'app.Frequent',
       controllerAs: 'vm',
@@ -103615,6 +103624,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-frequent', {
+      title: frequentTitle,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/frequent',
       controller: 'app.Frequent',
       controllerAs: 'vm',
@@ -103630,6 +103640,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-type-frequent', {
+      title: frequentTitle,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/frequent',
       controller: 'app.Frequent',
       controllerAs: 'vm',
@@ -103649,6 +103660,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-frequent', {
+      title: frequentTitle,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/frequent',
       controller: 'app.Frequent',
       controllerAs: 'vm',
@@ -103664,6 +103676,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-type-frequent', {
+      title: frequentTitle,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/frequent',
       controller: 'app.Frequent',
       controllerAs: 'vm',
@@ -103683,6 +103696,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.type-frequent', {
+      title: frequentTitle,
       url: '/type/:type/frequent',
       controller: 'app.Frequent',
       controllerAs: 'vm',
@@ -103697,7 +103711,9 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }]
     });
 
+    var newTitle = 'New';
     $stateProvider.state('app.new', {
+      title: newTitle,
       url: '/new',
       controller: 'app.New',
       controllerAs: 'vm',
@@ -103709,6 +103725,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-new', {
+      title: newTitle,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/new',
       controller: 'app.New',
       controllerAs: 'vm',
@@ -103724,6 +103741,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-type-new', {
+      title: newTitle,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/new',
       controller: 'app.New',
       controllerAs: 'vm',
@@ -103743,6 +103761,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-new', {
+      title: newTitle,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/new',
       controller: 'app.New',
       controllerAs: 'vm',
@@ -103758,6 +103777,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-type-new', {
+      title: newTitle,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/new',
       controller: 'app.New',
       controllerAs: 'vm',
@@ -103777,6 +103797,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.type-new', {
+      title: newTitle,
       url: '/type/:type/new',
       controller: 'app.New',
       controllerAs: 'vm',
@@ -103791,7 +103812,9 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }]
     });
 
+    var recentTitle = 'Most Recent';
     $stateProvider.state('app.recent', {
+      title: recentTitle,
       url: '/recent',
       controller: 'app.Recent',
       controllerAs: 'vm',
@@ -103803,6 +103826,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-recent', {
+      title: recentTitle,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/recent',
       controller: 'app.Recent',
       controllerAs: 'vm',
@@ -103818,6 +103842,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project-type-recent', {
+      title: recentTitle,
       url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/recent',
       controller: 'app.Recent',
       controllerAs: 'vm',
@@ -103837,6 +103862,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-recent', {
+      title: recentTitle,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/recent',
       controller: 'app.Recent',
       controllerAs: 'vm',
@@ -103852,6 +103878,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization-type-recent', {
+      title: recentTitle,
       url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/recent',
       controller: 'app.Recent',
       controllerAs: 'vm',
@@ -103871,6 +103898,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.type-recent', {
+      title: recentTitle,
       url: '/type/:type/recent',
       controller: 'app.Recent',
       controllerAs: 'vm',
@@ -103969,6 +103997,16 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       return !handleError(response);
     });
 
+    $rootScope.page = {
+      setTitle: function(title) {
+        if (title) {
+          this.title = title + ' - Exceptionless';
+        } else {
+          this.title = 'Exceptionless';
+        }
+      }
+    };
+
     $rootScope.$on('$stateChangeStart', function (event, toState) {
       if (!toState || !toState.data || !toState.data.requireAuthentication)
         return;
@@ -103978,6 +104016,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         stateService.save(['auth.']);
         $state.transitionTo('auth.login');
       }
+
+      $rootScope.page.setTitle(toState.title);
     });
   }]);
 }());
@@ -109829,6 +109869,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('auth.forgot-password', {
+      title: 'Forgot Password',
       url: '/forgot-password',
       controller: 'auth.ForgotPassword',
       controllerAs: 'vm',
@@ -109836,6 +109877,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('auth.login', {
+      title: 'Login',
       url: '/login?token',
       controller: 'auth.Login',
       controllerAs: 'vm',
@@ -109843,12 +109885,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('auth.logout', {
+      title: 'Logout',
       url: '/logout',
       template: null,
       controller: 'auth.Logout'
     });
 
     $stateProvider.state('auth.reset-password', {
+      title: 'Reset Password',
       url: '/reset-password/:token?cancel',
       controller: 'auth.ResetPassword',
       controllerAs: 'vm',
@@ -109856,6 +109900,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('auth.signup', {
+      title: 'Signup',
       url: '/signup?token',
       controller: 'auth.Signup',
       controllerAs: 'vm',
@@ -110215,6 +110260,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.account.manage', {
+        title: 'My Account',
         url: '/manage?projectId&tab',
         controller: 'account.Manage',
         controllerAs: 'vm',
@@ -110222,6 +110268,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.account.verify', {
+        title: 'Verify Account',
         url: '/verify?token',
         template: null,
         controller: 'account.Verify'
@@ -110599,6 +110646,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.admin.dashboard', {
+      title: 'Admin Dashboard',
       url: '/dashboard',
       controller: 'admin.Dashboard',
       controllerAs: 'vm',
@@ -110643,6 +110691,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   ])
     .config(['$stateProvider', function ($stateProvider) {
       $stateProvider.state('app.event', {
+        title: 'Event',
         url: '/event/{id:[0-9a-fA-F]{24}}?tab',
         controller: 'Event',
         controllerAs: 'vm',
@@ -110650,6 +110699,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.event-reference', {
+        title: 'Event Reference',
         url: '/event/by-ref/{referenceId:.{8,100}}',
         controller: 'Reference',
         controllerAs: 'vm',
@@ -111264,6 +111314,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization.list', {
+      title: 'My Organizations',
       url: '/list',
       controller: 'organization.List',
       controllerAs: 'vm',
@@ -111271,6 +111322,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.organization.manage', {
+      title: 'Manage Organization',
       url: '/{id:[0-9a-fA-F]{24}}/manage?tab',
       controller: 'organization.Manage',
       controllerAs: 'vm',
@@ -111892,6 +111944,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   ])
   .config(['$stateProvider', function ($stateProvider) {
     $stateProvider.state('payment', {
+      title: 'View Invoice',
       url: '/payment/:id',
       controller: 'Payment',
       controllerAs: 'vm',
@@ -111966,6 +112019,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project.add', {
+      title: 'Add Project',
       url: '/add?{organizationId:[0-9a-fA-F]{24}}',
       controller: 'project.Add',
       controllerAs: 'vm',
@@ -111973,6 +112027,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project.configure', {
+      title: 'Configure Project',
       url: '/:id/configure?redirect',
       controller: 'project.Configure',
       controllerAs: 'vm',
@@ -111980,6 +112035,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project.list', {
+      title: 'My Projects',
       url: '/list',
       controller: 'project.List',
       controllerAs: 'vm',
@@ -111987,6 +112043,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.project.manage', {
+      title: 'Manage Project',
       url: '/{id:[0-9a-fA-F]{24}}/manage',
       controller: 'project.Manage',
       controllerAs: 'vm',
@@ -112635,6 +112692,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         filterService.setEventType(null, true);
       }];
 
+      var title = 'Session Dashboard';
       $stateProvider.state('app.session', {
         abstract: true,
         url: '/session',
@@ -112642,6 +112700,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.session.dashboard', {
+        title: title,
         url: '/dashboard',
         controller: 'session.Dashboard',
         controllerAs: 'vm',
@@ -112651,6 +112710,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.session-dashboard', {
+        title: title,
         url: '/session/dashboard',
         controller: 'session.Dashboard',
         controllerAs: 'vm',
@@ -112660,6 +112720,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.session-project-dashboard', {
+        title: title,
         url: '/project/{projectId:[0-9a-fA-F]{24}}/session/dashboard',
         controller: 'session.Dashboard',
         controllerAs: 'vm',
@@ -112677,6 +112738,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       $stateProvider.state('app.session-organization-dashboard', {
+        title: title,
         url: '/organization/{organizationId:[0-9a-fA-F]{24}}/session/dashboard',
         controller: 'session.Dashboard',
         controllerAs: 'vm',
@@ -113004,6 +113066,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   ])
   .config(['$stateProvider', function ($stateProvider) {
     $stateProvider.state('app.stack', {
+      title: 'Stack',
       url: '/stack/{id:[0-9a-fA-F]{24}}',
       controller: 'Stack',
       controllerAs: 'vm',
@@ -113011,6 +113074,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     });
 
     $stateProvider.state('app.stack-action', {
+      title: 'Stack',
       url: '/stack/{id:[0-9a-fA-F]{24}}/:action',
       controller: 'Stack',
       controllerAs: 'vm',
@@ -113515,6 +113579,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   ])
   .config(['$stateProvider', function ($stateProvider) {
     $stateProvider.state('status', {
+      title: 'Status',
       url: '/status?redirect',
       controller: 'Status',
       controllerAs: 'vm',
