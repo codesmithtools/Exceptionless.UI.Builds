@@ -72484,7 +72484,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.5.0
+ * @license AngularJS v1.5.1
  * (c) 2010-2016 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -111727,7 +111727,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         var bonusEvents = moment.utc().isBefore(moment.utc(vm.organization.bonus_expiration)) ? vm.organization.bonus_events_per_month : 0;
         var usage = vm.organization.usage && vm.organization.usage[vm.organization.usage.length - 1];
         if (usage && moment.utc(usage.date).isSame(moment.utc().startOf('month'))) {
-          var remaining = usage.limit - usage.total;
+          var remaining = usage.limit - (usage.total - usage.blocked - usage.too_big);
           return remaining > 0 ? remaining : 0;
         }
 
