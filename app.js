@@ -22388,7 +22388,7 @@ return /******/ (function(modules) { // webpackBootstrap
 })(jQuery);
 
 /**
- * @license AngularJS v1.5.0
+ * @license AngularJS v1.5.2
  * (c) 2010-2016 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -22446,7 +22446,7 @@ function minErr(module, ErrorConstructor) {
       return match;
     });
 
-    message += '\nhttp://errors.angularjs.org/1.5.0/' +
+    message += '\nhttp://errors.angularjs.org/1.5.2/' +
       (module ? module + '/' : '') + code;
 
     for (i = SKIP_INDEXES, paramPrefix = '?'; i < templateArgs.length; i++, paramPrefix = '&') {
@@ -22674,7 +22674,7 @@ function isArrayLike(obj) {
  *
  * Unlike ES262's
  * [Array.prototype.forEach](http://www.ecma-international.org/ecma-262/5.1/#sec-15.4.4.18),
- * Providing 'undefined' or 'null' values for `obj` will not throw a TypeError, but rather just
+ * providing 'undefined' or 'null' values for `obj` will not throw a TypeError, but rather just
  * return the value provided.
  *
    ```js
@@ -22915,7 +22915,7 @@ function identity($) {return $;}
 identity.$inject = [];
 
 
-function valueFn(value) {return function() {return value;};}
+function valueFn(value) {return function valueRef() {return value;};}
 
 function hasCustomToString(obj) {
   return isFunction(obj.toString) && obj.toString !== toString;
@@ -23277,7 +23277,7 @@ function copy(source, destination) {
 
   function copyRecurse(source, destination) {
     var h = destination.$$hashKey;
-    var result, key;
+    var key;
     if (isArray(source)) {
       for (var i = 0, ii = source.length; i < ii; i++) {
         destination.push(copyElement(source[i]));
@@ -23371,6 +23371,9 @@ function copy(source, destination) {
         var re = new RegExp(source.source, source.toString().match(/[^\/]*$/)[0]);
         re.lastIndex = source.lastIndex;
         return re;
+
+      case '[object Blob]':
+        return new source.constructor([source], {type: source.type});
     }
 
     if (isFunction(source.cloneNode)) {
@@ -23860,10 +23863,17 @@ function getNgAttribute(element, ngAttr) {
  * designates the **root element** of the application and is typically placed near the root element
  * of the page - e.g. on the `<body>` or `<html>` tags.
  *
- * Only one AngularJS application can be auto-bootstrapped per HTML document. The first `ngApp`
- * found in the document will be used to define the root element to auto-bootstrap as an
- * application. To run multiple applications in an HTML document you must manually bootstrap them using
- * {@link angular.bootstrap} instead. AngularJS applications cannot be nested within each other.
+ * There are a few things to keep in mind when using `ngApp`:
+ * - only one AngularJS application can be auto-bootstrapped per HTML document. The first `ngApp`
+ *   found in the document will be used to define the root element to auto-bootstrap as an
+ *   application. To run multiple applications in an HTML document you must manually bootstrap them using
+ *   {@link angular.bootstrap} instead.
+ * - AngularJS applications cannot be nested within each other.
+ * - Do not use a directive that uses {@link ng.$compile#transclusion transclusion} on the same element as `ngApp`.
+ *   This includes directives such as {@link ng.ngIf `ngIf`}, {@link ng.ngInclude `ngInclude`} and
+ *   {@link ngRoute.ngView `ngView`}.
+ *   Doing this misplaces the app {@link ng.$rootElement `$rootElement`} and the app's {@link auto.$injector injector},
+ *   causing animations to stop working and making the injector inaccessible from outside the app.
  *
  * You can specify an **AngularJS module** to be used as the root module for the application.  This
  * module will be loaded into the {@link auto.$injector} when the application is bootstrapped. It
@@ -24003,15 +24013,24 @@ function angularInit(element, bootstrap) {
  * @description
  * Use this function to manually start up angular application.
  *
- * See: {@link guide/bootstrap Bootstrap}
- *
- * Note that Protractor based end-to-end tests cannot use this function to bootstrap manually.
- * They must use {@link ng.directive:ngApp ngApp}.
+ * For more information, see the {@link guide/bootstrap Bootstrap guide}.
  *
  * Angular will detect if it has been loaded into the browser more than once and only allow the
  * first loaded script to be bootstrapped and will report a warning to the browser console for
  * each of the subsequent scripts. This prevents strange results in applications, where otherwise
  * multiple instances of Angular try to work on the DOM.
+ *
+ * <div class="alert alert-warning">
+ * **Note:** Protractor based end-to-end tests cannot use this function to bootstrap manually.
+ * They must use {@link ng.directive:ngApp ngApp}.
+ * </div>
+ *
+ * <div class="alert alert-warning">
+ * **Note:** Do not bootstrap the app on an element with a directive that uses {@link ng.$compile#transclusion transclusion},
+ * such as {@link ng.ngIf `ngIf`}, {@link ng.ngInclude `ngInclude`} and {@link ngRoute.ngView `ngView`}.
+ * Doing this misplaces the app {@link ng.$rootElement `$rootElement`} and the app's {@link auto.$injector injector},
+ * causing animations to stop working and making the injector inaccessible from outside the app.
+ * </div>
  *
  * ```html
  * <!doctype html>
@@ -24813,11 +24832,11 @@ function toDebugString(obj) {
  * - `codeName` – `{string}` – Code name of the release, such as "jiggling-armfat".
  */
 var version = {
-  full: '1.5.0',    // all of these placeholder strings will be replaced by grunt's
+  full: '1.5.2',    // all of these placeholder strings will be replaced by grunt's
   major: 1,    // package task
   minor: 5,
-  dot: 0,
-  codeName: 'ennoblement-facilitation'
+  dot: 2,
+  codeName: 'differential-recovery'
 };
 
 
@@ -26676,14 +26695,13 @@ function annotate(fn, strictDi, name) {
  * @description
  *
  * Register a **value service** with the {@link auto.$injector $injector}, such as a string, a
- * number, an array, an object or a function.  This is short for registering a service where its
+ * number, an array, an object or a function. This is short for registering a service where its
  * provider's `$get` property is a factory function that takes no arguments and returns the **value
- * service**.
+ * service**. That also means it is not possible to inject other services into a value service.
  *
  * Value services are similar to constant services, except that they cannot be injected into a
  * module configuration function (see {@link angular.Module#config}) but they can be overridden by
- * an Angular
- * {@link auto.$provide#decorator decorator}.
+ * an Angular {@link auto.$provide#decorator decorator}.
  *
  * @param {string} name The name of the instance.
  * @param {*} value The value.
@@ -26708,8 +26726,11 @@ function annotate(fn, strictDi, name) {
  * @name $provide#constant
  * @description
  *
- * Register a **constant service**, such as a string, a number, an array, an object or a function,
- * with the {@link auto.$injector $injector}. Unlike {@link auto.$provide#value value} it can be
+ * Register a **constant service** with the {@link auto.$injector $injector}, such as a string,
+ * a number, an array, an object or a function. Like the {@link auto.$provide#value value}, it is not
+ * possible to inject other services into a constant.
+ *
+ * But unlike {@link auto.$provide#value value}, a constant can be
  * injected into a module configuration function (see {@link angular.Module#config}) and it cannot
  * be overridden by an Angular {@link auto.$provide#decorator decorator}.
  *
@@ -27348,7 +27369,7 @@ function prepareAnimateOptions(options) {
 }
 
 var $$CoreAnimateJsProvider = function() {
-  this.$get = function() {};
+  this.$get = noop;
 };
 
 // this is prefixed with Core since it conflicts with
@@ -28168,7 +28189,6 @@ var $CoreAnimateCssProvider = function() {
  */
 function Browser(window, document, $log, $sniffer) {
   var self = this,
-      rawDocument = document[0],
       location = window.location,
       history = window.history,
       setTimeout = window.setTimeout,
@@ -29756,6 +29776,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
   // The assumption is that future DOM event attribute names will begin with
   // 'on' and be composed of only English letters.
   var EVENT_HANDLER_ATTR_REGEXP = /^(on[a-z]+|formaction)$/;
+  var bindingCache = createMap();
 
   function parseIsolateBindings(scope, directiveName, isController) {
     var LOCAL_REGEXP = /^\s*([@&<]|=(\*?))(\??)\s*(\w*)\s*$/;
@@ -29763,6 +29784,10 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
     var bindings = {};
 
     forEach(scope, function(definition, scopeName) {
+      if (definition in bindingCache) {
+        bindings[scopeName] = bindingCache[definition];
+        return;
+      }
       var match = definition.match(LOCAL_REGEXP);
 
       if (!match) {
@@ -29780,6 +29805,9 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
         optional: match[3] === '?',
         attrName: match[4] || scopeName
       };
+      if (match[4]) {
+        bindingCache[definition] = bindings[scopeName];
+      }
     });
 
     return bindings;
@@ -29849,7 +29877,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
    *    {@link guide/directive directive guide} and the {@link $compile compile API} for more info.
    * @returns {ng.$compileProvider} Self for chaining.
    */
-   this.directive = function registerDirective(name, directiveFactory) {
+  this.directive = function registerDirective(name, directiveFactory) {
     assertNotHasOwnProperty(name, 'directive');
     if (isString(name)) {
       assertValidDirectiveName(name);
@@ -29872,11 +29900,6 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
                 directive.name = directive.name || name;
                 directive.require = directive.require || (directive.controller && directive.name);
                 directive.restrict = directive.restrict || 'EA';
-                var bindings = directive.$$bindings =
-                    parseDirectiveBindings(directive, directive.name);
-                if (isObject(bindings.isolateScope)) {
-                  directive.$$isolateBindings = bindings.isolateScope;
-                }
                 directive.$$moduleName = directiveFactory.$$moduleName;
                 directives.push(directive);
               } catch (e) {
@@ -29932,7 +29955,8 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
    *      See {@link ng.$compile#-bindtocontroller- `bindToController`}.
    *    - `transclude` – `{boolean=}` – whether {@link $compile#transclusion content transclusion} is enabled.
    *      Disabled by default.
-   *    - `$...` – `{function()=}` – additional annotations to provide to the directive factory function.
+   *    - `$...` – additional properties to attach to the directive factory function and the controller
+   *      constructor function. (This is used by the component router to annotate)
    *
    * @returns {ng.$compileProvider} the compile provider itself, for chaining of function calls.
    * @description
@@ -29964,7 +29988,8 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
    *
    *   myMod.component('myComp', {
    *     templateUrl: 'views/my-comp.html',
-   *     controller: 'MyCtrl as ctrl',
+   *     controller: 'MyCtrl',
+   *     controllerAs: 'ctrl',
    *     bindings: {name: '@'}
    *   });
    *
@@ -29975,7 +30000,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
    * See also {@link ng.$compileProvider#directive $compileProvider.directive()}.
    */
   this.component = function registerComponent(name, options) {
-    var controller = options.controller || function() {};
+    var controller = options.controller || noop;
 
     function factory($injector) {
       function makeInjectable(fn) {
@@ -30007,6 +30032,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
     forEach(options, function(val, key) {
       if (key.charAt(0) === '$') {
         factory[key] = val;
+        controller[key] = val;
       }
     });
 
@@ -30114,7 +30140,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
 
     var SIMPLE_ATTR_NAME = /^\w/;
     var specialAttrHolder = document.createElement('div');
-    var Attributes = function(element, attributesToCopy) {
+    function Attributes(element, attributesToCopy) {
       if (attributesToCopy) {
         var keys = Object.keys(attributesToCopy);
         var i, l, key;
@@ -30128,7 +30154,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
       }
 
       this.$$element = element;
-    };
+    }
 
     Attributes.prototype = {
       /**
@@ -30409,6 +30435,14 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
       safeAddClass($element, isolated ? 'ng-isolate-scope' : 'ng-scope');
     } : noop;
 
+    compile.$$createComment = function(directiveName, comment) {
+      var content = '';
+      if (debugInfoEnabled) {
+        content = ' ' + (directiveName || '') + ': ' + (comment || '') + ' ';
+      }
+      return document.createComment(content);
+    };
+
     return compile;
 
     //================================
@@ -30622,8 +30656,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
     }
 
     function createBoundTranscludeFn(scope, transcludeFn, previousBoundTranscludeFn) {
-
-      var boundTranscludeFn = function(transcludedScope, cloneFn, controllers, futureParentElement, containingScope) {
+      function boundTranscludeFn(transcludedScope, cloneFn, controllers, futureParentElement, containingScope) {
 
         if (!transcludedScope) {
           transcludedScope = scope.$new(false, containingScope);
@@ -30635,7 +30668,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
           transcludeControllers: controllers,
           futureParentElement: futureParentElement
         });
-      };
+      }
 
       // We need  to attach the transclusion slots onto the `boundTranscludeFn`
       // so that they are available inside the `controllersBoundTransclude` function
@@ -30800,7 +30833,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
      * @returns {Function}
      */
     function groupElementsLinkFnWrapper(linkFn, attrStart, attrEnd) {
-      return function(scope, element, attrs, controllers, transcludeFn) {
+      return function groupedElementsLink(scope, element, attrs, controllers, transcludeFn) {
         element = groupScan(element[0], attrStart, attrEnd);
         return linkFn(scope, element, attrs, controllers, transcludeFn);
       };
@@ -30818,23 +30851,21 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
      * @returns {Function}
      */
     function compilationGenerator(eager, $compileNodes, transcludeFn, maxPriority, ignoreDirective, previousCompileContext) {
-        if (eager) {
-            return compile($compileNodes, transcludeFn, maxPriority, ignoreDirective, previousCompileContext);
+      var compiled;
+
+      if (eager) {
+        return compile($compileNodes, transcludeFn, maxPriority, ignoreDirective, previousCompileContext);
+      }
+      return function lazyCompilation() {
+        if (!compiled) {
+          compiled = compile($compileNodes, transcludeFn, maxPriority, ignoreDirective, previousCompileContext);
+
+          // Null out all of these references in order to make them eligible for garbage collection
+          // since this is a potentially long lived closure
+          $compileNodes = transcludeFn = previousCompileContext = null;
         }
-
-        var compiled;
-
-        return function() {
-            if (!compiled) {
-                compiled = compile($compileNodes, transcludeFn, maxPriority, ignoreDirective, previousCompileContext);
-
-                // Null out all of these references in order to make them eligible for garbage collection
-                // since this is a potentially long lived closure
-                $compileNodes = transcludeFn = previousCompileContext = null;
-            }
-
-            return compiled.apply(this, arguments);
-        };
+        return compiled.apply(this, arguments);
+      };
     }
 
     /**
@@ -30970,8 +31001,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
             terminalPriority = directive.priority;
             $template = $compileNode;
             $compileNode = templateAttrs.$$element =
-                jqLite(document.createComment(' ' + directiveName + ': ' +
-                                              templateAttrs[directiveName] + ' '));
+                jqLite(compile.$$createComment(directiveName, templateAttrs[directiveName]));
             compileNode = $compileNode[0];
             replaceWith(jqCollection, sliceArgs($template), compileNode);
 
@@ -31177,82 +31207,6 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
         }
       }
 
-
-      function getControllers(directiveName, require, $element, elementControllers) {
-        var value;
-
-        if (isString(require)) {
-          var match = require.match(REQUIRE_PREFIX_REGEXP);
-          var name = require.substring(match[0].length);
-          var inheritType = match[1] || match[3];
-          var optional = match[2] === '?';
-
-          //If only parents then start at the parent element
-          if (inheritType === '^^') {
-            $element = $element.parent();
-          //Otherwise attempt getting the controller from elementControllers in case
-          //the element is transcluded (and has no data) and to avoid .data if possible
-          } else {
-            value = elementControllers && elementControllers[name];
-            value = value && value.instance;
-          }
-
-          if (!value) {
-            var dataName = '$' + name + 'Controller';
-            value = inheritType ? $element.inheritedData(dataName) : $element.data(dataName);
-          }
-
-          if (!value && !optional) {
-            throw $compileMinErr('ctreq',
-                "Controller '{0}', required by directive '{1}', can't be found!",
-                name, directiveName);
-          }
-        } else if (isArray(require)) {
-          value = [];
-          for (var i = 0, ii = require.length; i < ii; i++) {
-            value[i] = getControllers(directiveName, require[i], $element, elementControllers);
-          }
-        } else if (isObject(require)) {
-          value = {};
-          forEach(require, function(controller, property) {
-            value[property] = getControllers(directiveName, controller, $element, elementControllers);
-          });
-        }
-
-        return value || null;
-      }
-
-      function setupControllers($element, attrs, transcludeFn, controllerDirectives, isolateScope, scope) {
-        var elementControllers = createMap();
-        for (var controllerKey in controllerDirectives) {
-          var directive = controllerDirectives[controllerKey];
-          var locals = {
-            $scope: directive === newIsolateScopeDirective || directive.$$isolateScope ? isolateScope : scope,
-            $element: $element,
-            $attrs: attrs,
-            $transclude: transcludeFn
-          };
-
-          var controller = directive.controller;
-          if (controller == '@') {
-            controller = attrs[directive.name];
-          }
-
-          var controllerInstance = $controller(controller, locals, true, directive.controllerAs);
-
-          // For directives with element transclusion the element is a comment,
-          // but jQuery .data doesn't support attaching data to comment nodes as it's hard to
-          // clean up (http://bugs.jquery.com/ticket/8335).
-          // Instead, we save the controllers for the element in a local hash and attach to .data
-          // later, once we have the actual element.
-          elementControllers[directive.name] = controllerInstance;
-          if (!hasElementTranscludeDirective) {
-            $element.data('$' + directive.name + 'Controller', controllerInstance.instance);
-          }
-        }
-        return elementControllers;
-      }
-
       function nodeLinkFn(childLinkFn, scope, linkNode, $rootElement, boundTranscludeFn) {
         var i, ii, linkFn, isolateScope, controllerScope, elementControllers, transcludeFn, $element,
             attrs, removeScopeBindingWatches, removeControllerBindingWatches;
@@ -31284,7 +31238,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
         }
 
         if (controllerDirectives) {
-          elementControllers = setupControllers($element, attrs, transcludeFn, controllerDirectives, isolateScope, scope);
+          elementControllers = setupControllers($element, attrs, transcludeFn, controllerDirectives, isolateScope, scope, newIsolateScopeDirective);
         }
 
         if (newIsolateScopeDirective) {
@@ -31412,6 +31366,78 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
       }
     }
 
+    function getControllers(directiveName, require, $element, elementControllers) {
+      var value;
+
+      if (isString(require)) {
+        var match = require.match(REQUIRE_PREFIX_REGEXP);
+        var name = require.substring(match[0].length);
+        var inheritType = match[1] || match[3];
+        var optional = match[2] === '?';
+
+        //If only parents then start at the parent element
+        if (inheritType === '^^') {
+          $element = $element.parent();
+        //Otherwise attempt getting the controller from elementControllers in case
+        //the element is transcluded (and has no data) and to avoid .data if possible
+        } else {
+          value = elementControllers && elementControllers[name];
+          value = value && value.instance;
+        }
+
+        if (!value) {
+          var dataName = '$' + name + 'Controller';
+          value = inheritType ? $element.inheritedData(dataName) : $element.data(dataName);
+        }
+
+        if (!value && !optional) {
+          throw $compileMinErr('ctreq',
+              "Controller '{0}', required by directive '{1}', can't be found!",
+              name, directiveName);
+        }
+      } else if (isArray(require)) {
+        value = [];
+        for (var i = 0, ii = require.length; i < ii; i++) {
+          value[i] = getControllers(directiveName, require[i], $element, elementControllers);
+        }
+      } else if (isObject(require)) {
+        value = {};
+        forEach(require, function(controller, property) {
+          value[property] = getControllers(directiveName, controller, $element, elementControllers);
+        });
+      }
+
+      return value || null;
+    }
+
+    function setupControllers($element, attrs, transcludeFn, controllerDirectives, isolateScope, scope, newIsolateScopeDirective) {
+      var elementControllers = createMap();
+      for (var controllerKey in controllerDirectives) {
+        var directive = controllerDirectives[controllerKey];
+        var locals = {
+          $scope: directive === newIsolateScopeDirective || directive.$$isolateScope ? isolateScope : scope,
+          $element: $element,
+          $attrs: attrs,
+          $transclude: transcludeFn
+        };
+
+        var controller = directive.controller;
+        if (controller == '@') {
+          controller = attrs[directive.name];
+        }
+
+        var controllerInstance = $controller(controller, locals, true, directive.controllerAs);
+
+        // For directives with element transclusion the element is a comment.
+        // In this case .data will not attach any data.
+        // Instead, we save the controllers for the element in a local hash and attach to .data
+        // later, once we have the actual element.
+        elementControllers[directive.name] = controllerInstance;
+        $element.data('$' + directive.name + 'Controller', controllerInstance.instance);
+      }
+      return elementControllers;
+    }
+
     // Depending upon the context in which a directive finds itself it might need to have a new isolated
     // or child scope created. For instance:
     // * if the directive has been pulled into a template because another directive with a higher priority
@@ -31451,6 +31477,13 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
                  directive.restrict.indexOf(location) != -1) {
               if (startAttrName) {
                 directive = inherit(directive, {$$start: startAttrName, $$end: endAttrName});
+              }
+              if (!directive.$$bindings) {
+                var bindings = directive.$$bindings =
+                    parseDirectiveBindings(directive, directive.name);
+                if (isObject(bindings.isolateScope)) {
+                  directive.$$isolateBindings = bindings.isolateScope;
+                }
               }
               tDirectives.push(directive);
               match = directive;
@@ -31889,7 +31922,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
     // only occurs for isolate scopes and new scopes with controllerAs.
     function initializeDirectiveBindings(scope, attrs, destination, bindings, directive) {
       var removeWatchCollection = [];
-      forEach(bindings, function(definition, scopeName) {
+      forEach(bindings, function initializeBinding(definition, scopeName) {
         var attrName = definition.attrName,
         optional = definition.optional,
         mode = definition.mode, // @, =, or &
@@ -31931,7 +31964,7 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
             if (parentGet.literal) {
               compare = equals;
             } else {
-              compare = function(a, b) { return a === b || (a !== a && b !== b); };
+              compare = function simpleCompare(a, b) { return a === b || (a !== a && b !== b); };
             }
             parentSet = parentGet.assign || function() {
               // reset the change, or we will throw this exception on every $digest
@@ -32135,6 +32168,15 @@ function $ControllerProvider() {
 
   /**
    * @ngdoc method
+   * @name $controllerProvider#has
+   * @param {string} name Controller name to check.
+   */
+  this.has = function(name) {
+    return controllers.hasOwnProperty(name);
+  };
+
+  /**
+   * @ngdoc method
    * @name $controllerProvider#register
    * @param {string|Object} name Controller name, or an object map of controllers where the keys are
    *    the names and the values are the constructors.
@@ -32189,7 +32231,7 @@ function $ControllerProvider() {
      * It's just a simple call to {@link auto.$injector $injector}, but extracted into
      * a service, so that one can override this service with [BC version](https://gist.github.com/1649788).
      */
-    return function(expression, locals, later, ident) {
+    return function $controller(expression, locals, later, ident) {
       // PRIVATE API:
       //   param `later` --- indicates that the controller's constructor is invoked at a later time.
       //                     If true, $controller will allocate the object with the correct
@@ -32240,7 +32282,7 @@ function $ControllerProvider() {
         }
 
         var instantiate;
-        return instantiate = extend(function() {
+        return instantiate = extend(function $controllerInit() {
           var result = $injector.invoke(expression, instance, locals, constructor);
           if (result !== instance && (isObject(result) || isFunction(result))) {
             instance = result;
@@ -32426,7 +32468,7 @@ function $HttpParamSerializerProvider() {
       forEachSorted(params, function(value, key) {
         if (value === null || isUndefined(value)) return;
         if (isArray(value)) {
-          forEach(value, function(v, k) {
+          forEach(value, function(v) {
             parts.push(encodeUriQuery(key)  + '=' + encodeUriQuery(serializeValue(v)));
           });
         } else {
@@ -32636,10 +32678,9 @@ function $HttpProvider() {
    *
    * Object containing default values for all {@link ng.$http $http} requests.
    *
-   * - **`defaults.cache`** - {Object} - an object built with {@link ng.$cacheFactory `$cacheFactory`}
-   * that will provide the cache for all requests who set their `cache` property to `true`.
-   * If you set the `defaults.cache = false` then only requests that specify their own custom
-   * cache object will be cached. See {@link $http#caching $http Caching} for more information.
+   * - **`defaults.cache`** - {boolean|Object} - A boolean value or object created with
+   * {@link ng.$cacheFactory `$cacheFactory`} to enable or disable caching of HTTP responses
+   * by default. See {@link $http#caching $http Caching} for more information.
    *
    * - **`defaults.xsrfCookieName`** - {string} - Name of cookie containing the XSRF token.
    * Defaults value is `'XSRF-TOKEN'`.
@@ -32930,6 +32971,15 @@ function $HttpProvider() {
      * the transformed value (`function(data, headersGetter, status)`) or an array of such transformation functions,
      * which allows you to `push` or `unshift` a new transformation function into the transformation chain.
      *
+     * <div class="alert alert-warning">
+     * **Note:** Angular does not make a copy of the `data` parameter before it is passed into the `transformRequest` pipeline.
+     * That means changes to the properties of `data` are not local to the transform function (since Javascript passes objects by reference).
+     * For example, when calling `$http.get(url, $scope.myObject)`, modifications to the object's properties in a transformRequest
+     * function will be reflected on the scope and in any templates where the object is data-bound.
+     * To prevent his, transform functions should have no side-effects.
+     * If you need to modify properties, it is recommended to make a copy of the data, or create new object to return.
+     * </div>
+     *
      * ### Default Transformations
      *
      * The `$httpProvider` provider and `$http` service expose `defaults.transformRequest` and
@@ -32987,26 +33037,35 @@ function $HttpProvider() {
      *
      * ## Caching
      *
-     * To enable caching, set the request configuration `cache` property to `true` (to use default
-     * cache) or to a custom cache object (built with {@link ng.$cacheFactory `$cacheFactory`}).
-     * When the cache is enabled, `$http` stores the response from the server in the specified
-     * cache. The next time the same request is made, the response is served from the cache without
-     * sending a request to the server.
+     * {@link ng.$http `$http`} responses are not cached by default. To enable caching, you must
+     * set the config.cache value or the default cache value to TRUE or to a cache object (created
+     * with {@link ng.$cacheFactory `$cacheFactory`}). If defined, the value of config.cache takes
+     * precedence over the default cache value.
      *
-     * Note that even if the response is served from cache, delivery of the data is asynchronous in
-     * the same way that real requests are.
+     * In order to:
+     *   * cache all responses - set the default cache value to TRUE or to a cache object
+     *   * cache a specific response - set config.cache value to TRUE or to a cache object
      *
-     * If there are multiple GET requests for the same URL that should be cached using the same
-     * cache, but the cache is not populated yet, only one request to the server will be made and
-     * the remaining requests will be fulfilled using the response from the first request.
+     * If caching is enabled, but neither the default cache nor config.cache are set to a cache object,
+     * then the default `$cacheFactory($http)` object is used.
      *
-     * You can change the default cache to a new object (built with
-     * {@link ng.$cacheFactory `$cacheFactory`}) by updating the
-     * {@link ng.$http#defaults `$http.defaults.cache`} property. All requests who set
-     * their `cache` property to `true` will now use this cache object.
+     * The default cache value can be set by updating the
+     * {@link ng.$http#defaults `$http.defaults.cache`} property or the
+     * {@link $httpProvider#defaults `$httpProvider.defaults.cache`} property.
      *
-     * If you set the default cache to `false` then only requests that specify their own custom
-     * cache object will be cached.
+     * When caching is enabled, {@link ng.$http `$http`} stores the response from the server using
+     * the relevant cache object. The next time the same request is made, the response is returned
+     * from the cache without sending a request to the server.
+     *
+     * Take note that:
+     *
+     *   * Only GET and JSONP requests are cached.
+     *   * The cache key is the request URL including search parameters; headers are not considered.
+     *   * Cached responses are returned asynchronously, in the same way as responses from the server.
+     *   * If multiple identical requests are made using the same cache, which is not yet populated,
+     *     one request will be made to the server and remaining requests will return the same response.
+     *   * A cache-control header on the response does not affect if or how responses are cached.
+     *
      *
      * ## Interceptors
      *
@@ -33176,7 +33235,7 @@ function $HttpProvider() {
      *      transform function or an array of such functions. The transform function takes the http
      *      response body, headers and status and returns its transformed (typically deserialized) version.
      *      See {@link ng.$http#overriding-the-default-transformations-per-request
-     *      Overriding the Default TransformationjqLiks}
+     *      Overriding the Default Transformations}
      *    - **paramSerializer** - `{string|function(Object<string,string>):string}` - A function used to
      *      prepare the string representation of request parameters (specified as an object).
      *      If specified as string, it is interpreted as function registered with the
@@ -33184,10 +33243,9 @@ function $HttpProvider() {
      *      by registering it as a {@link auto.$provide#service service}.
      *      The default serializer is the {@link $httpParamSerializer $httpParamSerializer};
      *      alternatively, you can use the {@link $httpParamSerializerJQLike $httpParamSerializerJQLike}
-     *    - **cache** – `{boolean|Cache}` – If true, a default $http cache will be used to cache the
-     *      GET request, otherwise if a cache instance built with
-     *      {@link ng.$cacheFactory $cacheFactory}, this cache will be used for
-     *      caching.
+     *    - **cache** – `{boolean|Object}` – A boolean value or object created with
+     *      {@link ng.$cacheFactory `$cacheFactory`} to enable or disable caching of the HTTP response.
+     *      See {@link $http#caching $http Caching} for more information.
      *    - **timeout** – `{number|Promise}` – timeout in milliseconds, or {@link ng.$q promise}
      *      that should abort the request when resolved.
      *    - **withCredentials** - `{boolean}` - whether to set the `withCredentials` flag on the
@@ -36098,8 +36156,10 @@ AST.prototype = {
       primary = this.arrayDeclaration();
     } else if (this.expect('{')) {
       primary = this.object();
-    } else if (this.constants.hasOwnProperty(this.peek().text)) {
-      primary = copy(this.constants[this.consume().text]);
+    } else if (this.selfReferential.hasOwnProperty(this.peek().text)) {
+      primary = copy(this.selfReferential[this.consume().text]);
+    } else if (this.options.literals.hasOwnProperty(this.peek().text)) {
+      primary = { type: AST.Literal, value: this.options.literals[this.consume().text]};
     } else if (this.peek().identifier) {
       primary = this.identifier();
     } else if (this.peek().constant) {
@@ -36251,15 +36311,7 @@ AST.prototype = {
     return false;
   },
 
-
-  /* `undefined` is not a constant, it is an identifier,
-   * but using it as an identifier is not supported
-   */
-  constants: {
-    'true': { type: AST.Literal, value: true },
-    'false': { type: AST.Literal, value: false },
-    'null': { type: AST.Literal, value: null },
-    'undefined': {type: AST.Literal, value: undefined },
+  selfReferential: {
     'this': {type: AST.ThisExpression },
     '$locals': {type: AST.LocalsExpression }
   }
@@ -36949,7 +37001,7 @@ ASTInterpreter.prototype = {
     forEach(ast.body, function(expression) {
       expressions.push(self.recurse(expression.expression));
     });
-    var fn = ast.body.length === 0 ? function() {} :
+    var fn = ast.body.length === 0 ? noop :
              ast.body.length === 1 ? expressions[0] :
              function(scope, locals) {
                var lastValue;
@@ -37090,7 +37142,7 @@ ASTInterpreter.prototype = {
         return context ? {value: locals} : locals;
       };
     case AST.NGValueParameter:
-      return function(scope, locals, assign, inputs) {
+      return function(scope, locals, assign) {
         return context ? {value: assign} : assign;
       };
     }
@@ -37304,7 +37356,7 @@ var Parser = function(lexer, $filter, options) {
   this.lexer = lexer;
   this.$filter = $filter;
   this.options = options;
-  this.ast = new AST(this.lexer);
+  this.ast = new AST(lexer, options);
   this.astCompiler = options.csp ? new ASTInterpreter(this.ast, $filter) :
                                    new ASTCompiler(this.ast, $filter);
 };
@@ -37381,16 +37433,39 @@ function getValueOf(value) {
 function $ParseProvider() {
   var cacheDefault = createMap();
   var cacheExpensive = createMap();
+  var literals = {
+    'true': true,
+    'false': false,
+    'null': null,
+    'undefined': undefined
+  };
+
+  /**
+   * @ngdoc method
+   * @name $parseProvider#addLiteral
+   * @description
+   *
+   * Configure $parse service to add literal values that will be present as literal at expressions.
+   *
+   * @param {string} literalName Token for the literal value. The literal name value must be a valid literal name.
+   * @param {*} literalValue Value for this literal. All literal values must be primitives or `undefined`.
+   *
+   **/
+  this.addLiteral = function(literalName, literalValue) {
+    literals[literalName] = literalValue;
+  };
 
   this.$get = ['$filter', function($filter) {
     var noUnsafeEval = csp().noUnsafeEval;
     var $parseOptions = {
           csp: noUnsafeEval,
-          expensiveChecks: false
+          expensiveChecks: false,
+          literals: copy(literals)
         },
         $parseOptionsExpensive = {
           csp: noUnsafeEval,
-          expensiveChecks: true
+          expensiveChecks: true,
+          literals: copy(literals)
         };
     var runningChecksEnabled = false;
 
@@ -37812,7 +37887,7 @@ function $ParseProvider() {
  * - Q has many more features than $q, but that comes at a cost of bytes. $q is tiny, but contains
  *   all the important functionality needed for common async tasks.
  *
- *  # Testing
+ * # Testing
  *
  *  ```js
  *    it('should simulate promise', inject(function($q, $rootScope) {
@@ -39000,7 +39075,7 @@ function $RootScopeProvider() {
             dirty, ttl = TTL,
             next, current, target = this,
             watchLog = [],
-            logIdx, logMsg, asyncTask;
+            logIdx, asyncTask;
 
         beginPhase('$digest');
         // Check for changes to browser url that happened in sync before the call to $digest
@@ -40855,7 +40930,7 @@ function $SnifferProvider() {
   }];
 }
 
-var $compileMinErr = minErr('$compile');
+var $templateRequestMinErr = minErr('$compile');
 
 /**
  * @ngdoc provider
@@ -40951,7 +41026,7 @@ function $TemplateRequestProvider() {
 
       function handleError(resp) {
         if (!ignoreRequestError) {
-          throw $compileMinErr('tpload', 'Failed to load template: {0} (HTTP status: {1} {2})',
+          throw $templateRequestMinErr('tpload', 'Failed to load template: {0} (HTTP status: {1} {2})',
             tpl, resp.status, resp.statusText);
         }
         return $q.reject(resp);
@@ -41873,7 +41948,7 @@ function currencyFilter($locale) {
  * Formats a number as text.
  *
  * If the input is null or undefined, it will just be returned.
- * If the input is infinite (Infinity/-Infinity) the Infinity symbol '∞' is returned.
+ * If the input is infinite (Infinity or -Infinity), the Infinity symbol '∞' or '-∞' is returned, respectively.
  * If the input is not a number an empty string is returned.
  *
  *
@@ -41963,7 +42038,7 @@ function parse(numStr) {
   }
 
   // Count the number of leading zeros.
-  for (i = 0; numStr.charAt(i) == ZERO_CHAR; i++);
+  for (i = 0; numStr.charAt(i) == ZERO_CHAR; i++) {/* jshint noempty: false */}
 
   if (i == (zeros = numStr.length)) {
     // The digits are all zero.
@@ -42009,18 +42084,37 @@ function roundNumber(parsedNumber, fractionSize, minFrac, maxFrac) {
     var digit = digits[roundAt];
 
     if (roundAt > 0) {
-      digits.splice(roundAt);
+      // Drop fractional digits beyond `roundAt`
+      digits.splice(Math.max(parsedNumber.i, roundAt));
+
+      // Set non-fractional digits beyond `roundAt` to 0
+      for (var j = roundAt; j < digits.length; j++) {
+        digits[j] = 0;
+      }
     } else {
       // We rounded to zero so reset the parsedNumber
+      fractionLen = Math.max(0, fractionLen);
       parsedNumber.i = 1;
-      digits.length = roundAt = fractionSize + 1;
-      for (var i=0; i < roundAt; i++) digits[i] = 0;
+      digits.length = Math.max(1, roundAt = fractionSize + 1);
+      digits[0] = 0;
+      for (var i = 1; i < roundAt; i++) digits[i] = 0;
     }
 
-    if (digit >= 5) digits[roundAt - 1]++;
+    if (digit >= 5) {
+      if (roundAt - 1 < 0) {
+        for (var k = 0; k > roundAt; k--) {
+          digits.unshift(0);
+          parsedNumber.i++;
+        }
+        digits.unshift(1);
+        parsedNumber.i++;
+      } else {
+        digits[roundAt - 1]++;
+      }
+    }
 
     // Pad out with zeros to get the required fraction length
-    for (; fractionLen < fractionSize; fractionLen++) digits.push(0);
+    for (; fractionLen < Math.max(0, fractionSize); fractionLen++) digits.push(0);
 
 
     // Do any carrying, e.g. a digit was rounded up to 10
@@ -42119,11 +42213,15 @@ function formatNumber(number, pattern, groupSep, decimalSep, fractionSize) {
   }
 }
 
-function padNumber(num, digits, trim) {
+function padNumber(num, digits, trim, negWrap) {
   var neg = '';
-  if (num < 0) {
-    neg =  '-';
-    num = -num;
+  if (num < 0 || (negWrap && num <= 0)) {
+    if (negWrap) {
+      num = -num + 1;
+    } else {
+      num = -num;
+      neg = '-';
+    }
   }
   num = '' + num;
   while (num.length < digits) num = ZERO_CHAR + num;
@@ -42134,7 +42232,7 @@ function padNumber(num, digits, trim) {
 }
 
 
-function dateGetter(name, size, offset, trim) {
+function dateGetter(name, size, offset, trim, negWrap) {
   offset = offset || 0;
   return function(date) {
     var value = date['get' + name]();
@@ -42142,14 +42240,15 @@ function dateGetter(name, size, offset, trim) {
       value += offset;
     }
     if (value === 0 && offset == -12) value = 12;
-    return padNumber(value, size, trim);
+    return padNumber(value, size, trim, negWrap);
   };
 }
 
-function dateStrGetter(name, shortForm) {
+function dateStrGetter(name, shortForm, standAlone) {
   return function(date, formats) {
     var value = date['get' + name]();
-    var get = uppercase(shortForm ? ('SHORT' + name) : name);
+    var propPrefix = (standAlone ? 'STANDALONE' : '') + (shortForm ? 'SHORT' : '');
+    var get = uppercase(propPrefix + name);
 
     return formats[get][value];
   };
@@ -42204,13 +42303,14 @@ function longEraGetter(date, formats) {
 }
 
 var DATE_FORMATS = {
-  yyyy: dateGetter('FullYear', 4),
-    yy: dateGetter('FullYear', 2, 0, true),
-     y: dateGetter('FullYear', 1),
+  yyyy: dateGetter('FullYear', 4, 0, false, true),
+    yy: dateGetter('FullYear', 2, 0, true, true),
+     y: dateGetter('FullYear', 1, 0, false, true),
   MMMM: dateStrGetter('Month'),
    MMM: dateStrGetter('Month', true),
     MM: dateGetter('Month', 2, 1),
      M: dateGetter('Month', 1, 1),
+  LLLL: dateStrGetter('Month', false, true),
     dd: dateGetter('Date', 2),
      d: dateGetter('Date', 1),
     HH: dateGetter('Hours', 2),
@@ -42236,7 +42336,7 @@ var DATE_FORMATS = {
      GGGG: longEraGetter
 };
 
-var DATE_FORMATS_SPLIT = /((?:[^yMdHhmsaZEwG']+)|(?:'(?:[^']|'')*')|(?:E+|y+|M+|d+|H+|h+|m+|s+|a|Z|G+|w+))(.*)/,
+var DATE_FORMATS_SPLIT = /((?:[^yMLdHhmsaZEwG']+)|(?:'(?:[^']|'')*')|(?:E+|y+|M+|L+|d+|H+|h+|m+|s+|a|Z|G+|w+))(.*)/,
     NUMBER_STRING = /^\-?\d+$/;
 
 /**
@@ -42256,6 +42356,7 @@ var DATE_FORMATS_SPLIT = /((?:[^yMdHhmsaZEwG']+)|(?:'(?:[^']|'')*')|(?:E+|y+|M+|
  *   * `'MMM'`: Month in year (Jan-Dec)
  *   * `'MM'`: Month in year, padded (01-12)
  *   * `'M'`: Month in year (1-12)
+ *   * `'LLLL'`: Stand-alone month in year (January-December)
  *   * `'dd'`: Day in month, padded (01-31)
  *   * `'d'`: Day in month (1-31)
  *   * `'EEEE'`: Day in Week,(Sunday-Saturday)
@@ -43937,8 +44038,8 @@ var ngFormDirective = formDirectiveFactory(true);
   ngModelMinErr: false,
 */
 
-// Regex code is obtained from SO: https://stackoverflow.com/questions/3143070/javascript-regex-iso-datetime#answer-3143231
-var ISO_DATE_REGEXP = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/;
+// Regex code was initially obtained from SO prior to modification: https://stackoverflow.com/questions/3143070/javascript-regex-iso-datetime#answer-3143231
+var ISO_DATE_REGEXP = /^\d{4,}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+(?:[+-][0-2]\d:[0-5]\d|Z)$/;
 // See valid URLs in RFC3987 (http://tools.ietf.org/html/rfc3987)
 // Note: We are being more lenient, because browsers are too.
 //   1. Scheme
@@ -43954,11 +44055,17 @@ var ISO_DATE_REGEXP = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-
 var URL_REGEXP = /^[a-z][a-z\d.+-]*:\/*(?:[^:@]+(?::[^@]+)?@)?(?:[^\s:/?#]+|\[[a-f\d:]+\])(?::\d+)?(?:\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i;
 var EMAIL_REGEXP = /^[a-z0-9!#$%&'*+\/=?^_`{|}~.-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i;
 var NUMBER_REGEXP = /^\s*(\-|\+)?(\d+|(\d*(\.\d*)))([eE][+-]?\d+)?\s*$/;
-var DATE_REGEXP = /^(\d{4})-(\d{2})-(\d{2})$/;
-var DATETIMELOCAL_REGEXP = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d)(\.\d{1,3})?)?$/;
-var WEEK_REGEXP = /^(\d{4})-W(\d\d)$/;
-var MONTH_REGEXP = /^(\d{4})-(\d\d)$/;
+var DATE_REGEXP = /^(\d{4,})-(\d{2})-(\d{2})$/;
+var DATETIMELOCAL_REGEXP = /^(\d{4,})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d)(\.\d{1,3})?)?$/;
+var WEEK_REGEXP = /^(\d{4,})-W(\d\d)$/;
+var MONTH_REGEXP = /^(\d{4,})-(\d\d)$/;
 var TIME_REGEXP = /^(\d\d):(\d\d)(?::(\d\d)(\.\d{1,3})?)?$/;
+
+var PARTIAL_VALIDATION_EVENTS = 'keydown wheel mousedown';
+var PARTIAL_VALIDATION_TYPES = createMap();
+forEach('date,datetime-local,month,time,week'.split(','), function(type) {
+  PARTIAL_VALIDATION_TYPES[type] = true;
+});
 
 var inputType = {
 
@@ -45036,7 +45143,7 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   if (!$sniffer.android) {
     var composing = false;
 
-    element.on('compositionstart', function(data) {
+    element.on('compositionstart', function() {
       composing = true;
     });
 
@@ -45045,6 +45152,8 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
       listener();
     });
   }
+
+  var timeout;
 
   var listener = function(ev) {
     if (timeout) {
@@ -45075,8 +45184,6 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   if ($sniffer.hasEvent('input')) {
     element.on('input', listener);
   } else {
-    var timeout;
-
     var deferListener = function(ev, input, origValue) {
       if (!timeout) {
         timeout = $browser.defer(function() {
@@ -45107,6 +45214,26 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   // if user paste into input using mouse on older browser
   // or form autocomplete on newer browser, we need "change" event to catch it
   element.on('change', listener);
+
+  // Some native input types (date-family) have the ability to change validity without
+  // firing any input/change events.
+  // For these event types, when native validators are present and the browser supports the type,
+  // check for validity changes on various DOM events.
+  if (PARTIAL_VALIDATION_TYPES[type] && ctrl.$$hasNativeValidators && type === attr.type) {
+    element.on(PARTIAL_VALIDATION_EVENTS, function(ev) {
+      if (!timeout) {
+        var validity = this[VALIDITY_STATE_PROPERTY];
+        var origBadInput = validity.badInput;
+        var origTypeMismatch = validity.typeMismatch;
+        timeout = $browser.defer(function() {
+          timeout = null;
+          if (validity.badInput !== origBadInput || validity.typeMismatch !== origTypeMismatch) {
+            listener(ev);
+          }
+        });
+      }
+    });
+  }
 
   ctrl.$render = function() {
     // Workaround for Firefox validation #12102.
@@ -46128,9 +46255,10 @@ function classDirective(name, selector) {
  * new classes added.
  *
  * @animations
- * **add** - happens just before the class is applied to the elements
- *
- * **remove** - happens just before the class is removed from the element
+ * | Animation                        | Occurs                              |
+ * |----------------------------------|-------------------------------------|
+ * | {@link ng.$animate#addClass addClass}       | just before the class is applied to the element   |
+ * | {@link ng.$animate#removeClass removeClass} | just before the class is removed from the element |
  *
  * @element ANY
  * @param {expression} ngClass {@link guide/expression Expression} to eval. The result
@@ -47389,8 +47517,10 @@ forEach(
  * and `leave` effects.
  *
  * @animations
- * enter - happens just after the `ngIf` contents change and a new DOM element is created and injected into the `ngIf` container
- * leave - happens just before the `ngIf` contents are removed from the DOM
+ * | Animation                        | Occurs                               |
+ * |----------------------------------|-------------------------------------|
+ * | {@link ng.$animate#enter enter}  | just after the `ngIf` contents change and a new DOM element is created and injected into the `ngIf` container |
+ * | {@link ng.$animate#leave leave}  | just before the `ngIf` contents are removed from the DOM |
  *
  * @element ANY
  * @scope
@@ -47431,7 +47561,7 @@ forEach(
     </file>
   </example>
  */
-var ngIfDirective = ['$animate', function($animate) {
+var ngIfDirective = ['$animate', '$compile', function($animate, $compile) {
   return {
     multiElement: true,
     transclude: 'element',
@@ -47447,7 +47577,7 @@ var ngIfDirective = ['$animate', function($animate) {
             if (!childScope) {
               $transclude(function(clone, newScope) {
                 childScope = newScope;
-                clone[clone.length++] = document.createComment(' end ngIf: ' + $attr.ngIf + ' ');
+                clone[clone.length++] = $compile.$$createComment('end ngIf', $attr.ngIf);
                 // Note: We only need the first/last node of the cloned nodes.
                 // However, we need to keep the reference to the jqlite wrapper as it might be changed later
                 // by a directive with templateUrl when its template arrives.
@@ -47502,8 +47632,10 @@ var ngIfDirective = ['$animate', function($animate) {
  * access on some browsers.
  *
  * @animations
- * enter - animation is used to bring new content into the browser.
- * leave - animation is used to animate existing content away.
+ * | Animation                        | Occurs                              |
+ * |----------------------------------|-------------------------------------|
+ * | {@link ng.$animate#enter enter}  | when the expression changes, on the new include |
+ * | {@link ng.$animate#leave leave}  | when the expression changes, on the old include |
  *
  * The enter and leave animation occur concurrently.
  *
@@ -48244,9 +48376,9 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
       };
       ngModelSet = function($scope, newValue) {
         if (isFunction(parsedNgModel($scope))) {
-          invokeModelSetter($scope, {$$$p: ctrl.$modelValue});
+          invokeModelSetter($scope, {$$$p: newValue});
         } else {
-          parsedNgModelAssign($scope, ctrl.$modelValue);
+          parsedNgModelAssign($scope, newValue);
         }
       };
     } else if (!parsedNgModel.assign) {
@@ -48271,7 +48403,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
    *   the `$viewValue` are different from last time.
    *
    * Since `ng-model` does not do a deep watch, `$render()` is only invoked if the values of
-   * `$modelValue` and `$viewValue` are actually different from their previous value. If `$modelValue`
+   * `$modelValue` and `$viewValue` are actually different from their previous values. If `$modelValue`
    * or `$viewValue` are objects (rather than a string or number) then `$render()` will not be
    * invoked if you only change a property on the objects.
    */
@@ -48623,7 +48755,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
         setValidity(name, undefined);
         validatorPromises.push(promise.then(function() {
           setValidity(name, true);
-        }, function(error) {
+        }, function() {
           allValid = false;
           setValidity(name, false);
         }));
@@ -49097,7 +49229,7 @@ var ngModelDirective = ['$rootScope', function($rootScope) {
             });
           }
 
-          element.on('blur', function(ev) {
+          element.on('blur', function() {
             if (modelCtrl.$touched) return;
 
             if ($rootScope.$$phase) {
@@ -49780,8 +49912,8 @@ var ngOptionsDirective = ['$compile', '$parse', function($compile, $parse) {
           var key = (optionValues === optionValuesKeys) ? index : optionValuesKeys[index];
           var value = optionValues[key];
 
-          var locals = getLocals(optionValues[key], key);
-          var selectValue = getTrackByValueFn(optionValues[key], locals);
+          var locals = getLocals(value, key);
+          var selectValue = getTrackByValueFn(value, locals);
           watchedArray.push(selectValue);
 
           // Only need to watch the displayFn if there is a specific label expression
@@ -49906,14 +50038,20 @@ var ngOptionsDirective = ['$compile', '$parse', function($compile, $parse) {
           var option = options.getOptionFromViewValue(value);
 
           if (option && !option.disabled) {
+            // Don't update the option when it is already selected.
+            // For example, the browser will select the first option by default. In that case,
+            // most properties are set automatically - except the `selected` attribute, which we
+            // set always
+
             if (selectElement[0].value !== option.selectValue) {
               removeUnknownOption();
               removeEmptyOption();
 
               selectElement[0].value = option.selectValue;
               option.element.selected = true;
-              option.element.setAttribute('selected', 'selected');
             }
+
+            option.element.setAttribute('selected', 'selected');
           } else {
             if (value === null || providedEmptyOption) {
               removeUnknownOption();
@@ -50472,17 +50610,23 @@ var ngPluralizeDirective = ['$locale', '$interpolate', '$log', function($locale,
  * <div ng-repeat="(key, value) in myObj"> ... </div>
  * ```
  *
- * You need to be aware that the JavaScript specification does not define the order of keys
- * returned for an object. (To mitigate this in Angular 1.3 the `ngRepeat` directive
- * used to sort the keys alphabetically.)
+ * However, there are a limitations compared to array iteration:
  *
- * Version 1.4 removed the alphabetic sorting. We now rely on the order returned by the browser
- * when running `for key in myObj`. It seems that browsers generally follow the strategy of providing
- * keys in the order in which they were defined, although there are exceptions when keys are deleted
- * and reinstated. See the [MDN page on `delete` for more info](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete#Cross-browser_notes).
+ * - The JavaScript specification does not define the order of keys
+ *   returned for an object, so Angular relies on the order returned by the browser
+ *   when running `for key in myObj`. Browsers generally follow the strategy of providing
+ *   keys in the order in which they were defined, although there are exceptions when keys are deleted
+ *   and reinstated. See the
+ *   [MDN page on `delete` for more info](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete#Cross-browser_notes).
  *
- * If this is not desired, the recommended workaround is to convert your object into an array
- * that is sorted into the order that you prefer before providing it to `ngRepeat`.  You could
+ * - `ngRepeat` will silently *ignore* object keys starting with `$`, because
+ *   it's a prefix used by Angular for public (`$`) and private (`$$`) properties.
+ *
+ * - The built-in filters {@link ng.orderBy orderBy} and {@link ng.filter filter} do not work with
+ *   objects, and will throw if used with one.
+ *
+ * If you are hitting any of these limitations, the recommended workaround is to convert your object into an array
+ * that is sorted into the order that you prefer before providing it to `ngRepeat`. You could
  * do this with a filter such as [toArrayFilter](http://ngmodules.org/modules/angular-toArrayFilter)
  * or implement a `$watch` on the object yourself.
  *
@@ -50600,11 +50744,11 @@ var ngPluralizeDirective = ['$locale', '$interpolate', '$log', function($locale,
  * as **data-ng-repeat-start**, **x-ng-repeat-start** and **ng:repeat-start**).
  *
  * @animations
- * **.enter** - when a new item is added to the list or when an item is revealed after a filter
- *
- * **.leave** - when an item is removed from the list or when an item is filtered out
- *
- * **.move** - when an adjacent item is filtered out causing a reorder or when the item contents are reordered
+ * | Animation                        | Occurs                              |
+ * |----------------------------------|-------------------------------------|
+ * | {@link ng.$animate#enter enter} | when a new item is added to the list or when an item is revealed after a filter |
+ * | {@link ng.$animate#leave leave} | when an item is removed from the list or when an item is filtered out |
+ * | {@link ng.$animate#move move } | when an adjacent item is filtered out causing a reorder or when the item contents are reordered |
  *
  * See the example below for defining CSS animations with ngRepeat.
  *
@@ -50752,7 +50896,7 @@ var ngPluralizeDirective = ['$locale', '$interpolate', '$log', function($locale,
       </file>
     </example>
  */
-var ngRepeatDirective = ['$parse', '$animate', function($parse, $animate) {
+var ngRepeatDirective = ['$parse', '$animate', '$compile', function($parse, $animate, $compile) {
   var NG_REMOVED = '$$NG_REMOVED';
   var ngRepeatMinErr = minErr('ngRepeat');
 
@@ -50787,7 +50931,7 @@ var ngRepeatDirective = ['$parse', '$animate', function($parse, $animate) {
     $$tlb: true,
     compile: function ngRepeatCompile($element, $attr) {
       var expression = $attr.ngRepeat;
-      var ngRepeatEndComment = document.createComment(' end ngRepeat: ' + expression + ' ');
+      var ngRepeatEndComment = $compile.$$createComment('end ngRepeat', expression);
 
       var match = expression.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)(?:\s+as\s+([\s\S]+?))?(?:\s+track\s+by\s+([\s\S]+?))?\s*$/);
 
@@ -50951,7 +51095,7 @@ var ngRepeatDirective = ['$parse', '$animate', function($parse, $animate) {
 
               if (getBlockStart(block) != nextNode) {
                 // existing item which got moved
-                $animate.move(getBlockNodes(block.clone), null, jqLite(previousNode));
+                $animate.move(getBlockNodes(block.clone), null, previousNode);
               }
               previousNode = getBlockEnd(block);
               updateScope(block.scope, index, valueIdentifier, value, keyIdentifier, key, collectionLength);
@@ -50963,8 +51107,7 @@ var ngRepeatDirective = ['$parse', '$animate', function($parse, $animate) {
                 var endNode = ngRepeatEndComment.cloneNode(false);
                 clone[clone.length++] = endNode;
 
-                // TODO(perf): support naked previousNode in `enter` to avoid creation of jqLite wrapper?
-                $animate.enter(clone, null, jqLite(previousNode));
+                $animate.enter(clone, null, previousNode);
                 previousNode = endNode;
                 // Note: We only need the first/last node of the cloned nodes.
                 // However, we need to keep the reference to the jqlite wrapper as it might be changed later
@@ -51067,12 +51210,14 @@ var NG_HIDE_IN_PROGRESS_CLASS = 'ng-hide-animate';
  * .my-element.ng-hide-remove.ng-hide-remove-active { ... }
  * ```
  *
- * Keep in mind that, as of AngularJS version 1.3.0-beta.11, there is no need to change the display
+ * Keep in mind that, as of AngularJS version 1.3, there is no need to change the display
  * property to block during animation states--ngAnimate will handle the style toggling automatically for you.
  *
  * @animations
- * addClass: `.ng-hide` - happens after the `ngShow` expression evaluates to a truthy value and the just before contents are set to visible
- * removeClass: `.ng-hide` - happens after the `ngShow` expression evaluates to a non truthy value and just before the contents are set to hidden
+ * | Animation                        | Occurs                              |
+ * |----------------------------------|-------------------------------------|
+ * | {@link $animate#addClass addClass} `.ng-hide`  | after the `ngShow` expression evaluates to a non truthy value and just before the contents are set to hidden |
+ * | {@link $animate#removeClass removeClass}  `.ng-hide`  | after the `ngShow` expression evaluates to a truthy value and just before contents are set to visible |
  *
  * @element ANY
  * @param {expression} ngShow If the {@link guide/expression expression} is truthy
@@ -51231,12 +51376,15 @@ var ngShowDirective = ['$animate', function($animate) {
  * .my-element.ng-hide-remove.ng-hide-remove-active { ... }
  * ```
  *
- * Keep in mind that, as of AngularJS version 1.3.0-beta.11, there is no need to change the display
+ * Keep in mind that, as of AngularJS version 1.3, there is no need to change the display
  * property to block during animation states--ngAnimate will handle the style toggling automatically for you.
  *
  * @animations
- * removeClass: `.ng-hide` - happens after the `ngHide` expression evaluates to a truthy value and just before the contents are set to hidden
- * addClass: `.ng-hide` - happens after the `ngHide` expression evaluates to a non truthy value and just before the contents are set to visible
+ * | Animation                        | Occurs                              |
+ * |----------------------------------|-------------------------------------|
+ * | {@link $animate#addClass addClass} `.ng-hide`  | after the `ngHide` expression evaluates to a truthy value and just before the contents are set to hidden |
+ * | {@link $animate#removeClass removeClass}  `.ng-hide`  | after the `ngHide` expression evaluates to a non truthy value and just before contents are set to visible |
+ *
  *
  * @element ANY
  * @param {expression} ngHide If the {@link guide/expression expression} is truthy then
@@ -51398,8 +51546,10 @@ var ngStyleDirective = ngDirective(function(scope, element, attr) {
  * </div>
 
  * @animations
- * enter - happens after the ngSwitch contents change and the matched child element is placed inside the container
- * leave - happens just after the ngSwitch contents change and just before the former contents are removed from the DOM
+ * | Animation                        | Occurs                              |
+ * |----------------------------------|-------------------------------------|
+ * | {@link ng.$animate#enter enter}  | after the ngSwitch contents change and the matched child element is placed inside the container |
+ * | {@link ng.$animate#leave leave}  | after the ngSwitch contents change and just before the former contents are removed from the DOM |
  *
  * @usage
  *
@@ -51498,7 +51648,7 @@ var ngStyleDirective = ngDirective(function(scope, element, attr) {
     </file>
   </example>
  */
-var ngSwitchDirective = ['$animate', function($animate) {
+var ngSwitchDirective = ['$animate', '$compile', function($animate, $compile) {
   return {
     require: 'ngSwitch',
 
@@ -51539,7 +51689,7 @@ var ngSwitchDirective = ['$animate', function($animate) {
             selectedTransclude.transclude(function(caseElement, selectedScope) {
               selectedScopes.push(selectedScope);
               var anchor = selectedTransclude.element;
-              caseElement[caseElement.length++] = document.createComment(' end ngSwitchWhen: ');
+              caseElement[caseElement.length++] = $compile.$$createComment('end ngSwitchWhen');
               var block = { clone: caseElement };
 
               selectedElements.push(block);
@@ -51833,7 +51983,7 @@ function chromeHack(optionElement) {
  * added `<option>` elements, perhaps by an `ngRepeat` directive.
  */
 var SelectController =
-        ['$element', '$scope', '$attrs', function($element, $scope, $attrs) {
+        ['$element', '$scope', function($element, $scope) {
 
   var self = this,
       optionsMap = new HashMap();
@@ -52655,7 +52805,9 @@ var minlengthDirective = function() {
 
 if (window.angular.bootstrap) {
   //AngularJS is already loaded, so we can return here...
-  console.log('WARNING: Tried to load angular more than once.');
+  if (window.console) {
+    console.log('WARNING: Tried to load angular more than once.');
+  }
   return;
 }
 
@@ -52916,7 +53068,7 @@ angular.module('exceptionless', [])
     }]);
 //# sourceMappingURL=angular.js.map
 /**
- * @license AngularJS v1.5.0
+ * @license AngularJS v1.5.2
  * (c) 2010-2016 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -55254,13 +55406,18 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
       return matches;
     }
 
-    return {
+    var $animate = {
       on: function(event, container, callback) {
         var node = extractElementNode(container);
         callbackRegistry[event] = callbackRegistry[event] || [];
         callbackRegistry[event].push({
           node: node,
           callback: callback
+        });
+
+        // Remove the callback when the element is removed from the DOM
+        jqLite(container).on('$destroy', function() {
+          $animate.off(event, container, callback);
         });
       },
 
@@ -55328,6 +55485,8 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
         return bool;
       }
     };
+
+    return $animate;
 
     function queueAnimation(element, event, initialOptions) {
       // we always make a copy of the options since
@@ -55645,30 +55804,31 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
       var animateChildren;
       var elementDisabled = disabledElementsLookup.get(getDomNode(element));
 
-      var parentHost = element.data(NG_ANIMATE_PIN_DATA);
+      var parentHost = jqLite.data(element[0], NG_ANIMATE_PIN_DATA);
       if (parentHost) {
         parentElement = parentHost;
       }
 
-      while (parentElement && parentElement.length) {
+      parentElement = getDomNode(parentElement);
+
+      while (parentElement) {
         if (!rootElementDetected) {
           // angular doesn't want to attempt to animate elements outside of the application
           // therefore we need to ensure that the rootElement is an ancestor of the current element
           rootElementDetected = isMatchingElement(parentElement, $rootElement);
         }
 
-        var parentNode = parentElement[0];
-        if (parentNode.nodeType !== ELEMENT_NODE) {
+        if (parentElement.nodeType !== ELEMENT_NODE) {
           // no point in inspecting the #document element
           break;
         }
 
-        var details = activeAnimationsLookup.get(parentNode) || {};
+        var details = activeAnimationsLookup.get(parentElement) || {};
         // either an enter, leave or move animation will commence
         // therefore we can't allow any animations to take place
         // but if a parent animation is class-based then that's ok
         if (!parentAnimationDetected) {
-          var parentElementDisabled = disabledElementsLookup.get(parentNode);
+          var parentElementDisabled = disabledElementsLookup.get(parentElement);
 
           if (parentElementDisabled === true && elementDisabled !== false) {
             // disable animations if the user hasn't explicitly enabled animations on the
@@ -55683,7 +55843,7 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
         }
 
         if (isUndefined(animateChildren) || animateChildren === true) {
-          var value = parentElement.data(NG_ANIMATE_CHILDREN_DATA);
+          var value = jqLite.data(parentElement, NG_ANIMATE_CHILDREN_DATA);
           if (isDefined(value)) {
             animateChildren = value;
           }
@@ -55706,15 +55866,15 @@ var $$AnimateQueueProvider = ['$animateProvider', function($animateProvider) {
 
         if (!rootElementDetected) {
           // If no rootElement is detected, check if the parentElement is pinned to another element
-          parentHost = parentElement.data(NG_ANIMATE_PIN_DATA);
+          parentHost = jqLite.data(parentElement, NG_ANIMATE_PIN_DATA);
           if (parentHost) {
             // The pin target element becomes the next parent element
-            parentElement = parentHost;
+            parentElement = getDomNode(parentHost);
             continue;
           }
         }
 
-        parentElement = parentElement.parent();
+        parentElement = parentElement.parentNode;
       }
 
       var allowAnimation = (!parentAnimationDetected || animateChildren) && elementDisabled !== true;
@@ -56155,10 +56315,16 @@ var $$AnimationProvider = ['$animateProvider', function($animateProvider) {
  *
  * ngAnimateSwap is a animation-oriented directive that allows for the container to
  * be removed and entered in whenever the associated expression changes. A
- * common usecase for this directive is a rotating banner component which
+ * common usecase for this directive is a rotating banner or slider component which
  * contains one image being present at a time. When the active image changes
  * then the old image will perform a `leave` animation and the new element
  * will be inserted via an `enter` animation.
+ *
+ * @animations
+ * | Animation                        | Occurs                               |
+ * |----------------------------------|--------------------------------------|
+ * | {@link ng.$animate#enter enter}  | when the new element is inserted to the DOM  |
+ * | {@link ng.$animate#leave leave}  | when the old element is removed from the DOM |
  *
  * @example
  * <example name="ngAnimateSwap-directive" module="ngAnimateSwapExample"
@@ -56953,31 +57119,6 @@ var ngAnimateSwapDirective = ['$animate', '$rootScope', function($animate, $root
  * possible be sure to visit the {@link ng.$animate $animate service API page}.
  *
  *
- * ### Preventing Collisions With Third Party Libraries
- *
- * Some third-party frameworks place animation duration defaults across many element or className
- * selectors in order to make their code small and reuseable. This can lead to issues with ngAnimate, which
- * is expecting actual animations on these elements and has to wait for their completion.
- *
- * You can prevent this unwanted behavior by using a prefix on all your animation classes:
- *
- * ```css
- * /&#42; prefixed with animate- &#42;/
- * .animate-fade-add.animate-fade-add-active {
- *   transition:1s linear all;
- *   opacity:0;
- * }
- * ```
- *
- * You then configure `$animate` to enforce this prefix:
- *
- * ```js
- * $animateProvider.classNameFilter(/animate-/);
- * ```
- *
- * This also may provide your application with a speed boost since only specific elements containing CSS class prefix
- * will be evaluated for animation when any DOM changes occur in the application.
- *
  * ## Callbacks and Promises
  *
  * When `$animate` is called it returns a promise that can be used to capture when the animation has ended. Therefore if we were to trigger
@@ -57041,7 +57182,7 @@ angular.module('ngAnimate', [])
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.2.4 - 2016-03-06
+ * Version: 1.2.5 - 2016-03-20
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module("ui.bootstrap.tpls", ["uib/template/accordion/accordion-group.html","uib/template/accordion/accordion.html","uib/template/alert/alert.html","uib/template/carousel/carousel.html","uib/template/carousel/slide.html","uib/template/datepicker/datepicker.html","uib/template/datepicker/day.html","uib/template/datepicker/month.html","uib/template/datepicker/popup.html","uib/template/datepicker/year.html","uib/template/modal/backdrop.html","uib/template/modal/window.html","uib/template/pager/pager.html","uib/template/pagination/pagination.html","uib/template/tooltip/tooltip-html-popup.html","uib/template/tooltip/tooltip-popup.html","uib/template/tooltip/tooltip-template-popup.html","uib/template/popover/popover-html.html","uib/template/popover/popover-template.html","uib/template/popover/popover.html","uib/template/progressbar/bar.html","uib/template/progressbar/progress.html","uib/template/progressbar/progressbar.html","uib/template/rating/rating.html","uib/template/tabs/tab.html","uib/template/tabs/tabset.html","uib/template/timepicker/timepicker.html","uib/template/typeahead/typeahead-match.html","uib/template/typeahead/typeahead-popup.html"]);
@@ -57213,6 +57354,7 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
     },
     scope: {
       heading: '@',               // Interpolate the heading attribute onto this scope
+      panelClass: '@?',           // Ditto with panelClass
       isOpen: '=?',
       isDisabled: '=?'
     },
@@ -59147,7 +59289,9 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     ngModelCtrl = ngModelCtrl_;
     ngModelOptions = ngModelCtrl_.$options || datepickerConfig.ngModelOptions;
 
-    this.activeDate = ngModelCtrl.$modelValue || new Date();
+    this.activeDate = ngModelCtrl.$modelValue ?
+      dateParser.fromTimezone(new Date(ngModelCtrl.$modelValue), ngModelOptions.timezone) :
+      dateParser.fromTimezone(new Date(), ngModelOptions.timezone);
 
     ngModelCtrl.$render = function() {
       self.render();
@@ -59889,11 +60033,17 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
 
   $scope.isDisabled = function(date) {
     if (date === 'today') {
-      date = new Date();
+      date = dateParser.fromTimezone(new Date(), ngModelOptions.timezone);
+    }
+
+    if ($scope.datepickerOptions) {
+      return $scope.datepickerOptions &&
+        $scope.datepickerOptions.minDate && $scope.compare(date, $scope.datepickerOptions.minDate) < 0 ||
+        $scope.datepickerOptions.maxDate && $scope.compare(date, $scope.datepickerOptions.maxDate) > 0;
     }
 
     return $scope.watchData.minDate && $scope.compare(date, cache.minDate) < 0 ||
-        $scope.watchData.maxDate && $scope.compare(date, cache.maxDate) > 0;
+      $scope.watchData.maxDate && $scope.compare(date, cache.maxDate) > 0;
   };
 
   $scope.compare = function(date1, date2) {
@@ -60821,11 +60971,15 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
       };
 
       //Modal focus behavior
-      var focusableElementList;
-      var focusIndex = 0;
-      var tababbleSelector = 'a[href], area[href], input:not([disabled]), ' +
+      var tabableSelector = 'a[href], area[href], input:not([disabled]), ' +
         'button:not([disabled]),select:not([disabled]), textarea:not([disabled]), ' +
         'iframe, object, embed, *[tabindex], *[contenteditable=true]';
+
+      function isVisible(element) {
+        return !!(element.offsetWidth ||
+          element.offsetHeight ||
+          element.getClientRects().length);
+      }
 
       function backdropIndex() {
         var topBackdropIndex = -1;
@@ -60953,15 +61107,15 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
               break;
             }
             case 9: {
-              $modalStack.loadFocusElementList(modal);
+              var list = $modalStack.loadFocusElementList(modal);
               var focusChanged = false;
               if (evt.shiftKey) {
-                if ($modalStack.isFocusInFirstItem(evt) || $modalStack.isModalFocused(evt, modal)) {
-                  focusChanged = $modalStack.focusLastFocusableElement();
+                if ($modalStack.isFocusInFirstItem(evt, list) || $modalStack.isModalFocused(evt, modal)) {
+                  focusChanged = $modalStack.focusLastFocusableElement(list);
                 }
               } else {
-                if ($modalStack.isFocusInLastItem(evt)) {
-                  focusChanged = $modalStack.focusFirstFocusableElement();
+                if ($modalStack.isFocusInLastItem(evt, list)) {
+                  focusChanged = $modalStack.focusFirstFocusableElement(list);
                 }
               }
 
@@ -60969,6 +61123,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
                 evt.preventDefault();
                 evt.stopPropagation();
               }
+
               break;
             }
           }
@@ -61038,8 +61193,6 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
 
         openedWindows.top().value.modalDomEl = angularDomEl;
         openedWindows.top().value.modalOpener = modalOpener;
-
-        $modalStack.clearFocusListCache();
       };
 
       function broadcastClosing(modalWindow, resultOrReason, closing) {
@@ -61086,16 +61239,17 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
         }
       };
 
-      $modalStack.focusFirstFocusableElement = function() {
-        if (focusableElementList.length > 0) {
-          focusableElementList[0].focus();
+      $modalStack.focusFirstFocusableElement = function(list) {
+        if (list.length > 0) {
+          list[0].focus();
           return true;
         }
         return false;
       };
-      $modalStack.focusLastFocusableElement = function() {
-        if (focusableElementList.length > 0) {
-          focusableElementList[focusableElementList.length - 1].focus();
+
+      $modalStack.focusLastFocusableElement = function(list) {
+        if (list.length > 0) {
+          list[list.length - 1].focus();
           return true;
         }
         return false;
@@ -61111,32 +61265,29 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
         return false;
       };
 
-      $modalStack.isFocusInFirstItem = function(evt) {
-        if (focusableElementList.length > 0) {
-          return (evt.target || evt.srcElement) === focusableElementList[0];
+      $modalStack.isFocusInFirstItem = function(evt, list) {
+        if (list.length > 0) {
+          return (evt.target || evt.srcElement) === list[0];
         }
         return false;
       };
 
-      $modalStack.isFocusInLastItem = function(evt) {
-        if (focusableElementList.length > 0) {
-          return (evt.target || evt.srcElement) === focusableElementList[focusableElementList.length - 1];
+      $modalStack.isFocusInLastItem = function(evt, list) {
+        if (list.length > 0) {
+          return (evt.target || evt.srcElement) === list[list.length - 1];
         }
         return false;
-      };
-
-      $modalStack.clearFocusListCache = function() {
-        focusableElementList = [];
-        focusIndex = 0;
       };
 
       $modalStack.loadFocusElementList = function(modalWindow) {
-        if (focusableElementList === undefined || !focusableElementList.length) {
-          if (modalWindow) {
-            var modalDomE1 = modalWindow.value.modalDomEl;
-            if (modalDomE1 && modalDomE1.length) {
-              focusableElementList = modalDomE1[0].querySelectorAll(tababbleSelector);
-            }
+        if (modalWindow) {
+          var modalDomE1 = modalWindow.value.modalDomEl;
+          if (modalDomE1 && modalDomE1.length) {
+            var elements = modalDomE1[0].querySelectorAll(tabableSelector);
+            return elements ?
+              Array.prototype.filter.call(elements, function(element) {
+                return isVisible(element);
+              }) : elements;
           }
         }
       };
@@ -62444,6 +62595,7 @@ angular.module('ui.bootstrap.rating', [])
   max: 5,
   stateOn: null,
   stateOff: null,
+  enableReset: true,
   titles : ['one', 'two', 'three', 'four', 'five']
 })
 
@@ -62465,7 +62617,9 @@ angular.module('ui.bootstrap.rating', [])
 
     this.stateOn = angular.isDefined($attrs.stateOn) ? $scope.$parent.$eval($attrs.stateOn) : ratingConfig.stateOn;
     this.stateOff = angular.isDefined($attrs.stateOff) ? $scope.$parent.$eval($attrs.stateOff) : ratingConfig.stateOff;
-    var tmpTitles = angular.isDefined($attrs.titles) ? $scope.$parent.$eval($attrs.titles) : ratingConfig.titles ;
+    this.enableReset = angular.isDefined($attrs.enableReset) ?
+      $scope.$parent.$eval($attrs.enableReset) : ratingConfig.enableReset;
+    var tmpTitles = angular.isDefined($attrs.titles) ? $scope.$parent.$eval($attrs.titles) : ratingConfig.titles;
     this.titles = angular.isArray(tmpTitles) && tmpTitles.length > 0 ?
       tmpTitles : ratingConfig.titles;
 
@@ -62492,7 +62646,8 @@ angular.module('ui.bootstrap.rating', [])
 
   $scope.rate = function(value) {
     if (!$scope.readonly && value >= 0 && value <= $scope.range.length) {
-      ngModelCtrl.$setViewValue(ngModelCtrl.$viewValue === value ? 0 : value);
+      var newViewValue = self.enableReset && ngModelCtrl.$viewValue === value ? 0 : value;
+      ngModelCtrl.$setViewValue(newViewValue);
       ngModelCtrl.$render();
     }
   };
@@ -62548,18 +62703,22 @@ angular.module('ui.bootstrap.tabs', [])
     oldIndex;
   ctrl.tabs = [];
 
-  ctrl.select = function(index) {
+  ctrl.select = function(index, evt) {
     if (!destroyed) {
       var previousIndex = findTabIndex(oldIndex);
       var previousSelected = ctrl.tabs[previousIndex];
       if (previousSelected) {
-        previousSelected.tab.onDeselect();
+        previousSelected.tab.onDeselect({
+          $event: evt
+        });
         previousSelected.tab.active = false;
       }
 
       var selected = ctrl.tabs[index];
       if (selected) {
-        selected.tab.onSelect();
+        selected.tab.onSelect({
+          $event: evt
+        });
         selected.tab.active = true;
         ctrl.active = selected.index;
         oldIndex = selected.index;
@@ -62691,7 +62850,7 @@ angular.module('ui.bootstrap.tabs', [])
         scope.classes = '';
       }
 
-      scope.select = function() {
+      scope.select = function(evt) {
         if (!scope.disabled) {
           var index;
           for (var i = 0; i < tabsetCtrl.tabs.length; i++) {
@@ -62701,7 +62860,7 @@ angular.module('ui.bootstrap.tabs', [])
             }
           }
 
-          tabsetCtrl.select(index);
+          tabsetCtrl.select(index, evt);
         }
       };
 
@@ -62787,7 +62946,8 @@ angular.module('ui.bootstrap.timepicker', [])
   var selected = new Date(),
     watchers = [],
     ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl
-    meridians = angular.isDefined($attrs.meridians) ? $scope.$parent.$eval($attrs.meridians) : timepickerConfig.meridians || $locale.DATETIME_FORMATS.AMPMS;
+    meridians = angular.isDefined($attrs.meridians) ? $scope.$parent.$eval($attrs.meridians) : timepickerConfig.meridians || $locale.DATETIME_FORMATS.AMPMS,
+    padHours = angular.isDefined($attrs.padHours) ? $scope.$parent.$eval($attrs.padHours) : true;
 
   $scope.tabindex = angular.isDefined($attrs.tabindex) ? $attrs.tabindex : 0;
   $element.removeAttr('tabindex');
@@ -62959,12 +63119,12 @@ angular.module('ui.bootstrap.timepicker', [])
     return seconds >= 0 && seconds < 60 ? seconds : undefined;
   }
 
-  function pad(value) {
+  function pad(value, noPad) {
     if (value === null) {
       return '';
     }
 
-    return angular.isDefined(value) && value.toString().length < 2 ?
+    return angular.isDefined(value) && value.toString().length < 2 && !noPad ?
       '0' + value : value.toString();
   }
 
@@ -63095,7 +63255,7 @@ angular.module('ui.bootstrap.timepicker', [])
         invalidate(true);
       } else if (!$scope.invalidHours && $scope.hours < 10) {
         $scope.$apply(function() {
-          $scope.hours = pad($scope.hours);
+          $scope.hours = pad($scope.hours, !padHours);
         });
       }
     });
@@ -63204,7 +63364,7 @@ angular.module('ui.bootstrap.timepicker', [])
         hours = hours === 0 || hours === 12 ? 12 : hours % 12; // Convert 24 to 12 hour system
       }
 
-      $scope.hours = keyboardChange === 'h' ? hours : pad(hours);
+      $scope.hours = keyboardChange === 'h' ? hours : pad(hours, !padHours);
       if (keyboardChange !== 'm') {
         $scope.minutes = pad(minutes);
       }
@@ -63760,6 +63920,9 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       }
       if (!isEditable && modelCtrl.$error.editable) {
         modelCtrl.$viewValue = '';
+        // Reset validity as we are clearing
+        modelCtrl.$setValidity('editable', true);
+        modelCtrl.$setValidity('parse', true);
         element.val('');
       }
       hasFocus = false;
@@ -64328,7 +64491,7 @@ angular.module("uib/template/rating/rating.html", []).run(["$templateCache", fun
 angular.module("uib/template/tabs/tab.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("uib/template/tabs/tab.html",
     "<li ng-class=\"[{active: active, disabled: disabled}, classes]\" class=\"uib-tab nav-item\">\n" +
-    "  <a href ng-click=\"select()\" class=\"nav-link\" uib-tab-heading-transclude>{{heading}}</a>\n" +
+    "  <a href ng-click=\"select($event)\" class=\"nav-link\" uib-tab-heading-transclude>{{heading}}</a>\n" +
     "</li>\n" +
     "");
 }]);
@@ -64408,7 +64571,7 @@ angular.module("uib/template/typeahead/typeahead-popup.html", []).run(["$templat
 angular.module('ui.bootstrap.carousel').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibCarouselCss && angular.element(document).find('head').prepend('<style type="text/css">.ng-animate.item:not(.left):not(.right){-webkit-transition:0s ease-in-out left;transition:0s ease-in-out left}</style>'); angular.$$uibCarouselCss = true; });
 angular.module('ui.bootstrap.position').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibPositionCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-position-measure{display:block !important;visibility:hidden !important;position:absolute !important;top:-9999px !important;left:-9999px !important;}.uib-position-scrollbar-measure{position:absolute;top:-9999px;width:50px;height:50px;overflow:scroll;}</style>'); angular.$$uibPositionCss = true; });
 angular.module('ui.bootstrap.datepicker').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibDatepickerCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-datepicker .uib-title{width:100%;}.uib-day button,.uib-month button,.uib-year button{min-width:100%;}.uib-datepicker-popup.dropdown-menu{display:block;float:none;margin:0;}.uib-button-bar{padding:10px 9px 2px;}.uib-left,.uib-right{width:100%}</style>'); angular.$$uibDatepickerCss = true; });
-angular.module('ui.bootstrap.tooltip').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTooltipCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-tooltip-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-bottom > .tooltip-arrow,[uib-popover-popup].popover.top-left > .arrow,[uib-popover-popup].popover.top-right > .arrow,[uib-popover-popup].popover.bottom-left > .arrow,[uib-popover-popup].popover.bottom-right > .arrow,[uib-popover-popup].popover.left-top > .arrow,[uib-popover-popup].popover.left-bottom > .arrow,[uib-popover-popup].popover.right-top > .arrow,[uib-popover-popup].popover.right-bottom > .arrow{top:auto;bottom:auto;left:auto;right:auto;margin:0;}[uib-popover-popup].popover,[uib-popover-template-popup].popover{display:block !important;}</style>'); angular.$$uibTooltipCss = true; });
+angular.module('ui.bootstrap.tooltip').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTooltipCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-tooltip-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-bottom > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.right-bottom > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.right-bottom > .tooltip-arrow,[uib-popover-popup].popover.top-left > .arrow,[uib-popover-popup].popover.top-right > .arrow,[uib-popover-popup].popover.bottom-left > .arrow,[uib-popover-popup].popover.bottom-right > .arrow,[uib-popover-popup].popover.left-top > .arrow,[uib-popover-popup].popover.left-bottom > .arrow,[uib-popover-popup].popover.right-top > .arrow,[uib-popover-popup].popover.right-bottom > .arrow,[uib-popover-html-popup].popover.top-left > .arrow,[uib-popover-html-popup].popover.top-right > .arrow,[uib-popover-html-popup].popover.bottom-left > .arrow,[uib-popover-html-popup].popover.bottom-right > .arrow,[uib-popover-html-popup].popover.left-top > .arrow,[uib-popover-html-popup].popover.left-bottom > .arrow,[uib-popover-html-popup].popover.right-top > .arrow,[uib-popover-html-popup].popover.right-bottom > .arrow,[uib-popover-template-popup].popover.top-left > .arrow,[uib-popover-template-popup].popover.top-right > .arrow,[uib-popover-template-popup].popover.bottom-left > .arrow,[uib-popover-template-popup].popover.bottom-right > .arrow,[uib-popover-template-popup].popover.left-top > .arrow,[uib-popover-template-popup].popover.left-bottom > .arrow,[uib-popover-template-popup].popover.right-top > .arrow,[uib-popover-template-popup].popover.right-bottom > .arrow{top:auto;bottom:auto;left:auto;right:auto;margin:0;}[uib-popover-popup].popover,[uib-popover-html-popup].popover,[uib-popover-template-popup].popover{display:block !important;}</style>'); angular.$$uibTooltipCss = true; });
 angular.module('ui.bootstrap.timepicker').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTimepickerCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-time input{width:50px;}</style>'); angular.$$uibTimepickerCss = true; });
 angular.module('ui.bootstrap.typeahead').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTypeaheadCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-typeahead-popup].dropdown-menu{display:block;}</style>'); angular.$$uibTypeaheadCss = true; });
 angular.module("dialogs.default-translations",["pascalprecht.translate"]).config(["$translateProvider",function(O){O.translations("de-DE",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"Ein unbekannter Fehler ist aufgetreten.",DIALOGS_CLOSE:"Schließen",DIALOGS_PLEASE_WAIT:"Bitte warten",DIALOGS_PLEASE_WAIT_ELIPS:"Bitte warten...",DIALOGS_PLEASE_WAIT_MSG:"Warte auf Fertigstellung der Operation.",DIALOGS_PERCENT_COMPLETE:"% fertig",DIALOGS_NOTIFICATION:"Benachrichtigung",DIALOGS_NOTIFICATION_MSG:"Unbekannte Anwendungsbenachrichtigung.",DIALOGS_CONFIRMATION:"Bestätigung",DIALOGS_CONFIRMATION_MSG:"Bestätigung erforderlich.",DIALOGS_OK:"OK",DIALOGS_YES:"Ja",DIALOGS_NO:"Nein"}),O.translations("en-US",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"An unknown error has occurred.",DIALOGS_CLOSE:"Close",DIALOGS_PLEASE_WAIT:"Please Wait",DIALOGS_PLEASE_WAIT_ELIPS:"Please Wait...",DIALOGS_PLEASE_WAIT_MSG:"Waiting on operation to complete.",DIALOGS_PERCENT_COMPLETE:"% Complete",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Unknown application notification.",DIALOGS_CONFIRMATION:"Confirmation",DIALOGS_CONFIRMATION_MSG:"Confirmation required.",DIALOGS_OK:"OK",DIALOGS_YES:"Yes",DIALOGS_NO:"No"}),O.translations("es-ES",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"Se ha producido un error.",DIALOGS_CLOSE:"Cerrar",DIALOGS_PLEASE_WAIT:"Espere por favor",DIALOGS_PLEASE_WAIT_ELIPS:"Espere por favor...",DIALOGS_PLEASE_WAIT_MSG:"Completando operación.",DIALOGS_PERCENT_COMPLETE:"% Completado",DIALOGS_NOTIFICATION:"Notificación",DIALOGS_NOTIFICATION_MSG:"Notificación de una aplicación desconocida.",DIALOGS_CONFIRMATION:"Confirmación",DIALOGS_CONFIRMATION_MSG:"Se requiere confirmacion.",DIALOGS_OK:"Aceptar",DIALOGS_YES:"Sí",DIALOGS_NO:"No"}),O.translations("fr-FR",{DIALOGS_ERROR:"Erreur",DIALOGS_ERROR_MSG:"Une erreur inconnue s'est produite.",DIALOGS_CLOSE:"Fermer",DIALOGS_PLEASE_WAIT:"Patientez svp",DIALOGS_PLEASE_WAIT_ELIPS:"Patienter svp...",DIALOGS_PLEASE_WAIT_MSG:"En attente de la fin de l'opération.",DIALOGS_PERCENT_COMPLETE:"% Terminer",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Notification de l'application inconnue",DIALOGS_CONFIRMATION:"Confirmer",DIALOGS_CONFIRMATION_MSG:"Merci de confirmer",DIALOGS_OK:"OK",DIALOGS_YES:"Oui",DIALOGS_NO:"Non"}),O.translations("pt-BR",{DIALOGS_ERROR:"Erro",DIALOGS_ERROR_MSG:"Ocorreu um erro inesperado.",DIALOGS_CLOSE:"Fechar",DIALOGS_PLEASE_WAIT:"Por favor aguarde",DIALOGS_PLEASE_WAIT_ELIPS:"Por favor aguarde...",DIALOGS_PLEASE_WAIT_MSG:"Aguardando que a operação termine.",DIALOGS_PERCENT_COMPLETE:"% Completados",DIALOGS_NOTIFICATION:"Notificação",DIALOGS_NOTIFICATION_MSG:"Notificação de aplicação desconhecida.",DIALOGS_CONFIRMATION:"Confirmação",DIALOGS_CONFIRMATION_MSG:"Confirmação requerida.",DIALOGS_OK:"OK",DIALOGS_YES:"Sim",DIALOGS_NO:"Não"}),O.translations("zh-CN",{DIALOGS_ERROR:"错误",DIALOGS_ERROR_MSG:"出现未知错误。",DIALOGS_CLOSE:"关闭",DIALOGS_PLEASE_WAIT:"请稍候",DIALOGS_PLEASE_WAIT_ELIPS:"请稍候...",DIALOGS_PLEASE_WAIT_MSG:"请等待操作完成。",DIALOGS_PERCENT_COMPLETE:"% 已完成",DIALOGS_NOTIFICATION:"通知",DIALOGS_NOTIFICATION_MSG:"未知应用程序的通知。",DIALOGS_CONFIRMATION:"确认",DIALOGS_CONFIRMATION_MSG:"确认要求。",DIALOGS_OK:"确定",DIALOGS_YES:"确认",DIALOGS_NO:"取消"}),O.preferredLanguage("en-US")}]);
@@ -67116,13 +67279,13 @@ angular.module('md5', []).constant('md5', (function() {
             delete attrs[directiveName];
             opts = filterKeys('gravatar', attrs);
             unbind = scope.$watch(item, function(newVal) {
+              element.attr('src', gravatarService.url(newVal, opts));
               if (bindOnce) {
                 if (newVal == null) {
                   return;
                 }
                 unbind();
               }
-              element.attr('src', gravatarService.url(newVal, opts));
             });
           }
         };
@@ -69380,7 +69543,6 @@ angular.module('cfp.loadingBar', [])
           $animate = $injector.get('$animate');
         }
 
-        var $parent = $document.find($parentSelector).eq(0);
         $timeout.cancel(completeTimeout);
 
         // do not continually broadcast the started event:
@@ -69388,15 +69550,28 @@ angular.module('cfp.loadingBar', [])
           return;
         }
 
+        var document = $document[0];
+        var parent = document.querySelector ?
+          document.querySelector($parentSelector)
+          : $document.find($parentSelector)[0]
+        ;
+
+        if (! parent) {
+          parent = document.getElementsByTagName('body')[0];
+        }
+
+        var $parent = angular.element(parent);
+        var $after = parent.lastChild && angular.element(parent.lastChild);
+
         $rootScope.$broadcast('cfpLoadingBar:started');
         started = true;
 
         if (includeBar) {
-          $animate.enter(loadingBarContainer, $parent, angular.element($parent[0].lastChild));
+          $animate.enter(loadingBarContainer, $parent, $after);
         }
 
         if (includeSpinner) {
-          $animate.enter(spinner, $parent, angular.element($parent[0].lastChild));
+          $animate.enter(spinner, $parent, loadingBarContainer);
         }
 
         _set(startSize);
@@ -70214,7 +70389,7 @@ angular.module('cfp.loadingBar', [])
 });
 
 /**
- * @license AngularJS v1.5.0
+ * @license AngularJS v1.5.2
  * (c) 2010-2016 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -70244,45 +70419,66 @@ var jqLite = angular.element;
  * `ngMessage` and `ngMessageExp` directives.
  *
  * # Usage
- * The `ngMessages` directive listens on a key/value collection which is set on the ngMessages attribute.
- * Since the {@link ngModel ngModel} directive exposes an `$error` object, this error object can be
- * used with `ngMessages` to display control error messages in an easier way than with just regular angular
- * template directives.
+ * The `ngMessages` directive allows keys in a key/value collection to be associated with a child element
+ * (or 'message') that will show or hide based on the truthiness of that key's value in the collection. A common use
+ * case for `ngMessages` is to display error messages for inputs using the `$error` object exposed by the
+ * {@link ngModel ngModel} directive.
+ *
+ * The child elements of the `ngMessages` directive are matched to the collection keys by a `ngMessage` or
+ * `ngMessageExp` directive. The value of these attributes must match a key in the collection that is provided by
+ * the `ngMessages` directive.
+ *
+ * Consider the following example, which illustrates a typical use case of `ngMessages`. Within the form `myForm` we
+ * have a text input named `myField` which is bound to the scope variable `field` using the {@link ngModel ngModel}
+ * directive.
+ *
+ * The `myField` field is a required input of type `email` with a maximum length of 15 characters.
  *
  * ```html
  * <form name="myForm">
  *   <label>
  *     Enter text:
- *     <input type="text" ng-model="field" name="myField" required minlength="5" />
+ *     <input type="email" ng-model="field" name="myField" required maxlength="15" />
  *   </label>
  *   <div ng-messages="myForm.myField.$error" role="alert">
- *     <div ng-message="required">You did not enter a field</div>
- *     <div ng-message="minlength, maxlength">
- *       Your email must be between 5 and 100 characters long
- *     </div>
+ *     <div ng-message="required">Please enter a value for this field.</div>
+ *     <div ng-message="email">This field must be a valid email address.</div>
+ *     <div ng-message="maxlength">This field can be at most 15 characters long.</div>
  *   </div>
  * </form>
  * ```
  *
- * Now whatever key/value entries are present within the provided object (in this case `$error`) then
- * the ngMessages directive will render the inner first ngMessage directive (depending if the key values
- * match the attribute value present on each ngMessage directive). In other words, if your errors
- * object contains the following data:
+ * In order to show error messages corresponding to `myField` we first create an element with an `ngMessages` attribute
+ * set to the `$error` object owned by the `myField` input in our `myForm` form.
+ *
+ * Within this element we then create separate elements for each of the possible errors that `myField` could have.
+ * The `ngMessage` attribute is used to declare which element(s) will appear for which error - for example,
+ * setting `ng-message="required"` specifies that this particular element should be displayed when there
+ * is no value present for the required field `myField` (because the key `required` will be `true` in the object
+ * `myForm.myField.$error`).
+ *
+ * ### Message order
+ *
+ * By default, `ngMessages` will only display one message for a particular key/value collection at any time. If more
+ * than one message (or error) key is currently true, then which message is shown is determined by the order of messages
+ * in the HTML template code (messages declared first are prioritised). This mechanism means the developer does not have
+ * to prioritise messages using custom JavaScript code.
+ *
+ * Given the following error object for our example (which informs us that the field `myField` currently has both the
+ * `required` and `email` errors):
  *
  * ```javascript
  * <!-- keep in mind that ngModel automatically sets these error flags -->
- * myField.$error = { minlength : true, required : true };
+ * myField.$error = { required : true, email: true, maxlength: false };
  * ```
+ * The `required` message will be displayed to the user since it appears before the `email` message in the DOM.
+ * Once the user types a single character, the `required` message will disappear (since the field now has a value)
+ * but the `email` message will be visible because it is still applicable.
  *
- * Then the `required` message will be displayed first. When required is false then the `minlength` message
- * will be displayed right after (since these messages are ordered this way in the template HTML code).
- * The prioritization of each message is determined by what order they're present in the DOM.
- * Therefore, instead of having custom JavaScript code determine the priority of what errors are
- * present before others, the presentation of the errors are handled within the template.
+ * ### Displaying multiple messages at the same time
  *
- * By default, ngMessages will only display one error at a time. However, if you wish to display all
- * messages then the `ng-messages-multiple` attribute flag can be used on the element containing the
- * ngMessages directive to make this happen.
+ * While `ngMessages` will by default only display one error element at a time, the `ng-messages-multiple` attribute can
+ * be applied to the `ngMessages` container element to cause it to display all applicable error messages at once:
  *
  * ```html
  * <!-- attribute-style usage -->
@@ -70742,7 +70938,10 @@ angular.module('ngMessages', [])
              element.after(contents);
 
              // the anchor is placed for debugging purposes
-             var anchor = jqLite($document[0].createComment(' ngMessagesInclude: ' + src + ' '));
+             var comment = $compile.$$createComment ?
+                 $compile.$$createComment('ngMessagesInclude', src) :
+                 $document[0].createComment(' ngMessagesInclude: ' + src + ' ');
+             var anchor = jqLite(comment);
              element.after(anchor);
 
              // we don't want to pollute the DOM anymore by keeping an empty directive element
@@ -71715,7 +71914,7 @@ angular.module('angularPayments', []);angular.module('angularPayments')
 }]);
 
 /**
- * @license AngularJS v1.5.0
+ * @license AngularJS v1.5.2
  * (c) 2010-2016 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -72427,7 +72626,7 @@ angular.module('ngResource', ['ng']).
               return $q.reject(response);
             });
 
-            promise.finally(function() {
+            promise['finally'](function() {
               value.$resolved = true;
               if (!isInstanceCall && cancellable) {
                 value.$cancelRequest = angular.noop;
@@ -72484,7 +72683,7 @@ angular.module('ngResource', ['ng']).
 })(window, window.angular);
 
 /**
- * @license AngularJS v1.5.1
+ * @license AngularJS v1.5.2
  * (c) 2010-2016 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -73395,7 +73594,7 @@ function verifyQ (assertQConstructor) {
 },{"./provider":5,"angular-assert-q-constructor":1}]},{},[7])(7)
 });
 /*!
- * angular-translate - v2.10.0 - 2016-02-28
+ * angular-translate - v2.11.0 - 2016-03-20
  * 
  * Copyright (c) 2016 The angular-translate team, Pascal Precht; Licensed MIT
  */
@@ -73422,6 +73621,13 @@ function verifyQ (assertQConstructor) {
  * @description
  * The main module which holds everything together.
  */
+runTranslate.$inject = ['$translate'];
+$translate.$inject = ['$STORAGE_KEY', '$windowProvider', '$translateSanitizationProvider', 'pascalprechtTranslateOverrider'];
+$translateDefaultInterpolation.$inject = ['$interpolate', '$translateSanitization'];
+translateDirective.$inject = ['$translate', '$q', '$interpolate', '$compile', '$parse', '$rootScope'];
+translateCloakDirective.$inject = ['$translate', '$rootScope'];
+translateFilterFactory.$inject = ['$parse', '$translate'];
+$translationCache.$inject = ['$cacheFactory'];
 angular.module('pascalprecht.translate', ['ng'])
   .run(runTranslate);
 
@@ -73455,7 +73661,6 @@ function runTranslate($translate) {
     $translate.use($translate.preferredLanguage());
   }
 }
-runTranslate.$inject = ['$translate'];
 
 runTranslate.displayName = 'runTranslate';
 
@@ -73770,6 +73975,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       loaderCache,
       directivePriority = 0,
       statefulFilter = true,
+      postProcessFn,
       uniformLanguageTagResolver = 'default',
       languageTagResolver = {
         'default': function (tag) {
@@ -73784,10 +73990,15 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           var temp = (tag || '').split('_').join('-');
           var parts = temp.split('-');
           return parts.length > 1 ? (parts[0].toLowerCase() + '-' + parts[1].toUpperCase()) : temp;
+        },
+        'iso639-1': function (tag) {
+          var temp = (tag || '').split('_').join('-');
+          var parts = temp.split('-');
+          return parts[0].toLowerCase();
         }
       };
 
-  var version = '2.10.0';
+  var version = '2.11.0';
 
   // tries to determine the browsers language
   var getFirstBrowserLanguage = function () {
@@ -73890,17 +74101,19 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
     if ($languageKeyAliases) {
       var alias;
       for (var langKeyAlias in $languageKeyAliases) {
-        var hasWildcardKey = false;
-        var hasExactKey = Object.prototype.hasOwnProperty.call($languageKeyAliases, langKeyAlias) &&
-          angular.lowercase(langKeyAlias) === angular.lowercase(preferred);
+        if ($languageKeyAliases.hasOwnProperty(langKeyAlias)) {
+          var hasWildcardKey = false;
+          var hasExactKey = Object.prototype.hasOwnProperty.call($languageKeyAliases, langKeyAlias) &&
+            angular.lowercase(langKeyAlias) === angular.lowercase(preferred);
 
-        if (langKeyAlias.slice(-1) === '*') {
-          hasWildcardKey = langKeyAlias.slice(0, -1) === preferred.slice(0, langKeyAlias.length-1);
-        }
-        if (hasExactKey || hasWildcardKey) {
-          alias = $languageKeyAliases[langKeyAlias];
-          if (indexOf(avail, angular.lowercase(alias)) > -1) {
-            return alias;
+          if (langKeyAlias.slice(-1) === '*') {
+            hasWildcardKey = langKeyAlias.slice(0, -1) === preferred.slice(0, langKeyAlias.length - 1);
+          }
+          if (hasExactKey || hasWildcardKey) {
+            alias = $languageKeyAliases[langKeyAlias];
+            if (indexOf(avail, angular.lowercase(alias)) > -1) {
+              return alias;
+            }
           }
         }
       }
@@ -73949,7 +74162,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
    * registered with no language key. Invoking it with a language key returns the
    * related translation table.
    *
-   * @param {string} key A language key.
+   * @param {string} langKey A language key.
    * @param {object} translationTable A plain old JavaScript object that represents a translation table.
    *
    */
@@ -74266,6 +74479,20 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       return this;
     }
     return $uses;
+  };
+
+  /**
+   * @ngdoc function
+   * @name pascalprecht.translate.$translateProvider#resolveClientLocale
+   * @methodOf pascalprecht.translate.$translateProvider
+   *
+   * @description
+   * This returns the current browser/client's language key. The result is processed with the configured uniform tag resolver.
+   *
+   * @returns {string} the current client/browser language key
+   */
+  this.resolveClientLocale = function () {
+    return getLocale();
   };
 
  /**
@@ -74681,6 +74908,25 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
   };
 
   /**
+   * @ngdoc function
+   * @name pascalprecht.translate.$translateProvider#postProcess
+   * @methodOf pascalprecht.translate.$translateProvider
+   *
+   * @description
+   * The post processor will be intercept right after the translation result. It can modify the result.
+   *
+   * @param {object} fn Function or service name (string) to be called after the translation value has been set / resolved. The function itself will enrich every value being processed and then continue the normal resolver process
+   */
+  this.postProcess = function (fn) {
+    if (fn) {
+      postProcessFn = fn;
+    } else {
+      postProcessFn = undefined;
+    }
+    return this;
+  };
+
+  /**
    * @ngdoc object
    * @name pascalprecht.translate.$translate
    * @requires $interpolate
@@ -74723,9 +74969,16 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           startFallbackIteration;
 
       var $translate = function (translationId, interpolateParams, interpolationId, defaultTranslationText, forceLanguage) {
-
+        if (!$uses && $preferredLanguage) {
+          $uses = $preferredLanguage;
+        }
         var uses = (forceLanguage && forceLanguage !== $uses) ? // we don't want to re-negotiate $uses
               (negotiateLocale(forceLanguage) || forceLanguage) : $uses;
+
+        // Check forceLanguage is present
+        if (forceLanguage) {
+          loadTranslationsIfMissing(forceLanguage);
+        }
 
         // Duck detection: If the first argument is an array, a bunch of translations was requested.
         // The result is an object.
@@ -75020,7 +75273,11 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
               getFallbackTranslation(langKey, translation.substr(2), interpolateParams, Interpolator)
                 .then(deferred.resolve, deferred.reject);
             } else {
-              deferred.resolve(Interpolator.interpolate(translationTable[translationId], interpolateParams));
+              var interpolatedValue = Interpolator.interpolate(translationTable[translationId], interpolateParams);
+              interpolatedValue = applyPostProcessing(translationId, translationTable[translationId], interpolatedValue, interpolateParams, langKey);
+
+              deferred.resolve(interpolatedValue);
+
             }
             Interpolator.setLocale($uses);
           } else {
@@ -75071,14 +75328,16 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
        * Translate by missing translation handler.
        *
        * @param translationId
+       * @param interpolateParams
+       * @param defaultTranslationText
        * @returns translation created by $missingTranslationHandler or translationId is $missingTranslationHandler is
        * absent
        */
-      var translateByHandler = function (translationId, interpolateParams) {
+      var translateByHandler = function (translationId, interpolateParams, defaultTranslationText) {
         // If we have a handler factory - we might also call it here to determine if it provides
         // a default text for a translationid that can't be found anywhere in our tables
         if ($missingTranslationHandlerFactory) {
-          var resultString = $injector.get($missingTranslationHandlerFactory)(translationId, $uses, interpolateParams);
+          var resultString = $injector.get($missingTranslationHandlerFactory)(translationId, $uses, interpolateParams, defaultTranslationText);
           if (resultString !== undefined) {
             return resultString;
           } else {
@@ -75108,11 +75367,13 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         if (fallbackLanguageIndex < $fallbackLanguage.length) {
           var langKey = $fallbackLanguage[fallbackLanguageIndex];
           getFallbackTranslation(langKey, translationId, interpolateParams, Interpolator).then(
-            deferred.resolve,
+            function (data) {
+                deferred.resolve(data);
+            },
             function () {
               // Look in the next fallback language for a translation.
               // It delays the resolving by passing another promise to resolve.
-              resolveForFallbackLanguage(fallbackLanguageIndex + 1, translationId, interpolateParams, Interpolator, defaultTranslationText).then(deferred.resolve);
+              return resolveForFallbackLanguage(fallbackLanguageIndex + 1, translationId, interpolateParams, Interpolator, defaultTranslationText).then(deferred.resolve, deferred.reject);
             }
           );
         } else {
@@ -75123,7 +75384,12 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           } else {
             // if no default translation is set and an error handler is defined, send it to the handler
             // and then return the result
-            deferred.resolve(translateByHandler(translationId, interpolateParams));
+            if ($missingTranslationHandlerFactory) {
+              deferred.resolve(translateByHandler(translationId, interpolateParams));
+            } else {
+              deferred.reject(translateByHandler(translationId, interpolateParams));
+            }
+
           }
         }
         return deferred.promise;
@@ -75198,13 +75464,16 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
             $translate(translation.substr(2), interpolateParams, interpolationId, defaultTranslationText, uses)
               .then(deferred.resolve, deferred.reject);
           } else {
-            deferred.resolve(Interpolator.interpolate(translation, interpolateParams));
+            //
+            var resolvedTranslation = Interpolator.interpolate(translation, interpolateParams);
+            resolvedTranslation = applyPostProcessing(translationId, translation, resolvedTranslation, interpolateParams, uses);
+            deferred.resolve(resolvedTranslation);
           }
         } else {
           var missingTranslationHandlerTranslation;
           // for logging purposes only (as in $translateMissingTranslationHandlerLog), value is not returned to promise
           if ($missingTranslationHandlerFactory && !pendingLoader) {
-            missingTranslationHandlerTranslation = translateByHandler(translationId, interpolateParams);
+            missingTranslationHandlerTranslation = translateByHandler(translationId, interpolateParams, defaultTranslationText);
           }
 
           // since we couldn't translate the inital requested translation id,
@@ -75288,6 +75557,31 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           $nextLang = undefined;
         }
         langPromises[key] = undefined;
+      };
+
+      var applyPostProcessing = function (translationId, translation, resolvedTranslation, interpolateParams, uses) {
+        var fn = postProcessFn;
+
+        if (fn) {
+
+          if (typeof(fn) === 'string') {
+            // getting on-demand instance
+            fn = $injector.get(fn);
+          }
+          if (fn) {
+            return fn(translationId, translation, resolvedTranslation, interpolateParams, uses);
+          }
+        }
+
+        return resolvedTranslation;
+      };
+
+      var loadTranslationsIfMissing = function (key) {
+        if (!$translationTable[key] && $loaderFactory && !langPromises[key]) {
+          langPromises[key] = loadAsync(key).then(function (translation) {
+            translations(translation.key, translation.table);
+          });
+        }
       };
 
       /**
@@ -75481,6 +75775,11 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
 
         // Try to get the aliased language key
         var aliasedKey = negotiateLocale(key);
+        // Ensure only registered language keys will be loaded
+        if ($availableLanguageKeys.length > 0 && !aliasedKey) {
+          return $q.reject(key);
+        }
+
         if (aliasedKey) {
           key = aliasedKey;
         }
@@ -75528,6 +75827,20 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         }
 
         return deferred.promise;
+      };
+
+      /**
+       * @ngdoc function
+       * @name pascalprecht.translate.$translate#resolveClientLocale
+       * @methodOf pascalprecht.translate.$translate
+       *
+       * @description
+       * This returns the current browser/client's language key. The result is processed with the configured uniform tag resolver.
+       *
+       * @returns {string} the current client/browser language key
+       */
+      $translate.resolveClientLocale = function () {
+        return getLocale();
       };
 
       /**
@@ -75702,6 +76015,11 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           return translationId;
         }
 
+        // Check forceLanguage is present
+        if (forceLanguage) {
+          loadTranslationsIfMissing(forceLanguage);
+        }
+
         // Duck detection: If the first argument is an array, a bunch of translations was requested.
         // The result is an object.
         if (angular.isArray(translationId)) {
@@ -75844,6 +76162,25 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         return deferred.promise;
       };
 
+      /**
+       * @ngdoc function
+       * @name pascalprecht.translate.$translate#getAvailableLanguageKeys
+       * @methodOf pascalprecht.translate.$translate
+       *
+       * @description
+       * This function simply returns the registered language keys being defined before in the config phase
+       * With this, an application can use the array to provide a language selection dropdown or similar
+       * without any additional effort
+       *
+       * @returns {object} returns the list of possibly registered language keys and mapping or null if not defined
+       */
+      $translate.getAvailableLanguageKeys = function () {
+        if ($availableLanguageKeys.length > 0) {
+          return $availableLanguageKeys;
+        }
+        return null;
+      };
+
       // Whenever $translateReady is being fired, this will ensure the state of $isReady
       var globalOnReadyListener = $rootScope.$on('$translateReady', function () {
         $onReadyDeferred.resolve();
@@ -75889,7 +76226,6 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
     }
   ];
 }
-$translate.$inject = ['$STORAGE_KEY', '$windowProvider', '$translateSanitizationProvider', 'pascalprechtTranslateOverrider'];
 
 $translate.displayName = 'displayName';
 
@@ -75978,7 +76314,6 @@ function $translateDefaultInterpolation ($interpolate, $translateSanitization) {
 
   return $translateInterpolator;
 }
-$translateDefaultInterpolation.$inject = ['$interpolate', '$translateSanitization'];
 
 $translateDefaultInterpolation.displayName = '$translateDefaultInterpolation';
 
@@ -76003,6 +76338,7 @@ angular.module('pascalprecht.translate')
  * @param {string=} translate-attr-ATTR translate Translation id and put it into ATTR attribute.
  * @param {string=} translate-default will be used unless translation was successful
  * @param {boolean=} translate-compile (default true if present) defines locally activation of {@link pascalprecht.translate.$translateProvider#methods_usePostCompiling}
+ * @param {boolean=} translate-keep-content (default true if present) defines that in case a KEY could not be translated, that the existing content is left in the innerHTML}
  *
  * @example
    <example module="ngView">
@@ -76231,7 +76567,6 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
         // Master update function
         var updateTranslations = function () {
           for (var key in translationIds) {
-
             if (translationIds.hasOwnProperty(key) && translationIds[key] !== undefined) {
               updateTranslation(key, translationIds[key], scope, scope.interpolateParams, scope.defaultText, scope.translateNamespace);
             }
@@ -76259,12 +76594,16 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
         };
 
         var applyTranslation = function (value, scope, successful, translateAttr) {
-          if (translateAttr === 'translate') {
-            // default translate into innerHTML
-            if (!successful && typeof scope.defaultText !== 'undefined') {
+          if (!successful) {
+            if (typeof scope.defaultText !== 'undefined') {
               value = scope.defaultText;
             }
-            iElement.empty().append(scope.preText + value + scope.postText);
+          }
+          if (translateAttr === 'translate') {
+            // default translate into innerHTML
+            if (successful || (!successful && typeof iAttr.translateKeepContent === 'undefined')) {
+              iElement.empty().append(scope.preText + value + scope.postText);
+            }
             var globallyEnabled = $translate.isPostCompilingEnabled();
             var locallyDefined = typeof tAttr.translateCompile !== 'undefined';
             var locallyEnabled = locallyDefined && tAttr.translateCompile !== 'false';
@@ -76273,9 +76612,6 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
             }
           } else {
             // translate attribute
-            if (!successful && typeof scope.defaultText !== 'undefined') {
-              value = scope.defaultText;
-            }
             var attributeName = iAttr.$attr[translateAttr];
             if (attributeName.substr(0, 5) === 'data-') {
               // ensure html5 data prefix is stripped
@@ -76289,7 +76625,9 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
         if (translateValuesExist || translateValueExist || iAttr.translateDefault) {
           scope.$watch('interpolateParams', updateTranslations, true);
         }
-        scope.$watch('translateLanguage', updateTranslations);
+
+        // Replaced watcher on translateLanguage with event listener
+        var unbindTranslateLanguage = scope.$on('translateLanguageChanged', updateTranslations);
 
         // Ensures the text will be refreshed after the current language was changed
         // w/ $translate.use(...)
@@ -76307,12 +76645,14 @@ function translateDirective($translate, $q, $interpolate, $compile, $parse, $roo
           observeElementTranslation(iAttr.translate);
         }
         updateTranslations();
-        scope.$on('$destroy', unbind);
+        scope.$on('$destroy', function(){
+          unbindTranslateLanguage();
+          unbind();
+        });
       };
     }
   };
 }
-translateDirective.$inject = ['$translate', '$q', '$interpolate', '$compile', '$parse', '$rootScope'];
 
 /**
  * Returns the scope's namespace.
@@ -76388,7 +76728,6 @@ function translateCloakDirective($translate, $rootScope) {
     }
   };
 }
-translateCloakDirective.$inject = ['$translate', '$rootScope'];
 
 translateCloakDirective.displayName = 'translateCloakDirective';
 
@@ -76541,8 +76880,13 @@ function translateLanguageDirective() {
     scope: true,
     compile: function () {
       return function linkFn(scope, iElement, iAttrs) {
+
         iAttrs.$observe('translateLanguage', function (newTranslateLanguage) {
           scope.translateLanguage = newTranslateLanguage;
+        });
+
+        scope.$watch('translateLanguage', function(){
+          scope.$broadcast('translateLanguageChanged');
         });
       };
     }
@@ -76550,7 +76894,6 @@ function translateLanguageDirective() {
 }
 
 translateLanguageDirective.displayName = 'translateLanguageDirective';
-
 
 angular.module('pascalprecht.translate')
 /**
@@ -76611,7 +76954,6 @@ function translateFilterFactory($parse, $translate) {
   'use strict';
 
   var translateFilter = function (translationId, interpolateParams, interpolation, forceLanguage) {
-
     if (!angular.isObject(interpolateParams)) {
       interpolateParams = $parse(interpolateParams)(this);
     }
@@ -76625,7 +76967,6 @@ function translateFilterFactory($parse, $translate) {
 
   return translateFilter;
 }
-translateFilterFactory.$inject = ['$parse', '$translate'];
 
 translateFilterFactory.displayName = 'translateFilterFactory';
 
@@ -76651,7 +76992,6 @@ function $translationCache($cacheFactory) {
 
   return $cacheFactory('translations');
 }
-$translationCache.$inject = ['$cacheFactory'];
 
 $translationCache.displayName = '$translationCache';
 return 'pascalprecht.translate';
@@ -103326,73 +103666,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
 }, this);
 
-/*!
-	query-string
-	Parse and stringify URL query strings
-	https://github.com/sindresorhus/query-string
-	by Sindre Sorhus
-	MIT License
-*/
-(function () {
-	'use strict';
-	var queryString = {};
-
-	queryString.parse = function (str) {
-		if (typeof str !== 'string') {
-			return {};
-		}
-
-		str = str.trim().replace(/^(\?|#)/, '');
-
-		if (!str) {
-			return {};
-		}
-
-		return str.trim().split('&').reduce(function (ret, param) {
-			var parts = param.replace(/\+/g, ' ').split('=');
-			var key = parts[0];
-			var val = parts[1];
-
-			key = decodeURIComponent(key);
-			// missing `=` should be `null`:
-			// http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
-			val = val === undefined ? null : decodeURIComponent(val);
-
-			if (!ret.hasOwnProperty(key)) {
-				ret[key] = val;
-			} else if (Array.isArray(ret[key])) {
-				ret[key].push(val);
-			} else {
-				ret[key] = [ret[key], val];
-			}
-
-			return ret;
-		}, {});
-	};
-
-	queryString.stringify = function (obj) {
-		return obj ? Object.keys(obj).map(function (key) {
-			var val = obj[key];
-
-			if (Array.isArray(val)) {
-				return val.map(function (val2) {
-					return encodeURIComponent(key) + '=' + encodeURIComponent(val2);
-				}).join('&');
-			}
-
-			return encodeURIComponent(key) + '=' + encodeURIComponent(val);
-		}).join('&') : '';
-	};
-
-	if (typeof define === 'function' && define.amd) {
-		define(function() { return queryString; });
-	} else if (typeof module !== 'undefined' && module.exports) {
-		module.exports = queryString;
-	} else {
-		self.queryString = queryString;
-	}
-})();
-
 (function () {
   'use strict';
 
@@ -104585,6 +104858,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'dialogs.default-translations',
 
     'exceptionless',
+    'exceptionless.autofocus',
     'exceptionless.date-range-parser',
     'exceptionless.date-range-picker',
     'exceptionless.refresh'
@@ -104651,22 +104925,22 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         controller: ['$interval', '$scope', 'dialogs', 'filterService', function ($interval, $scope, dialogs, filterService) {
           var vm = this;
 
-          function getFilterName() {
+          function getFilteredDisplayName() {
             var time = filterService.getTime();
             if (time === 'last hour') {
-              return moment().subtract(1, 'hours').twix(moment()).format();
+              return 'Last Hour';
             }
 
             if (time === 'last 24 hours') {
-              return moment().subtract(24, 'hours').twix(moment()).format();
+              return 'Last 24 Hours';
             }
 
             if (time === 'last week') {
-              return moment().subtract(7, 'days').startOf('day').twix(moment()).format();
+              return 'Last Week';
             }
 
             if (time === 'last 30 days') {
-              return moment().subtract(30, 'days').startOf('day').twix(moment()).format();
+              return 'Last 30 Days';
             }
 
             if (time === 'all') {
@@ -104679,17 +104953,17 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             }
 
             setFilter('last week');
-            return moment().subtract(7, 'days').startOf('day').twix(moment()).format();
+            return 'Last Week';
           }
 
-          function isActive(filterName) {
+          function isActive(timeRangeName) {
             var time = filterService.getTime();
-            if (time && filterName === 'Custom') {
+            if (time && timeRangeName === 'Custom') {
               var range = dateRangeParserService.parse(time);
               return range && range.start && range.end;
             }
 
-            return filterName === time;
+            return timeRangeName === time;
           }
 
           function hasFilter() {
@@ -104729,22 +105003,22 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             filterService.setTime(filter);
           }
 
-          function updateFilterName() {
-            vm.filterName = getFilterName();
+          function updateFilterDisplayName() {
+            vm.filteredDisplayName = getFilteredDisplayName();
           }
 
-          var interval = $interval(updateFilterName, 60 * 1000);
+          var interval = $interval(updateFilterDisplayName, 60 * 1000);
           $scope.$on('$destroy', function () {
             $interval.cancel(interval);
           });
 
           vm.hasFilter = hasFilter;
           vm.isActive = isActive;
-          vm.filterName = getFilterName();
+          vm.filteredDisplayName = getFilteredDisplayName();
           vm.isDropDownOpen = false;
           vm.setCustomFilter = setCustomFilter;
           vm.setFilter = setFilter;
-          vm.updateFilterName = updateFilterName;
+          vm.updateFilterDisplayName = updateFilterDisplayName;
         }],
         controllerAs: 'vm'
       };
@@ -105280,8 +105554,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   angular.module('exceptionless.filter')
     .factory('filterService', ['$rootScope', 'filterStoreService', 'objectIDService', function ($rootScope, filterStoreService, objectIDService) {
       var DEFAULT_TIME_FILTER = 'last week';
-      var _includeFixed = filterStoreService.getIncludeFixed();
-      var _includeHidden = filterStoreService.getIncludeHidden();
       var _time = filterStoreService.getTimeFilter() || DEFAULT_TIME_FILTER;
       var _eventType, _organizationId, _projectId, _raw;
 
@@ -105291,14 +105563,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       function buildFilter() {
         var filters = [];
-
-        if (!_includeFixed) {
-          filters.push('fixed:false');
-        }
-
-        if (!_includeHidden) {
-          filters.push('hidden:false');
-        }
 
         if (_organizationId) {
           filters.push('organization:' + _organizationId);
@@ -105313,20 +105577,31 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         if (_raw) {
-          filters.push(_raw);
+          filters.push('(' + _raw + ')');
         }
 
-        return filters.join(' ');
+        var filter = filters.join(' ');
+        var hasFixed = filter.search(/\bfixed:/i) !== -1;
+        var hasHidden = filter.search(/\bhidden:/i) !== -1;
+        if (!hasFixed || !hasHidden) {
+          if (!hasFixed) {
+            filter += ' fixed:false';
+          }
+
+          if (!hasHidden) {
+            filter += ' hidden:false';
+          }
+        }
+
+        return filter.trim();
       }
 
-      function clearFilterAndIncludeFixedAndIncludeHidden() {
-        if (!_raw && !_includeFixed && !_includeHidden) {
+      function clearFilter() {
+        if (!_raw) {
           return;
         }
 
         setFilter(null, false);
-        setIncludeFixed(null, false);
-        setIncludeHidden(null, false);
         fireFilterChanged();
       }
 
@@ -105368,14 +105643,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return _raw;
       }
 
-      function getIncludeFixed() {
-        return _includeFixed === true;
-      }
-
-      function getIncludeHidden() {
-        return _includeHidden === true;
-      }
-
       function getProjectId() {
         return _projectId;
       }
@@ -105397,7 +105664,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function hasFilter() {
-        return _includeFixed || _includeHidden || _raw || (_time && _time !== 'all');
+        return _raw || (_time && _time !== 'all');
       }
 
       function includedInProjectOrOrganizationFilter(data) {
@@ -105419,32 +105686,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         _eventType = eventType;
-
-        if (!suspendNotifications) {
-          fireFilterChanged();
-        }
-      }
-
-      function setIncludeFixed(includeFixed, suspendNotifications) {
-        if (angular.equals(includeFixed, _includeFixed)) {
-          return;
-        }
-
-        _includeFixed = includeFixed === true;
-        filterStoreService.setIncludeFixed(_includeFixed);
-
-        if (!suspendNotifications) {
-          fireFilterChanged();
-        }
-      }
-
-      function setIncludeHidden(includeHidden, suspendNotifications) {
-        if (angular.equals(includeHidden, _includeHidden)) {
-          return;
-        }
-
-        _includeHidden = includeHidden === true;
-        filterStoreService.setIncludeHidden(_includeHidden);
 
         if (!suspendNotifications) {
           fireFilterChanged();
@@ -105516,12 +105757,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       var service = {
         apply: apply,
-        clearFilterAndIncludeFixedAndIncludeHidden: clearFilterAndIncludeFixedAndIncludeHidden,
+        clearFilter: clearFilter,
         clearOrganizationAndProjectFilter: clearOrganizationAndProjectFilter,
         getEventType: getEventType,
         getFilter: getFilter,
-        getIncludeFixed: getIncludeFixed,
-        getIncludeHidden: getIncludeHidden,
         getProjectId: getProjectId,
         getOrganizationId: getOrganizationId,
         getTime: getTime,
@@ -105529,8 +105768,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         includedInProjectOrOrganizationFilter: includedInProjectOrOrganizationFilter,
         setEventType: setEventType,
         setFilter: setFilter,
-        setIncludeFixed: setIncludeFixed,
-        setIncludeHidden: setIncludeHidden,
         setOrganizationId: setOrganizationId,
         setProjectId: setProjectId,
         setTime: setTime
@@ -105547,24 +105784,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     .factory('filterStoreService', ['$window', 'locker', function ($window, locker) {
       var _store = locker.driver('local').namespace('filter');
 
-      function getIncludeFixed() {
-        return _store.get('fixed');
-      }
-
-      function getIncludeHidden() {
-        return _store.get('hidden');
-      }
-
       function getTimeFilter() {
         return _store.get('time');
-      }
-
-      function setIncludeFixed(includeFixed) {
-        _store.put('fixed', includeFixed);
-      }
-
-      function setIncludeHidden(includeHidden) {
-        _store.put('hidden', includeHidden);
       }
 
       function setTimeFilter(timeFilter) {
@@ -105572,11 +105793,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       var service = {
-        getIncludeFixed: getIncludeFixed,
-        getIncludeHidden: getIncludeHidden,
         getTimeFilter: getTimeFilter,
-        setIncludeFixed: setIncludeFixed,
-        setIncludeHidden: setIncludeHidden,
         setTimeFilter: setTimeFilter
       };
 
@@ -105788,10 +106005,46 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         var links = {};
         for (var rel in parsedLinks) {
           var url = parsedLinks[rel];
-          links[rel] = queryString.parse(url.slice(url.indexOf('?')));
+          links[rel] = parseQueryString(url.slice(url.indexOf('?')));
         }
 
         return links;
+      }
+
+      function parseQueryString(input) {
+        // Source import from https://github.com/sindresorhus/query-string due to lack of browser support (node / requirejs).
+        if (typeof input !== 'string') {
+          return {};
+        }
+
+        input = input.trim().replace(/^(\?|#|&)/, '');
+        if (!input) {
+          return {};
+        }
+
+        return input.split('&').reduce(function (previous, param) {
+          var parts = param.replace(/\+/g, ' ').split('=');
+          // Firefox (pre 40) decodes `%3D` to `=`
+          // https://github.com/sindresorhus/query-string/pull/37
+          var key = parts.shift();
+          var val = parts.length > 0 ? parts.join('=') : undefined;
+
+          key = decodeURIComponent(key);
+
+          // missing `=` should be `null`:
+          // http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
+          val = val === undefined ? null : decodeURIComponent(val);
+
+          if (!previous.hasOwnProperty(key)) {
+            previous[key] = val;
+          } else if (Array.isArray(previous[key])) {
+            previous[key].push(val);
+          } else {
+            previous[key] = [previous[key], val];
+          }
+
+          return previous;
+        }, {});
       }
 
       var service = {
@@ -106749,10 +107002,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               filterService.setOrganizationId();
             }
 
-            vm.filterName = getFilterName();
+            vm.filteredDisplayName = getFilterName();
+            vm.isLoadingOrganizations = false;
           }
 
           function onFailure() {
+            vm.isLoadingOrganizations = false;
             notificationService.error('An error occurred while loading your organizations.');
           }
 
@@ -106775,10 +107030,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               filterService.setProjectId();
             }
 
-            vm.filterName = getFilterName();
+            vm.filteredDisplayName = getFilterName();
+            vm.isLoadingProjects = false;
           }
 
           function onFailure() {
+            vm.isLoadingProjects = false;
             notificationService.error('An error occurred while loading your projects.');
           }
 
@@ -106818,7 +107075,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         var updateFilterDropDownMaxHeight = debounce(function() {
-          vm.filterDropDownMaxHeight = angular.element($window).height() - 52;
+          vm.filterDropDownMaxHeight = angular.element($window).height() - 100;
         }, 150);
 
         var window = angular.element($window);
@@ -106826,22 +107083,24 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
         // NOTE: We need to watch on getFilterName because the filterChangedEvents might not be called depending on suspendNotifications option.
         var unbind = $scope.$watch(function() { return vm.getFilterName(); }, function (filterName) {
-          vm.filterName = filterName;
+          vm.filteredDisplayName = filterName;
         });
 
-        $scope.$on('$destroy', function(e) {
+        $scope.$on('$destroy', function() {
           unbind();
           window.unbind('resize', updateFilterDropDownMaxHeight);
         });
 
         var vm = this;
-        vm.filterName = 'Loading';
+        vm.filteredDisplayName = 'Loading';
         vm.get = get;
         vm.getAllProjectsUrl = getAllProjectsUrl;
         vm.getFilterName = getFilterName;
         vm.getOrganizationUrl = getOrganizationUrl;
         vm.getProjectUrl = getProjectUrl;
         vm.getProjectsByOrganizationId = getProjectsByOrganizationId;
+        vm.isLoadingOrganizations = true;
+        vm.isLoadingProjects = true;
         vm.organizations = [];
         vm.projects = [];
 
@@ -107597,60 +107856,42 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   angular.module('exceptionless.search-filter', [
     'ngMessages',
 
+    'exceptionless',
     'exceptionless.autofocus',
     'exceptionless.refresh',
     'exceptionless.validators'
-  ])
-  .directive('searchFilter', function () {
-    return {
-      restrict: 'E',
-      replace: true,
-      scope: true,
-      templateUrl: 'components/search-filter/search-filter-directive.tpl.html',
-      controller: ['filterService', function (filterService) {
-        var vm = this;
+  ]);
+}());
 
-        function clearFilter() {
-          filterService.clearFilterAndIncludeFixedAndIncludeHidden();
-          vm.isDropDownOpen = !vm.isDropDownOpen;
-        }
+(function () {
+  'use strict';
 
-        function hasFilter() {
-          return filterService.getFilter() || filterService.getIncludeFixed() || filterService.getIncludeHidden();
-        }
+  angular.module('exceptionless.search-filter')
+    .directive('searchFilter', function () {
+      return {
+        restrict: 'E',
+        replace: true,
+        scope: true,
+        templateUrl: 'components/search-filter/search-filter-directive.tpl.html',
+        controller: ['filterService', function (filterService) {
+          var vm = this;
 
-        function setFilter(filter) {
-          filterService.setFilter(filter);
-        }
+          function setSearchFilter(filter) {
+            filterService.setFilter(filter);
+          }
 
-        function setIncludeFixed(includeFixed) {
-          filterService.setIncludeFixed(includeFixed);
-        }
+          function updateFilter() {
+            vm.filter = filterService.getFilter();
+          }
+          
+          vm.searchFilterForm = {};
+          vm.setSearchFilter = setSearchFilter;
+          vm.updateFilter = updateFilter;
 
-        function setIncludeHidden(includeHidden) {
-          filterService.setIncludeHidden(includeHidden);
-        }
-
-        function updateFilter() {
-          vm.filter = filterService.getFilter();
-          vm.includeFixed =  filterService.getIncludeFixed();
-          vm.includeHidden = filterService.getIncludeHidden();
-        }
-
-        vm.clearFilter = clearFilter;
-        vm.filter = filterService.getFilter();
-        vm.hasFilter = hasFilter;
-        vm.isDropDownOpen = false;
-        vm.includeFixed =  filterService.getIncludeFixed();
-        vm.includeHidden = filterService.getIncludeHidden();
-        vm.searchFilterForm = {};
-        vm.setFilter = setFilter;
-        vm.setIncludeFixed = setIncludeFixed;
-        vm.setIncludeHidden = setIncludeHidden;
-        vm.updateFilter = updateFilter;
-      }],
-      controllerAs: 'vm'
-    };
+          updateFilter();
+        }],
+        controllerAs: 'vm'
+      };
   });
 }());
 
@@ -109663,11 +109904,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           });
         }
 
-        function onFailure() {
-          notificationService.error('An error occurred while loading the stats.');
-        }
-
-        return statService.getTimeline('distinct:stack_id,term:is_first_occurrence:-F').then(onSuccess, onFailure);
+        return statService.getTimeline('distinct:stack_id,term:is_first_occurrence:-F').then(onSuccess);
       }
 
       vm.canRefresh = canRefresh;
@@ -111825,7 +112062,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         features: {
           hover: {
             render: function (args) {
-              var date = moment.unix(args.domainX);
+              var date = moment.utc(args.domainX, 'X');
               var formattedDate = date.hours() === 0 && date.minutes() === 0 ? date.format('ddd, MMM D, YYYY') : date.format('ddd, MMM D, YYYY h:mma');
               var content = '<div class="date">' + formattedDate + '</div>';
               args.detail.sort(function (a, b) {
@@ -112787,11 +113024,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           });
         }
 
-        function onFailure() {
-          notificationService.error('An error occurred while loading the stats.');
-        }
-
-        return statService.getTimeline('avg:value,distinct:user.raw').then(onSuccess, onFailure);
+        return statService.getTimeline('avg:value,distinct:user.raw').then(onSuccess);
       }
 
       vm.chart = {
@@ -113653,7 +113886,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
   'use strict';
 
   $templateCache.put('app/account/manage.tpl.html',
-    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"avatar\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\" active=\"vm.tabNotificationsActive\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\" active=\"vm.tabPasswordActive\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" active=\"vm.tabExternalActive\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
+    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"img-thumbnail\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\" active=\"vm.tabNotificationsActive\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\" active=\"vm.tabPasswordActive\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" active=\"vm.tabExternalActive\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
   );
 
 
@@ -113663,7 +113896,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/app.tpl.html',
-    "<div class=\"app-header-fixed app-aside-fixed\" ng-class=\"{'app-aside-folded': appVm.isSideNavCollapsed}\"> <div ng-include=\"'app/blocks/header.tpl.html'\" class=\"app-header navbar\"></div> <div ng-include=\"'app/blocks/sidebar.tpl.html'\" class=\"app-aside hidden-xs bg-dark\"></div> <div class=\"app-content\" refresh-on=\"UserChanged\" refresh-action=\"appVm.getUser(data)\" refresh-debounce=\"1000\"> <div refresh-on=\"OrganizationChanged\" refresh-action=\"appVm.getOrganizations()\" refresh-debounce=\"5000\"></div> <button type=\"button\" role=\"button\" class=\"off-screen-toggle hide\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\"></button> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"appVm.hasSystemNotificationMessage()\"> <div ng-bind-html=\"appVm.getSystemNotificationMessage()\"></div> </div> <rate-limit></rate-limit> <div class=\"app-content-body fade-in\" ui-view autoscroll=\"true\"></div> </div> <div class=\"app-footer wrapper b-t bg-light\"> <span class=\"pull-right\"> <a href=\"https://github.com/exceptionless/Exceptionless.UI/releases\" target=\"_blank\">@@version</a> <a href=\"javascript:void(0);\" ui-scroll=\"app\" class=\"m-l-sm text-muted\"><i class=\"fa fa-long-arrow-up\"></i></a> </span> &copy; 2016 <a href=\"http://exceptionless.io\">Exceptionless</a> </div> <intercom ng-if=\"appVm.isIntercomEnabled()\"></intercom> </div>"
+    "<div class=\"app-header-fixed app-aside-fixed\" ng-class=\"{'app-aside-folded': appVm.isSideNavCollapsed}\"> <nav ng-include=\"'app/blocks/header.tpl.html'\" class=\"app-header navbar navbar-default bg-black\"></nav> <div ng-include=\"'app/blocks/sidebar.tpl.html'\" class=\"app-aside hidden-xs bg-dark\"></div> <div class=\"app-content\" refresh-on=\"UserChanged\" refresh-action=\"appVm.getUser(data)\" refresh-debounce=\"1000\"> <div refresh-on=\"OrganizationChanged\" refresh-action=\"appVm.getOrganizations()\" refresh-debounce=\"5000\"></div> <button type=\"button\" role=\"button\" class=\"off-screen-toggle hide\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\"></button> <div class=\"alert alert-danger alert-banner m-b-none\" ng-if=\"appVm.hasSystemNotificationMessage()\"> <div ng-bind-html=\"appVm.getSystemNotificationMessage()\"></div> </div> <rate-limit></rate-limit> <div class=\"app-content-body fade-in\" ui-view autoscroll=\"true\"></div> </div> <div class=\"app-footer wrapper b-t bg-light\"> <span class=\"pull-right\"> <a href=\"https://github.com/exceptionless/Exceptionless.UI/releases\" target=\"_blank\">@@version</a> <a href=\"javascript:void(0);\" ui-scroll=\"app\" class=\"m-l-sm text-muted\"><i class=\"fa fa-long-arrow-up\"></i></a> </span> &copy; 2016 <a href=\"http://exceptionless.io\">Exceptionless</a> </div> <intercom ng-if=\"appVm.isIntercomEnabled()\"></intercom> </div>"
   );
 
 
@@ -113688,17 +113921,17 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/blocks/header.tpl.html',
-    "<div class=\"navbar-header bg-black\"> <button type=\"button\" role=\"button\" class=\"pull-right visible-xs dk\" ui-toggle-class=\"show\" data-toggle=\"collapse\" data-target=\".navbar-collapse\"> <i class=\"fa fa-fw fa-cog\"></i> </button> <button type=\"button\" role=\"button\" class=\"pull-right visible-xs\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\" ui-scroll=\"app\"> <i class=\"fa fa-fw fa-align-justify\"></i> </button> <a ui-sref=\"app.dashboard\" class=\"navbar-brand text-lt\"> <img src=\"/touch-icon-ipad-114.png\" alt=\"exceptionless\" class=\"icon\"> <img src=\"/img/exceptionless-logo.png\" alt=\"exceptionless\" class=\"hidden-folded\"> </a> </div> <div class=\"collapse navbar-collapse box-shadow bg-black primary-underline\"> <div class=\"nav navbar-nav m-l-sm hidden-xs\"> <a class=\"btn no-shadow navbar-btn\" role=\"button\" ng-click=\"appVm.toggleSideNavCollapsed()\"> <i class=\"fa {{appVm.isSideNavCollapsed ? 'fa-indent' : 'fa-dedent'}} fa-fw\"></i> </a> </div> <project-filter></project-filter> <date-filter></date-filter> <search-filter></search-filter> <ul class=\"nav navbar-nav navbar-right\"> <li class=\"dropdown avatar-dd\" uib-dropdown> <a class=\"dropdown-toggle clear\" uib-dropdown-toggle> <span class=\"thumb-sm avatar pull-right m-t-n-sm m-b-n-sm m-l-sm\"> <img gravatar-src=\"appVm.user.email_address\" gravatar-size=\"40\" alt=\"{{appVm.user.full_name}}\"> </span> </a> <div class=\"dropdown-menu w-sm\" role=\"menu\"> <div class=\"panel bg-dark\"> <div class=\"list-group\"> <a class=\"media list-group-item\" ui-sref=\"app.account.manage\"><i class=\"fa fa-user fa-fw\"></i> My Account</a> <a class=\"media list-group-item\" ng-click=\"appVm.changePlan()\" ng-if=\"appVm.canChangePlan()\"><i class=\"fa fa-credit-card fa-fw\"></i> Change Plan</a> <a class=\"media list-group-item\" ui-sref=\"app.account.manage({ tab: 'password' })\"><i class=\"fa fa-lock fa-fw\"></i> Change Password</a> <a class=\"media list-group-item\" href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\"><i class=\"fa fa-book fa-fw\"></i> Documentation</a> <a class=\"media list-group-item\" ng-click=\"appVm.showIntercom()\" ng-if=\"appVm.isIntercomEnabled()\"><i class=\"fa fa-comment fa-fw\"></i> Support</a> <a class=\"media list-group-item\" ui-sref=\"auth.logout\"><i class=\"fa fa-power-off fa-fw\"></i> Logout</a> </div> </div> </div> </li> </ul> </div>"
+    "<div class=\"bg-black primary-underline\"> <div class=\"navbar-header\"> <button type=\"button\" role=\"button\" class=\"pull-right visible-xs dk\" ui-toggle-class=\"show\" data-toggle=\"collapse\" data-target=\".navbar-collapse\"> <i class=\"fa fa-fw fa-cog\"></i> </button> <button type=\"button\" role=\"button\" class=\"pull-right visible-xs\" ui-toggle-class=\"off-screen\" data-target=\".app-aside\" ui-scroll=\"app\"> <i class=\"fa fa-fw fa-align-justify\"></i> </button> <a ui-sref=\"app.dashboard\" class=\"navbar-brand text-lt\"> <img src=\"/touch-icon-ipad-114.png\" alt=\"exceptionless\" class=\"icon\"> <img src=\"/img/exceptionless-logo.png\" alt=\"exceptionless\" class=\"hidden-folded\"> </a> </div> <div class=\"collapse navbar-collapse no-shadow\"> <div class=\"nav navbar-nav navbar-left hidden-xs\"> <a class=\"btn no-shadow navbar-btn\" role=\"button\" ng-click=\"appVm.toggleSideNavCollapsed()\"> <i class=\"fa {{appVm.isSideNavCollapsed ? 'fa-indent' : 'fa-dedent'}} fa-fw\"></i> </a> </div> <ul class=\"nav navbar-nav navbar-left\"> <project-filter></project-filter> <date-filter></date-filter> </ul> <ul class=\"nav navbar-nav navbar-right hidden-xs\" auto-active> <li class=\"dropdown\"> <a class=\"dropdown-toggle profile-image\" data-toggle=\"dropdown\" role=\"button\" aria-haspopup=\"true\" aria-expanded=\"false\"> <img class=\"img-thumbnail\" gravatar-src=\"appVm.user.email_address\" gravatar-size=\"35\" alt=\"{{appVm.user.full_name}}\"> <span class=\"caret\"></span> </a> <ul class=\"dropdown-menu\"> <li><a ui-sref=\"app.account.manage\"><i class=\"fa fa-user fa-fw\"></i> My Account</a></li> <li><a ng-click=\"appVm.changePlan()\" ng-if=\"appVm.canChangePlan()\"><i class=\"fa fa-credit-card fa-fw\"></i> Change Plan</a></li> <li><a ui-sref=\"app.account.manage({ tab: 'password' })\"><i class=\"fa fa-lock fa-fw\"></i> Change Password</a></li> <li><a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\"><i class=\"fa fa-book fa-fw\"></i> Documentation</a></li> <li ng-if=\"appVm.isIntercomEnabled()\"><a ng-click=\"appVm.showIntercom()\"><i class=\"fa fa-comment fa-fw\"></i> Support</a></li> <li><a ui-sref=\"auth.logout\"><i class=\"fa fa-power-off fa-fw\"></i> Logout</a></li> </ul> </li> </ul> <search-filter></search-filter> <ul class=\"nav navbar-nav visible-xs hidden-sm\" auto-active> <li><a ui-sref=\"app.account.manage\"><i class=\"fa fa-user fa-fw\"></i> My Account</a></li> <li><a ng-click=\"appVm.changePlan()\" ng-if=\"appVm.canChangePlan()\"><i class=\"fa fa-credit-card fa-fw\"></i> Change Plan</a></li> <li><a ui-sref=\"app.account.manage({ tab: 'password' })\"><i class=\"fa fa-lock fa-fw\"></i> Change Password</a></li> <li><a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\"><i class=\"fa fa-book fa-fw\"></i> Documentation</a></li> <li ng-if=\"appVm.isIntercomEnabled()\"><a ng-click=\"appVm.showIntercom()\"><i class=\"fa fa-comment fa-fw\"></i> Support</a></li> <li><a ui-sref=\"auth.logout\"><i class=\"fa fa-power-off fa-fw\"></i> Logout</a></li> </ul> </div> </div>"
   );
 
 
   $templateCache.put('app/blocks/nav.tpl.html',
-    "<ul class=\"nav\"> <li ng-class=\"{active: appVm.isTypeMenuActive('error')}\"> <a href=\"#\" class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-warning fa-fw\"></i> <span>Exceptions</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Exceptions</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('error')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('error')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('error')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('error')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('log')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-file-text-o fa-fw\"></i> <span>Log Messages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Log Messages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('log')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('log')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('log')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('log')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('404')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-unlink fa-fw\"></i> <span>Broken Links</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Broken Links</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('404')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('404')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('404')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('404')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('usage')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-check-square-o fa-fw\"></i> <span>Feature Usages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Feature Usages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('usage')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('usage')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('usage')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAllMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-calendar fa-fw\"></i> <span>All Events</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">All Events</li> <li> <a ng-href=\"{{appVm.getDashboardUrl()}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl()}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl()}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl()}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isReportsMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-book fa-fw\"></i> <span>Reports</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Reports</li> <li> <a ng-href=\"{{appVm.getSessionDashboardUrl()}}\"> <i class=\"fa fa-heartbeat fa-fw\"></i> <span>Sessions</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAdminMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-cog fa-fw\"></i> <span>Admin</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Admin</li> <li> <a ui-sref=\"app.project.list\"> <i class=\"fa fa-briefcase fa-fw\"></i> <span>Projects</span> </a> </li> <li> <a ui-sref=\"app.organization.list\"> <i class=\"fa fa-group fa-fw\"></i> <span>Organizations</span> </a> </li> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> <span>My Account</span> </a> </li>  </ul> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\" title=\"Documentation\"> <i class=\"fa fa-book fa-fw\"></i> <span>Documentation</span> </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\" title=\"Support\"> <i class=\"fa fa-comment fa-fw\"></i> <span>Support</span> </a> </li> </ul>"
+    "<ul class=\"nav\"> <li ng-class=\"{active: appVm.isTypeMenuActive('error')}\"> <a href=\"#\" class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-warning fa-fw\"></i> <span>Exceptions</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Exceptions</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('error')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('error')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('error')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('error')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('log')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-file-text-o fa-fw\"></i> <span>Log Messages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Log Messages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('log')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('log')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('log')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('log')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('404')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-unlink fa-fw\"></i> <span>Broken Links</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Broken Links</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('404')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('404')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('404')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('404')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('usage')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-check-square-o fa-fw\"></i> <span>Feature Usages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Feature Usages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('usage')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('usage')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('usage')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAllMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-calendar fa-fw\"></i> <span>All Events</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">All Events</li> <li> <a ng-href=\"{{appVm.getDashboardUrl()}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl()}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl()}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl()}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isReportsMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-book fa-fw\"></i> <span>Reports</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Reports</li> <li> <a ng-href=\"{{appVm.getSessionDashboardUrl()}}\"> <i class=\"fa fa-heartbeat fa-fw\"></i> <span>Sessions</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAdminMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-cog fa-fw\"></i> <span>Admin</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Admin</li> <li> <a ui-sref=\"app.project.list\"> <i class=\"fa fa-briefcase fa-fw\"></i> <span>Projects</span> </a> </li> <li> <a ui-sref=\"app.organization.list\"> <i class=\"fa fa-group fa-fw\"></i> <span>Organizations</span> </a> </li> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> <span>My Account</span> </a> </li> </ul> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\" title=\"Documentation\"> <i class=\"fa fa-book fa-fw\"></i> <span>Documentation</span> </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\" title=\"Support\"> <i class=\"fa fa-comment fa-fw\"></i> <span>Support</span> </a> </li> </ul>"
   );
 
 
   $templateCache.put('app/blocks/sidebar.tpl.html',
-    "<div class=\"aside-wrap\"> <div class=\"navi-wrap\"> <div class=\"clearfix hidden-xs text-center hide\" id=\"aside-user\"> <div class=\"dropdown wrapper\"> <a ui-sref=\"app.page.profile\"> <span class=\"thumb-lg w-auto-folded avatar m-t-sm\"> <img gravatar-src=\"appVm.user.email_address\" gravatar-size=\"40\" class=\"img-full\" alt=\"{{appVm.user.full_name}}\"> </span> </a> <a href=\"javascript:void(0);\" class=\"dropdown-toggle hidden-folded\"> <span class=\"clear\"> <span class=\"block m-t-sm\"> <strong class=\"font-bold text-lt\">{{appVm.user.full_name}}</strong> <b class=\"caret\"></b> </span> <span class=\"text-muted text-xs block\">{{appVm.user.full_name}}</span> </span> </a> <ul class=\"dropdown-menu w hidden-folded\"> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> My Account </a> </li> <li ng-if=\"appVm.canChangePlan()\"> <a ng-click=\"appVm.changePlan()\"> <i class=\"fa fa-credit-card fa-fw\"></i> Change Plan </a> </li> <li> <a ui-sref=\"app.account.manage({ tab: 'password' })\"> <i class=\"fa fa-lock fa-fw\"></i> Change Password </a> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\"> <i class=\"fa fa-book fa-fw\"></i> Documentation </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\"> <i class=\"fa fa-comment fa-fw\"></i> Support </a> </li> <li class=\"divider\"></li> <li> <a ui-sref=\"auth.logout\"> <i class=\"fa fa-power-off fa-fw\"></i> Logout </a> </li> </ul> </div> <div class=\"line dk hidden-folded\"></div> </div> <nav ui-nav class=\"navi\" ng-include=\"'app/blocks/nav.tpl.html'\"></nav> </div> </div>"
+    "<div class=\"aside-wrap\"> <div class=\"navi-wrap\"> <div class=\"clearfix hidden-xs text-center hide\" id=\"aside-user\"> <div class=\"line dk hidden-folded\"></div> </div> <nav ui-nav class=\"navi\" ng-include=\"'app/blocks/nav.tpl.html'\"></nav> </div> </div>"
   );
 
 
@@ -113798,7 +114031,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/organization/manage/manage.tpl.html',
-    "<organization-notifications organization-id=\"vm.organization.id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-th-list\"></i> Manage {{ vm.organization.name ? 'Organization \"' + vm.organization.name + '\"' : 'Organization'}}</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"vm.organizationForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group m-b-none\"> <label for=\"name\">Organization Name</label> <div ng-class=\"{'input-group': vm.organizationForm.$pending }\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Organization Name\" ng-model=\"vm.organization.name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.save(vm.organizationForm.$valid)\" organization-name-available-validator ng-required=\"true\" autofocus> <span class=\"input-group-addon\" ng-if=\"vm.organizationForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.organizationForm.name.$error\" ng-if=\"vm.organizationForm.$submitted || vm.organizationForm.name.$touched\"> <small ng-message=\"required\">Organization Name is required.</small> <small ng-message=\"unique\">A organizations with this name already exists.</small> </div> </div> </form> <div ng-show=\"vm.hasMonthlyUsage\"> <h4 style=\"margin-top: 20px\">Monthly Usage</h4> <p> You are currently on the <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\"><strong>{{vm.organization.plan_name}}</strong> plan</a> with <span ng-if=\"vm.getRemainingEventLimit() > 0\">~</span><b ng-class=\"{'text-warning': vm.getRemainingEventLimit() === 0}\">{{vm.getRemainingEventLimit()}}</b> events remaining until this billing period's limit is reset on <b>{{vm.next_billing_date | date: 'longDate'}}</b> (<timeago date=\"vm.next_billing_date\"></timeago>). <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Click here to change your plan or billing information.</a> </p> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> <br class=\"clearfix\"> <h6><em>The usage data above is refreshed periodically and may not reflect current totals.</em></h6> </div> </uib-tab> <uib-tab heading=\"Projects\" active=\"vm.tabProjectsActive\"> <projects settings=\"vm.projects\"></projects> <a ui-sref=\"app.project.add\" class=\"btn btn-primary\" role=\"button\">Add New Project</a> </uib-tab> <uib-tab heading=\"Users\" active=\"vm.tabUsersActive\"> <users settings=\"vm.users\"></users> <button type=\"button\" role=\"button\" ng-click=\"vm.addUser()\" class=\"btn btn-primary\">Invite User</button> </uib-tab> <uib-tab heading=\"Billing\" active=\"vm.tabBillingActive\"> <p>You are currently on the <strong>{{vm.organization.plan_name}}</strong> plan. <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Change your plan or billing information.</a></p> <invoices settings=\"vm.invoices\"></invoices> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.organization-dashboard({ organizationId: vm.organization.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-remove\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\"> <li><a ng-click=\"vm.leaveOrganization(appVm.user)\" role=\"button\">Leave Organization</a></li> <li><a ng-click=\"vm.removeOrganization()\" role=\"button\">Delete Organization</a></li> </ul> </div> </footer> </div> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.organization.id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-th-list\"></i> Manage {{ vm.organization.name ? 'Organization \"' + vm.organization.name + '\"' : 'Organization'}}</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"vm.organizationForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group m-b-none\"> <label for=\"name\">Organization Name</label> <div ng-class=\"{'input-group': vm.organizationForm.$pending }\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Organization Name\" ng-model=\"vm.organization.name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.save(vm.organizationForm.$valid)\" organization-name-available-validator ng-required=\"true\" autofocus> <span class=\"input-group-addon\" ng-if=\"vm.organizationForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.organizationForm.name.$error\" ng-if=\"vm.organizationForm.$submitted || vm.organizationForm.name.$touched\"> <small ng-message=\"required\">Organization Name is required.</small> <small ng-message=\"unique\">A organizations with this name already exists.</small> </div> </div> </form> <div ng-show=\"vm.hasMonthlyUsage\"> <h4 style=\"margin-top: 20px\">Monthly Usage</h4> <p> You are currently on the <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\"><strong>{{vm.organization.plan_name}}</strong> plan</a> with <b ng-class=\"{'text-warning': vm.getRemainingEventLimit() === 0}\">{{vm.getRemainingEventLimit()}}</b> events remaining until this billing period's limit is reset on <b>{{vm.next_billing_date | date: 'longDate'}}</b> (<timeago date=\"vm.next_billing_date\"></timeago>). <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Click here to change your plan or billing information.</a> </p> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> <br class=\"clearfix\"> <h6><em>The usage data above is refreshed periodically and may not reflect current totals.</em></h6> </div> </uib-tab> <uib-tab heading=\"Projects\" active=\"vm.tabProjectsActive\"> <projects settings=\"vm.projects\"></projects> <a ui-sref=\"app.project.add\" class=\"btn btn-primary\" role=\"button\">Add New Project</a> </uib-tab> <uib-tab heading=\"Users\" active=\"vm.tabUsersActive\"> <users settings=\"vm.users\"></users> <button type=\"button\" role=\"button\" ng-click=\"vm.addUser()\" class=\"btn btn-primary\">Invite User</button> </uib-tab> <uib-tab heading=\"Billing\" active=\"vm.tabBillingActive\"> <p>You are currently on the <strong>{{vm.organization.plan_name}}</strong> plan. <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Change your plan or billing information.</a></p> <invoices settings=\"vm.invoices\"></invoices> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.organization-dashboard({ organizationId: vm.organization.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-remove\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\"> <li><a ng-click=\"vm.leaveOrganization(appVm.user)\" role=\"button\">Leave Organization</a></li> <li><a ng-click=\"vm.removeOrganization()\" role=\"button\">Delete Organization</a></li> </ul> </div> </footer> </div> </div> </div> </div>"
   );
 
 
@@ -113878,7 +114111,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/stack/stack.tpl.html',
-    "<organization-notifications organization-id=\"vm.stack.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"StackChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"1000\"> <div class=\"wrapper-md\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"row\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-left fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">First</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.first_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">NA</span> </span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-right fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Last</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.last_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">NA</span> </span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> Stack <span class=\"labels\"> <span class=\"label label-success\" ng-if=\"vm.isFixed()\"> <span class=\"hidden-xs\">FIXED</span> <span class=\"visible-xs\">F</span> </span> <span class=\"label label-success\" ng-if=\"vm.isRegressed()\"> <span class=\"hidden-xs\">REGRESSED</span> <span class=\"visible-xs\">R</span> </span> <span class=\"label label-success\" ng-if=\"vm.isHidden()\"> <span class=\"hidden-xs\">HIDDEN</span> <span class=\"visible-xs\">H</span> </span> </span> <div class=\"pull-right btn-toolbar hidden-print\"> <div class=\"btn-group btn-group-sm\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" title=\"{{vm.isFixed() ? 'Mark this stack as not fixed' : 'Mark this stack as fixed'}}\" promise-button=\"vm.updateIsFixed()\" promise-button-busy-text=\"{{vm.isFixed() ? 'Marking Not Fixed' : 'Marking Fixed' }}\" promise-button-busy-spinner-class=\"fa-size-sm\"> {{vm.isFixed() ? 'Mark Not Fixed' : 'Mark Fixed' }} </button> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"hidden-xs\">Options</span> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.updateIsHidden()\" title=\"Hide this stack from reports and mutes occurrence notifications\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isHidden()}\"></i>Hide</a></li> <li><a ng-click=\"vm.updateIsCritical()\" title=\"All future occurrences will be marked as critical\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isCritical()}\"></i>Future Occurrences Are Critical</a></li> <li><a ng-click=\"vm.updateNotifications()\" title=\"Stop sending occurrence notifications for this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.notificationsDisabled()}\"></i>Disable Notifications</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.promoteToExternal()\" title=\"Used to promote stacks to external systems.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Promote To External</a></li> <li><a ng-click=\"vm.addReferenceLink()\" title=\"Add a reference link to an external resource.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Add Reference Link</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.remove()\" title=\"Delete this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Delete</a></li> </ul> </div> </div> </div> <div class=\"panel-body\"> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr> <th>Title</th> <td><span truncate lines=\"3\">{{vm.stack.title}}</span></td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.isFixed()\"> <th>Date Fixed</th> <td><span>{{vm.stack.date_fixed | date: 'medium'}}</span></td> </tr> <tr ng-if=\"vm.stack.description\"> <th>Description</th> <td><span truncate lines=\"2\">{{vm.stack.description}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.stack.tags track by tag\">{{tag}}</span></td> </tr> <tr ng-if=\"vm.hasReference()\"> <th>{{vm.hasReferences() ? 'Reference Links' : 'Reference Link'}}</th> <td> <ul ng-if=\"vm.hasReferences()\"> <li ng-repeat=\"reference in vm.stack.references track by reference\"> <a ng-href=\"{{::reference}}\" target=\"_blank\">{{::reference}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(reference)\"><i class=\"fa fa-fw fa-times\"></i></a> </li> </ul> <div ng-if=\"!vm.hasReferences()\"> <a ng-href=\"{{::vm.stack.references[0]}}\" target=\"_blank\">{{::vm.stack.references[0]}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(vm.stack.references[0])\"><i class=\"fa fa-fw fa-times\"></i></a> </div> </td> </tr> </tbody> </table> <h4>Stacking Information</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr ng-repeat=\"(key, value) in vm.stack.signature_info track by key\"> <th>{{key}}</th> <td>{{value}}</td> </tr> </tbody> </table> <div> <div class=\"btn-group btn-group-xs pull-right\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"hidden-xs\">Chart Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li ng-repeat=\"o in vm.chartOptions | filter: { render: true } track by o.field\"> <a ng-click=\"o.selected = !o.selected; vm.getStats();\" title=\"{{::o.title}}\"><i class=\"fa fa-fw\" ng-class=\"{'fa-check': o.selected}\" ng-if=\"vm.hasSelectedChartOption()\"></i>Show {{::o.name}}</a> </li> </ul> </div> <div class=\"clearfix\"></div> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-fw fa-calendar\"></i> Recent Occurrences</div> <events settings=\"vm.recentOccurrences\"></events> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.stack.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"StackChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"1000\"> <div class=\"wrapper-md\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"row\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-left fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">First</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.first_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">NA</span> </span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-right fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Last</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.last_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">NA</span> </span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> Stack <span class=\"labels\"> <span class=\"label label-success\" ng-if=\"vm.isFixed()\"> <span class=\"hidden-xs\">FIXED</span> <span class=\"visible-xs\">F</span> </span> <span class=\"label label-success\" ng-if=\"vm.isRegressed()\"> <span class=\"hidden-xs\">REGRESSED</span> <span class=\"visible-xs\">R</span> </span> <span class=\"label label-success\" ng-if=\"vm.isHidden()\"> <span class=\"hidden-xs\">HIDDEN</span> <span class=\"visible-xs\">H</span> </span> </span> <div class=\"btn-toolbar pull-right hidden-print\" role=\"toolbar\" aria-label=\"Stack Options\"> <div class=\"btn-group btn-group-sm\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" title=\"{{vm.isFixed() ? 'Mark this stack as not fixed' : 'Mark this stack as fixed'}}\" promise-button=\"vm.updateIsFixed()\" promise-button-busy-text=\"{{vm.isFixed() ? 'Marking Not Fixed' : 'Marking Fixed' }}\" promise-button-busy-spinner-class=\"fa-size-sm\"> {{vm.isFixed() ? 'Mark Not Fixed' : 'Mark Fixed' }} </button> </div> <div class=\"btn-group btn-group-sm\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear fa-size-sm\"></i></span> <span class=\"hidden-xs\">Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.updateIsHidden()\" title=\"Hide this stack from reports and mutes occurrence notifications\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isHidden()}\"></i>Hide</a></li> <li><a ng-click=\"vm.updateIsCritical()\" title=\"All future occurrences will be marked as critical\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isCritical()}\"></i>Future Occurrences Are Critical</a></li> <li><a ng-click=\"vm.updateNotifications()\" title=\"Stop sending occurrence notifications for this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.notificationsDisabled()}\"></i>Disable Notifications</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.promoteToExternal()\" title=\"Used to promote stacks to external systems.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Promote To External</a></li> <li><a ng-click=\"vm.addReferenceLink()\" title=\"Add a reference link to an external resource.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Add Reference Link</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.remove()\" title=\"Delete this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Delete</a></li> </ul> </div> </div> </div> <div class=\"panel-body\"> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr> <th>Title</th> <td><span truncate lines=\"3\">{{vm.stack.title}}</span></td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.isFixed()\"> <th>Date Fixed</th> <td><span>{{vm.stack.date_fixed | date: 'medium'}}</span></td> </tr> <tr ng-if=\"vm.stack.description\"> <th>Description</th> <td><span truncate lines=\"2\">{{vm.stack.description}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.stack.tags track by tag\">{{tag}}</span></td> </tr> <tr ng-if=\"vm.hasReference()\"> <th>{{vm.hasReferences() ? 'Reference Links' : 'Reference Link'}}</th> <td> <ul ng-if=\"vm.hasReferences()\"> <li ng-repeat=\"reference in vm.stack.references track by reference\"> <a ng-href=\"{{::reference}}\" target=\"_blank\">{{::reference}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(reference)\"><i class=\"fa fa-fw fa-times\"></i></a> </li> </ul> <div ng-if=\"!vm.hasReferences()\"> <a ng-href=\"{{::vm.stack.references[0]}}\" target=\"_blank\">{{::vm.stack.references[0]}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(vm.stack.references[0])\"><i class=\"fa fa-fw fa-times\"></i></a> </div> </td> </tr> </tbody> </table> <h4>Stacking Information</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr ng-repeat=\"(key, value) in vm.stack.signature_info track by key\"> <th>{{key}}</th> <td>{{value}}</td> </tr> </tbody> </table> <div> <div class=\"btn-group btn-group-xs pull-right\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"hidden-xs\">Chart Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li ng-repeat=\"o in vm.chartOptions | filter: { render: true } track by o.field\"> <a ng-click=\"o.selected = !o.selected; vm.getStats();\" title=\"{{::o.title}}\"><i class=\"fa fa-fw\" ng-class=\"{'fa-check': o.selected}\" ng-if=\"vm.hasSelectedChartOption()\"></i>Show {{::o.name}}</a> </li> </ul> </div> <div class=\"clearfix\"></div> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-fw fa-calendar\"></i> Recent Occurrences</div> <events settings=\"vm.recentOccurrences\"></events> </div> </div> </div>"
   );
 
 
@@ -113898,7 +114131,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/date-filter/date-filter-directive.tpl.html',
-    "<ul class=\"nav navbar-nav\"> <li class=\"dropdown\" uib-dropdown is-open=\"vm.isDropDownOpen\"> <a class=\"dropdown-toggle\" uib-dropdown-toggle> <i class=\"fa fa-fw fa-calendar fa-lg\" ng-class=\"{'text-success': vm.hasFilter() }\"></i> </a> <div class=\"dropdown-menu w-md\" role=\"menu\"> <div class=\"panel bg-dark\"> <div class=\"list-group\"> <strong class=\"media list-group-item text-center\" ng-show=\"vm.isActive('Custom')\" refresh-on=\"filterChanged\" refresh-action=\"vm.updateFilterName()\">{{vm.filterName}}</strong> <a class=\"media list-group-item\" ng-class=\"{ active: vm.isActive('last hour')}\" ng-click=\"vm.setFilter('last hour')\">Last Hour</a> <a class=\"media list-group-item\" ng-class=\"{ active: vm.isActive('last 24 hours')}\" ng-click=\"vm.setFilter('last 24 hours')\">Last 24 Hours</a> <a class=\"media list-group-item\" ng-class=\"{ active: vm.isActive('last week')}\" ng-click=\"vm.setFilter('last week')\">Last Week</a> <a class=\"media list-group-item\" ng-class=\"{ active: vm.isActive('last 30 days')}\" ng-click=\"vm.setFilter('last 30 days')\">Last 30 Days</a> <a class=\"media list-group-item\" ng-class=\"{ active: vm.isActive('all')}\" ng-click=\"vm.setFilter('all')\">All Time</a> <a class=\"media list-group-item\" ng-class=\"{ active: vm.isActive('Custom')}\" ng-click=\"vm.setCustomFilter()\">Custom</a> </div> </div> </div> </li> </ul>"
+    "<li class=\"dropdown\" refresh-on=\"filterChanged\" refresh-action=\"vm.updateFilterDisplayName()\"> <a class=\"dropdown-toggle\" data-toggle=\"dropdown\" aria-haspopup=\"true\" aria-expanded=\"false\" refresh-on=\"filterChanged\" refresh-action=\"vm.updateFilterDisplayName()\"> {{vm.filteredDisplayName}} <span class=\"caret\"></span> </a> <ul class=\"dropdown-menu\"> <li ng-class=\"{ active: vm.isActive('last hour')}\"><a ng-click=\"vm.setFilter('last hour')\">Last Hour</a></li> <li ng-class=\"{ active: vm.isActive('last 24 hours')}\"><a ng-click=\"vm.setFilter('last 24 hours')\">Last 24 Hours</a></li> <li ng-class=\"{ active: vm.isActive('last week')}\"><a ng-click=\"vm.setFilter('last week')\">Last Week</a></li> <li ng-class=\"{ active: vm.isActive('last 30 days')}\"><a ng-click=\"vm.setFilter('last 30 days')\">Last 30 Days</a></li> <li ng-class=\"{ active: vm.isActive('all')}\"><a ng-click=\"vm.setFilter('all')\">All Time</a></li> <li role=\"separator\" class=\"divider hidden-xs\"></li> <li ng-class=\"{ active: vm.isActive('Custom')}\" class=\"hidden-xs\"><a ng-click=\"vm.setCustomFilter()\">Custom</a></li> </ul> </li>"
   );
 
 
@@ -113928,7 +114161,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/project-filter/project-filter-directive.tpl.html',
-    "<ul class=\"nav navbar-nav\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get()\" refresh-throttle=\"5000\"> <li class=\"dropdown\" uib-dropdown> <a class=\"dropdown-toggle\" uib-dropdown-toggle refresh-on=\"filterChanged\" refresh-action=\"vm.getFilterName()\"> <span>{{vm.filterName}}</span> <b class=\"caret\"></b> </a> <div class=\"dropdown-menu w-xl project-filter-dropdown-menu\" ng-style=\"{'max-height': vm.filterDropDownMaxHeight + 'px'}\"> <div class=\"panel bg-dark\"> <div class=\"list-group\"> <div ng-repeat=\"organization in vm.organizations | orderBy: 'name' track by organization.id\"> <a class=\"media list-group-item\" ng-if=\"$first\" ng-href=\"{{vm.getAllProjectsUrl()}}\" auto-active>All Projects</a> <a class=\"media list-group-item\" ng-href=\"{{vm.getOrganizationUrl(organization)}}\" auto-active>{{organization.name}} <span class=\"icon-right\" ui-sref=\"app.organization.manage({ id: organization.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> <a class=\"media list-group-item project-name\" ng-href=\"{{vm.getProjectUrl(project)}}\" auto-active ng-repeat=\"project in vm.getProjectsByOrganizationId(organization.id) | orderBy: 'name' track by project.id\">{{project.name}} <span class=\"icon-right\" ui-sref=\"app.project.manage({ id: project.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> </div> <a class=\"list-group-footer media list-group-item\" ui-sref=\"app.project.add\" auto-active>Add New Project</a> </div> </div> </div> </li> </ul>"
+    "<li class=\"dropdown\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get()\" refresh-throttle=\"5000\"> <a class=\"dropdown-toggle\" data-toggle=\"dropdown\" aria-haspopup=\"true\" aria-expanded=\"false\" refresh-on=\"filterChanged\" refresh-action=\"vm.getFilterName()\"> {{vm.filteredDisplayName}} <span class=\"caret\"></span> </a> <ul class=\"dropdown-menu w-xl scrollable-menu\" ng-style=\"{'max-height': vm.filterDropDownMaxHeight + 'px'}\" auto-active> <li><a ng-href=\"{{vm.getAllProjectsUrl()}}\">All Projects</a></li> <li role=\"separator\" class=\"divider\"></li> <li ng-if=\"vm.isLoadingOrganizations\" disabled><a href=\"#\">Loading Organizations...</a></li> <li ng-repeat-start=\"organization in vm.organizations | orderBy: 'name' track by organization.id\" class=\"heading-menu\"> <a ng-href=\"{{vm.getOrganizationUrl(organization)}}\"> {{organization.name}} <span class=\"icon-right\" ui-sref=\"app.organization.manage({ id: organization.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> </li> <li ng-if=\"vm.isLoadingProjects\" class=\"child-menu\" disabled><a href=\"#\">Loading Projects...</a></li> <li ng-repeat=\"project in vm.getProjectsByOrganizationId(organization.id) | orderBy: 'name' track by project.id\" class=\"child-menu\"> <a ng-href=\"{{vm.getProjectUrl(project)}}\"> {{project.name}} <span class=\"icon-right\" ui-sref=\"app.project.manage({ id: project.id })\" show-on-hover-parent><i class=\"fa fa-gear fa-fw\"></i></span> </a> </li> <li ng-repeat-end role=\"separator\" class=\"divider\"></li> <li><a ui-sref=\"app.project.add\">Add New Project</a></li> </ul> </li>"
   );
 
 
@@ -113953,7 +114186,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/search-filter/search-filter-directive.tpl.html',
-    "<ul class=\"nav navbar-nav\" refresh-on=\"filterChanged\" refresh-action=\"vm.updateFilter()\"> <li class=\"dropdown\" uib-dropdown is-open=\"vm.isDropDownOpen\"> <a class=\"dropdown-toggle\" uib-dropdown-toggle> <i class=\"fa fa-fw fa-search fa-lg\" ng-class=\"{'text-success': vm.hasFilter() }\"></i> </a> <div class=\"dropdown-menu w-xl\" role=\"menu\"> <div class=\"panel search-panel bg-dark\"> <form name=\"vm.searchFilterForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\"> <label for=\"search\">Filter <a href=\"https://github.com/exceptionless/Exceptionless/wiki/Filtering-Searching\" target=\"_blank\" title=\"Search Documentation\"><i class=\"fa fa-fw fa-question-circle\"></i></a></label> <div ng-class=\"{'input-group': vm.searchFilterForm.$pending }\"> <input id=\"search\" name=\"search\" type=\"search\" class=\"form-control\" placeholder=\"Criteria\" ng-model=\"vm.filter\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.setFilter(vm.filter)\" search-filter-validator autofocus> <span class=\"input-group-addon\" ng-if=\"vm.searchFilterForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.searchFilterForm.search.$error\" ng-if=\"vm.searchFilterForm.$submitted || vm.searchFilterForm.search.$touched\"> <small ng-message=\"valid\">An invalid search term was found.</small> </div> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input id=\"includeFixed\" type=\"checkbox\" ng-model=\"vm.includeFixed\" ng-change=\"vm.setIncludeFixed(vm.includeFixed)\"><i></i> Include Fixed </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input id=\"includeHidden\" type=\"checkbox\" ng-model=\"vm.includeHidden\" ng-change=\"vm.setIncludeHidden(vm.includeHidden)\"><i></i> Include Hidden </label> </div> <input type=\"button\" role=\"button\" class=\"btn btn-primary w-sm\" ng-click=\"vm.clearFilter()\" value=\"Clear\"> </form> </div> </div> </li> </ul>"
+    "<form class=\"navbar-form navbar-form-search no-shadow\" name=\"vm.searchFilterForm\" role=\"search\" refresh-on=\"filterChanged\" refresh-action=\"vm.updateFilter()\"> <div class=\"form-group\"> <div class=\"input-group\"> <input id=\"search\" name=\"search\" type=\"search\" class=\"form-control\" placeholder=\"Filter\" ng-model=\"vm.filter\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.setSearchFilter(vm.filter)\" search-filter-validator uib-tooltip=\"{{(vm.searchFilterForm.search.$invalid) ? 'An invalid search term was found.' : ''}}\" tooltip-class=\"error-tooltip\" tooltip-is-open=\"vm.searchFilterForm.search.$invalid\" tooltip-placement=\"bottom\"> <div class=\"input-group-btn\"> <a class=\"btn btn-search-help btn-dark\" href=\"https://github.com/exceptionless/Exceptionless/wiki/Filtering-Searching\" target=\"_blank\" title=\"Search Documentation\" aria-label=\"Search Documentation\"> <i class=\"fa fa-fw fa-question-circle\"></i> </a> </div> </div> </div> </form>"
   );
 
 
