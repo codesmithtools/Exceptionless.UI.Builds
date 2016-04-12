@@ -66,13 +66,13 @@ var min = Math.min;
 var to_string = ObjectPrototype.toString;
 
 /* global Symbol */
-/* eslint-disable one-var-declaration-per-line, no-redeclare */
+/* eslint-disable one-var-declaration-per-line, no-redeclare, max-statements-per-line */
 var hasToStringTag = typeof Symbol === 'function' && typeof Symbol.toStringTag === 'symbol';
 var isCallable; /* inlined from https://npmjs.com/is-callable */ var fnToStr = Function.prototype.toString, constructorRegex = /^\s*class /, isES6ClassFn = function isES6ClassFn(value) { try { var fnStr = fnToStr.call(value); var singleStripped = fnStr.replace(/\/\/.*\n/g, ''); var multiStripped = singleStripped.replace(/\/\*[.\s\S]*\*\//g, ''); var spaceStripped = multiStripped.replace(/\n/mg, ' ').replace(/ {2}/g, ' '); return constructorRegex.test(spaceStripped); } catch (e) { return false; /* not a function */ } }, tryFunctionObject = function tryFunctionObject(value) { try { if (isES6ClassFn(value)) { return false; } fnToStr.call(value); return true; } catch (e) { return false; } }, fnClass = '[object Function]', genClass = '[object GeneratorFunction]', isCallable = function isCallable(value) { if (!value) { return false; } if (typeof value !== 'function' && typeof value !== 'object') { return false; } if (hasToStringTag) { return tryFunctionObject(value); } if (isES6ClassFn(value)) { return false; } var strClass = to_string.call(value); return strClass === fnClass || strClass === genClass; };
 
 var isRegex; /* inlined from https://npmjs.com/is-regex */ var regexExec = RegExp.prototype.exec, tryRegexExec = function tryRegexExec(value) { try { regexExec.call(value); return true; } catch (e) { return false; } }, regexClass = '[object RegExp]'; isRegex = function isRegex(value) { if (typeof value !== 'object') { return false; } return hasToStringTag ? tryRegexExec(value) : to_string.call(value) === regexClass; };
 var isString; /* inlined from https://npmjs.com/is-string */ var strValue = String.prototype.valueOf, tryStringObject = function tryStringObject(value) { try { strValue.call(value); return true; } catch (e) { return false; } }, stringClass = '[object String]'; isString = function isString(value) { if (typeof value === 'string') { return true; } if (typeof value !== 'object') { return false; } return hasToStringTag ? tryStringObject(value) : to_string.call(value) === stringClass; };
-/* eslint-enable one-var-declaration-per-line, no-redeclare */
+/* eslint-enable one-var-declaration-per-line, no-redeclare, max-statements-per-line */
 
 /* inlined from http://npmjs.com/define-properties */
 var supportsDescriptors = $Object.defineProperty && (function () {
@@ -396,7 +396,9 @@ var properlyBoxesContext = function properlyBoxed(method) {
     if (method) {
         try {
             method.call('foo', function (_, __, context) {
-                if (typeof context !== 'object') { properlyBoxesNonStrict = false; }
+                if (typeof context !== 'object') {
+                    properlyBoxesNonStrict = false;
+                }
             });
 
             method.call([1], function () {
@@ -564,7 +566,9 @@ defineProperties(ArrayPrototype, {
 // https://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Objects/Array/reduce
 var reduceCoercesToObject = false;
 if (ArrayPrototype.reduce) {
-    reduceCoercesToObject = typeof ArrayPrototype.reduce.call('es5', function (_, __, ___, list) { return list; }) === 'object';
+    reduceCoercesToObject = typeof ArrayPrototype.reduce.call('es5', function (_, __, ___, list) {
+        return list;
+    }) === 'object';
 }
 defineProperties(ArrayPrototype, {
     reduce: function reduce(callbackfn/*, initialValue*/) {
@@ -615,7 +619,9 @@ defineProperties(ArrayPrototype, {
 // https://developer.mozilla.org/en/Core_JavaScript_1.5_Reference/Objects/Array/reduceRight
 var reduceRightCoercesToObject = false;
 if (ArrayPrototype.reduceRight) {
-    reduceRightCoercesToObject = typeof ArrayPrototype.reduceRight.call('es5', function (_, __, ___, list) { return list; }) === 'object';
+    reduceRightCoercesToObject = typeof ArrayPrototype.reduceRight.call('es5', function (_, __, ___, list) {
+        return list;
+    }) === 'object';
 }
 defineProperties(ArrayPrototype, {
     reduceRight: function reduceRight(callbackfn/*, initial*/) {
@@ -2011,8 +2017,10 @@ if (supportsDescriptors) {
     var ensureNonEnumerable = function (obj, prop) {
         if (isEnum(obj, prop)) {
             var desc = Object.getOwnPropertyDescriptor(obj, prop);
-            desc.enumerable = false;
-            Object.defineProperty(obj, prop, desc);
+            if (desc.configurable) {
+              desc.enumerable = false;
+              Object.defineProperty(obj, prop, desc);
+            }
         }
     };
     ensureNonEnumerable(Error.prototype, 'message');
@@ -57321,10 +57329,10 @@ angular.module('ngAnimate', [])
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.2.5 - 2016-03-20
+ * Version: 1.3.1 - 2016-04-05
  * License: MIT
- */angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
-angular.module("ui.bootstrap.tpls", ["uib/template/accordion/accordion-group.html","uib/template/accordion/accordion.html","uib/template/alert/alert.html","uib/template/carousel/carousel.html","uib/template/carousel/slide.html","uib/template/datepicker/datepicker.html","uib/template/datepicker/day.html","uib/template/datepicker/month.html","uib/template/datepicker/popup.html","uib/template/datepicker/year.html","uib/template/modal/backdrop.html","uib/template/modal/window.html","uib/template/pager/pager.html","uib/template/pagination/pagination.html","uib/template/tooltip/tooltip-html-popup.html","uib/template/tooltip/tooltip-popup.html","uib/template/tooltip/tooltip-template-popup.html","uib/template/popover/popover-html.html","uib/template/popover/popover-template.html","uib/template/popover/popover.html","uib/template/progressbar/bar.html","uib/template/progressbar/progress.html","uib/template/progressbar/progressbar.html","uib/template/rating/rating.html","uib/template/tabs/tab.html","uib/template/tabs/tabset.html","uib/template/timepicker/timepicker.html","uib/template/typeahead/typeahead-match.html","uib/template/typeahead/typeahead-popup.html"]);
+ */angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.datepicker","ui.bootstrap.position","ui.bootstrap.datepickerPopup","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
+angular.module("ui.bootstrap.tpls", ["uib/template/accordion/accordion-group.html","uib/template/accordion/accordion.html","uib/template/alert/alert.html","uib/template/carousel/carousel.html","uib/template/carousel/slide.html","uib/template/datepicker/datepicker.html","uib/template/datepicker/day.html","uib/template/datepicker/month.html","uib/template/datepicker/year.html","uib/template/datepickerPopup/popup.html","uib/template/modal/backdrop.html","uib/template/modal/window.html","uib/template/pager/pager.html","uib/template/pagination/pagination.html","uib/template/tooltip/tooltip-html-popup.html","uib/template/tooltip/tooltip-popup.html","uib/template/tooltip/tooltip-template-popup.html","uib/template/popover/popover-html.html","uib/template/popover/popover-template.html","uib/template/popover/popover.html","uib/template/progressbar/bar.html","uib/template/progressbar/progress.html","uib/template/progressbar/progressbar.html","uib/template/rating/rating.html","uib/template/tabs/tab.html","uib/template/tabs/tabset.html","uib/template/timepicker/timepicker.html","uib/template/typeahead/typeahead-match.html","uib/template/typeahead/typeahead-popup.html"]);
 angular.module('ui.bootstrap.collapse', [])
 
   .directive('uibCollapse', ['$animate', '$q', '$parse', '$injector', function($animate, $q, $parse, $injector) {
@@ -57705,7 +57713,7 @@ angular.module('ui.bootstrap.carousel', [])
       element: element
     });
     slides.sort(function(a, b) {
-      return +a.slide.index > +b.slide.index;
+      return +a.slide.index - +b.slide.index;
     });
     //if this is the first slide or the slide is set to active, select it
     if (slide.index === $scope.active || slides.length === 1 && !angular.isNumber($scope.active)) {
@@ -57813,6 +57821,14 @@ angular.module('ui.bootstrap.carousel', [])
     return $scope.active === slide.slide.index;
   };
 
+  $scope.isPrevDisabled = function() {
+    return $scope.active === 0 && $scope.noWrap();
+  };
+
+  $scope.isNextDisabled = function() {
+    return $scope.active === slides.length - 1 && $scope.noWrap();
+  };
+
   $scope.pause = function() {
     if (!$scope.noPause) {
       isPlaying = false;
@@ -57851,9 +57867,9 @@ angular.module('ui.bootstrap.carousel', [])
 
       var slide = slides[index];
       if (slide) {
-        currentIndex = index;
         setActive(index);
         self.select(slides[index]);
+        currentIndex = index;
       }
     }
   });
@@ -58080,7 +58096,7 @@ angular.module('ui.bootstrap.dateparser', [])
       {
         key: 'yy',
         regex: '\\d{2}',
-        apply: function(value) { this.year = +value + 2000; },
+        apply: function(value) { value = +value; this.year = value < 69 ? value + 2000 : value + 1900; },
         formatter: function(date) {
           var _date = new Date();
           _date.setFullYear(Math.abs(date.getFullYear()));
@@ -58612,6 +58628,645 @@ function ($animate) {
     }
   };
 }]);
+angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootstrap.isClass'])
+
+.value('$datepickerSuppressError', false)
+
+.value('$datepickerLiteralWarning', true)
+
+.constant('uibDatepickerConfig', {
+  datepickerMode: 'day',
+  formatDay: 'dd',
+  formatMonth: 'MMMM',
+  formatYear: 'yyyy',
+  formatDayHeader: 'EEE',
+  formatDayTitle: 'MMMM yyyy',
+  formatMonthTitle: 'yyyy',
+  maxDate: null,
+  maxMode: 'year',
+  minDate: null,
+  minMode: 'day',
+  ngModelOptions: {},
+  shortcutPropagation: false,
+  showWeeks: true,
+  yearColumns: 5,
+  yearRows: 4
+})
+
+.controller('UibDatepickerController', ['$scope', '$attrs', '$parse', '$interpolate', '$locale', '$log', 'dateFilter', 'uibDatepickerConfig', '$datepickerLiteralWarning', '$datepickerSuppressError', 'uibDateParser',
+  function($scope, $attrs, $parse, $interpolate, $locale, $log, dateFilter, datepickerConfig, $datepickerLiteralWarning, $datepickerSuppressError, dateParser) {
+  var self = this,
+      ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl;
+      ngModelOptions = {},
+      watchListeners = [],
+      optionsUsed = !!$attrs.datepickerOptions;
+
+  if (!$scope.datepickerOptions) {
+    $scope.datepickerOptions = {};
+  }
+
+  // Modes chain
+  this.modes = ['day', 'month', 'year'];
+
+  [
+    'customClass',
+    'dateDisabled',
+    'datepickerMode',
+    'formatDay',
+    'formatDayHeader',
+    'formatDayTitle',
+    'formatMonth',
+    'formatMonthTitle',
+    'formatYear',
+    'maxDate',
+    'maxMode',
+    'minDate',
+    'minMode',
+    'showWeeks',
+    'shortcutPropagation',
+    'startingDay',
+    'yearColumns',
+    'yearRows'
+  ].forEach(function(key) {
+    switch (key) {
+      case 'customClass':
+      case 'dateDisabled':
+        $scope[key] = $scope.datepickerOptions[key] || angular.noop;
+        break;
+      case 'datepickerMode':
+        $scope.datepickerMode = angular.isDefined($scope.datepickerOptions.datepickerMode) ?
+          $scope.datepickerOptions.datepickerMode : datepickerConfig.datepickerMode;
+        break;
+      case 'formatDay':
+      case 'formatDayHeader':
+      case 'formatDayTitle':
+      case 'formatMonth':
+      case 'formatMonthTitle':
+      case 'formatYear':
+        self[key] = angular.isDefined($scope.datepickerOptions[key]) ?
+          $interpolate($scope.datepickerOptions[key])($scope.$parent) :
+          datepickerConfig[key];
+        break;
+      case 'showWeeks':
+      case 'shortcutPropagation':
+      case 'yearColumns':
+      case 'yearRows':
+        self[key] = angular.isDefined($scope.datepickerOptions[key]) ?
+          $scope.datepickerOptions[key] : datepickerConfig[key];
+        break;
+      case 'startingDay':
+        if (angular.isDefined($scope.datepickerOptions.startingDay)) {
+          self.startingDay = $scope.datepickerOptions.startingDay;
+        } else if (angular.isNumber(datepickerConfig.startingDay)) {
+          self.startingDay = datepickerConfig.startingDay;
+        } else {
+          self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
+        }
+
+        break;
+      case 'maxDate':
+      case 'minDate':
+        $scope.$watch('datepickerOptions.' + key, function(value) {
+          if (value) {
+            if (angular.isDate(value)) {
+              self[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
+            } else {
+              if ($datepickerLiteralWarning) {
+                $log.warn('Literal date support has been deprecated, please switch to date object usage');
+              }
+
+              self[key] = new Date(dateFilter(value, 'medium'));
+            }
+          } else {
+            self[key] = datepickerConfig[key] ?
+              dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) :
+              null;
+          }
+
+          self.refreshView();
+        });
+
+        break;
+      case 'maxMode':
+      case 'minMode':
+        if ($scope.datepickerOptions[key]) {
+          $scope.$watch(function() { return $scope.datepickerOptions[key]; }, function(value) {
+            self[key] = $scope[key] = angular.isDefined(value) ? value : datepickerOptions[key];
+            if (key === 'minMode' && self.modes.indexOf($scope.datepickerOptions.datepickerMode) < self.modes.indexOf(self[key]) ||
+              key === 'maxMode' && self.modes.indexOf($scope.datepickerOptions.datepickerMode) > self.modes.indexOf(self[key])) {
+              $scope.datepickerMode = self[key];
+              $scope.datepickerOptions.datepickerMode = self[key];
+            }
+          });
+        } else {
+          self[key] = $scope[key] = datepickerConfig[key] || null;
+        }
+
+        break;
+    }
+  });
+
+  $scope.uniqueId = 'datepicker-' + $scope.$id + '-' + Math.floor(Math.random() * 10000);
+
+  $scope.disabled = angular.isDefined($attrs.disabled) || false;
+  if (angular.isDefined($attrs.ngDisabled)) {
+    watchListeners.push($scope.$parent.$watch($attrs.ngDisabled, function(disabled) {
+      $scope.disabled = disabled;
+      self.refreshView();
+    }));
+  }
+
+  $scope.isActive = function(dateObject) {
+    if (self.compare(dateObject.date, self.activeDate) === 0) {
+      $scope.activeDateId = dateObject.uid;
+      return true;
+    }
+    return false;
+  };
+
+  this.init = function(ngModelCtrl_) {
+    ngModelCtrl = ngModelCtrl_;
+    ngModelOptions = ngModelCtrl_.$options || datepickerConfig.ngModelOptions;
+    if ($scope.datepickerOptions.initDate) {
+      self.activeDate = dateParser.fromTimezone($scope.datepickerOptions.initDate, ngModelOptions.timezone) || new Date();
+      $scope.$watch('datepickerOptions.initDate', function(initDate) {
+        if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
+          self.activeDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
+          self.refreshView();
+        }
+      });
+    } else {
+      self.activeDate = new Date();
+    }
+
+    this.activeDate = ngModelCtrl.$modelValue ?
+      dateParser.fromTimezone(new Date(ngModelCtrl.$modelValue), ngModelOptions.timezone) :
+      dateParser.fromTimezone(new Date(), ngModelOptions.timezone);
+
+    ngModelCtrl.$render = function() {
+      self.render();
+    };
+  };
+
+  this.render = function() {
+    if (ngModelCtrl.$viewValue) {
+      var date = new Date(ngModelCtrl.$viewValue),
+          isValid = !isNaN(date);
+
+      if (isValid) {
+        this.activeDate = dateParser.fromTimezone(date, ngModelOptions.timezone);
+      } else if (!$datepickerSuppressError) {
+        $log.error('Datepicker directive: "ng-model" value must be a Date object');
+      }
+    }
+    this.refreshView();
+  };
+
+  this.refreshView = function() {
+    if (this.element) {
+      $scope.selectedDt = null;
+      this._refreshView();
+      if ($scope.activeDt) {
+        $scope.activeDateId = $scope.activeDt.uid;
+      }
+
+      var date = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : null;
+      date = dateParser.fromTimezone(date, ngModelOptions.timezone);
+      ngModelCtrl.$setValidity('dateDisabled', !date ||
+        this.element && !this.isDisabled(date));
+    }
+  };
+
+  this.createDateObject = function(date, format) {
+    var model = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : null;
+    model = dateParser.fromTimezone(model, ngModelOptions.timezone);
+    var today = new Date();
+    today = dateParser.fromTimezone(today, ngModelOptions.timezone);
+    var time = this.compare(date, today);
+    var dt = {
+      date: date,
+      label: dateParser.filter(date, format),
+      selected: model && this.compare(date, model) === 0,
+      disabled: this.isDisabled(date),
+      past: time < 0,
+      current: time === 0,
+      future: time > 0,
+      customClass: this.customClass(date) || null
+    };
+
+    if (model && this.compare(date, model) === 0) {
+      $scope.selectedDt = dt;
+    }
+
+    if (self.activeDate && this.compare(dt.date, self.activeDate) === 0) {
+      $scope.activeDt = dt;
+    }
+
+    return dt;
+  };
+
+  this.isDisabled = function(date) {
+    return $scope.disabled ||
+      this.minDate && this.compare(date, this.minDate) < 0 ||
+      this.maxDate && this.compare(date, this.maxDate) > 0 ||
+      $scope.dateDisabled && $scope.dateDisabled({date: date, mode: $scope.datepickerMode});
+  };
+
+  this.customClass = function(date) {
+    return $scope.customClass({date: date, mode: $scope.datepickerMode});
+  };
+
+  // Split array into smaller arrays
+  this.split = function(arr, size) {
+    var arrays = [];
+    while (arr.length > 0) {
+      arrays.push(arr.splice(0, size));
+    }
+    return arrays;
+  };
+
+  $scope.select = function(date) {
+    if ($scope.datepickerMode === self.minMode) {
+      var dt = ngModelCtrl.$viewValue ? dateParser.fromTimezone(new Date(ngModelCtrl.$viewValue), ngModelOptions.timezone) : new Date(0, 0, 0, 0, 0, 0, 0);
+      dt.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+      dt = dateParser.toTimezone(dt, ngModelOptions.timezone);
+      ngModelCtrl.$setViewValue(dt);
+      ngModelCtrl.$render();
+    } else {
+      self.activeDate = date;
+      setMode(self.modes[self.modes.indexOf($scope.datepickerMode) - 1]);
+
+      $scope.$emit('uib:datepicker.mode');
+    }
+  };
+
+  $scope.move = function(direction) {
+    var year = self.activeDate.getFullYear() + direction * (self.step.years || 0),
+        month = self.activeDate.getMonth() + direction * (self.step.months || 0);
+    self.activeDate.setFullYear(year, month, 1);
+    self.refreshView();
+  };
+
+  $scope.toggleMode = function(direction) {
+    direction = direction || 1;
+
+    if ($scope.datepickerMode === self.maxMode && direction === 1 ||
+      $scope.datepickerMode === self.minMode && direction === -1) {
+      return;
+    }
+
+    setMode(self.modes[self.modes.indexOf($scope.datepickerMode) + direction]);
+
+    $scope.$emit('uib:datepicker.mode');
+  };
+
+  // Key event mapper
+  $scope.keys = { 13: 'enter', 32: 'space', 33: 'pageup', 34: 'pagedown', 35: 'end', 36: 'home', 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
+
+  var focusElement = function() {
+    self.element[0].focus();
+  };
+
+  // Listen for focus requests from popup directive
+  $scope.$on('uib:datepicker.focus', focusElement);
+
+  $scope.keydown = function(evt) {
+    var key = $scope.keys[evt.which];
+
+    if (!key || evt.shiftKey || evt.altKey || $scope.disabled) {
+      return;
+    }
+
+    evt.preventDefault();
+    if (!self.shortcutPropagation) {
+      evt.stopPropagation();
+    }
+
+    if (key === 'enter' || key === 'space') {
+      if (self.isDisabled(self.activeDate)) {
+        return; // do nothing
+      }
+      $scope.select(self.activeDate);
+    } else if (evt.ctrlKey && (key === 'up' || key === 'down')) {
+      $scope.toggleMode(key === 'up' ? 1 : -1);
+    } else {
+      self.handleKeyDown(key, evt);
+      self.refreshView();
+    }
+  };
+
+  $scope.$on("$destroy", function() {
+    //Clear all watch listeners on destroy
+    while (watchListeners.length) {
+      watchListeners.shift()();
+    }
+  });
+
+  function setMode(mode) {
+    $scope.datepickerMode = mode;
+    $scope.datepickerOptions.datepickerMode = mode;
+  }
+}])
+
+.controller('UibDaypickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
+  var DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  this.step = { months: 1 };
+  this.element = $element;
+  function getDaysInMonth(year, month) {
+    return month === 1 && year % 4 === 0 &&
+      (year % 100 !== 0 || year % 400 === 0) ? 29 : DAYS_IN_MONTH[month];
+  }
+
+  this.init = function(ctrl) {
+    angular.extend(ctrl, this);
+    scope.showWeeks = ctrl.showWeeks;
+    ctrl.refreshView();
+  };
+
+  this.getDates = function(startDate, n) {
+    var dates = new Array(n), current = new Date(startDate), i = 0, date;
+    while (i < n) {
+      date = new Date(current);
+      dates[i++] = date;
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+
+  this._refreshView = function() {
+    var year = this.activeDate.getFullYear(),
+      month = this.activeDate.getMonth(),
+      firstDayOfMonth = new Date(this.activeDate);
+
+    firstDayOfMonth.setFullYear(year, month, 1);
+
+    var difference = this.startingDay - firstDayOfMonth.getDay(),
+      numDisplayedFromPreviousMonth = difference > 0 ?
+        7 - difference : - difference,
+      firstDate = new Date(firstDayOfMonth);
+
+    if (numDisplayedFromPreviousMonth > 0) {
+      firstDate.setDate(-numDisplayedFromPreviousMonth + 1);
+    }
+
+    // 42 is the number of days on a six-week calendar
+    var days = this.getDates(firstDate, 42);
+    for (var i = 0; i < 42; i ++) {
+      days[i] = angular.extend(this.createDateObject(days[i], this.formatDay), {
+        secondary: days[i].getMonth() !== month,
+        uid: scope.uniqueId + '-' + i
+      });
+    }
+
+    scope.labels = new Array(7);
+    for (var j = 0; j < 7; j++) {
+      scope.labels[j] = {
+        abbr: dateFilter(days[j].date, this.formatDayHeader),
+        full: dateFilter(days[j].date, 'EEEE')
+      };
+    }
+
+    scope.title = dateFilter(this.activeDate, this.formatDayTitle);
+    scope.rows = this.split(days, 7);
+
+    if (scope.showWeeks) {
+      scope.weekNumbers = [];
+      var thursdayIndex = (4 + 7 - this.startingDay) % 7,
+          numWeeks = scope.rows.length;
+      for (var curWeek = 0; curWeek < numWeeks; curWeek++) {
+        scope.weekNumbers.push(
+          getISO8601WeekNumber(scope.rows[curWeek][thursdayIndex].date));
+      }
+    }
+  };
+
+  this.compare = function(date1, date2) {
+    var _date1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
+    var _date2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
+    _date1.setFullYear(date1.getFullYear());
+    _date2.setFullYear(date2.getFullYear());
+    return _date1 - _date2;
+  };
+
+  function getISO8601WeekNumber(date) {
+    var checkDate = new Date(date);
+    checkDate.setDate(checkDate.getDate() + 4 - (checkDate.getDay() || 7)); // Thursday
+    var time = checkDate.getTime();
+    checkDate.setMonth(0); // Compare with Jan 1
+    checkDate.setDate(1);
+    return Math.floor(Math.round((time - checkDate) / 86400000) / 7) + 1;
+  }
+
+  this.handleKeyDown = function(key, evt) {
+    var date = this.activeDate.getDate();
+
+    if (key === 'left') {
+      date = date - 1;
+    } else if (key === 'up') {
+      date = date - 7;
+    } else if (key === 'right') {
+      date = date + 1;
+    } else if (key === 'down') {
+      date = date + 7;
+    } else if (key === 'pageup' || key === 'pagedown') {
+      var month = this.activeDate.getMonth() + (key === 'pageup' ? - 1 : 1);
+      this.activeDate.setMonth(month, 1);
+      date = Math.min(getDaysInMonth(this.activeDate.getFullYear(), this.activeDate.getMonth()), date);
+    } else if (key === 'home') {
+      date = 1;
+    } else if (key === 'end') {
+      date = getDaysInMonth(this.activeDate.getFullYear(), this.activeDate.getMonth());
+    }
+    this.activeDate.setDate(date);
+  };
+}])
+
+.controller('UibMonthpickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
+  this.step = { years: 1 };
+  this.element = $element;
+
+  this.init = function(ctrl) {
+    angular.extend(ctrl, this);
+    ctrl.refreshView();
+  };
+
+  this._refreshView = function() {
+    var months = new Array(12),
+        year = this.activeDate.getFullYear(),
+        date;
+
+    for (var i = 0; i < 12; i++) {
+      date = new Date(this.activeDate);
+      date.setFullYear(year, i, 1);
+      months[i] = angular.extend(this.createDateObject(date, this.formatMonth), {
+        uid: scope.uniqueId + '-' + i
+      });
+    }
+
+    scope.title = dateFilter(this.activeDate, this.formatMonthTitle);
+    scope.rows = this.split(months, 3);
+  };
+
+  this.compare = function(date1, date2) {
+    var _date1 = new Date(date1.getFullYear(), date1.getMonth());
+    var _date2 = new Date(date2.getFullYear(), date2.getMonth());
+    _date1.setFullYear(date1.getFullYear());
+    _date2.setFullYear(date2.getFullYear());
+    return _date1 - _date2;
+  };
+
+  this.handleKeyDown = function(key, evt) {
+    var date = this.activeDate.getMonth();
+
+    if (key === 'left') {
+      date = date - 1;
+    } else if (key === 'up') {
+      date = date - 3;
+    } else if (key === 'right') {
+      date = date + 1;
+    } else if (key === 'down') {
+      date = date + 3;
+    } else if (key === 'pageup' || key === 'pagedown') {
+      var year = this.activeDate.getFullYear() + (key === 'pageup' ? - 1 : 1);
+      this.activeDate.setFullYear(year);
+    } else if (key === 'home') {
+      date = 0;
+    } else if (key === 'end') {
+      date = 11;
+    }
+    this.activeDate.setMonth(date);
+  };
+}])
+
+.controller('UibYearpickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
+  var columns, range;
+  this.element = $element;
+
+  function getStartingYear(year) {
+    return parseInt((year - 1) / range, 10) * range + 1;
+  }
+
+  this.yearpickerInit = function() {
+    columns = this.yearColumns;
+    range = this.yearRows * columns;
+    this.step = { years: range };
+  };
+
+  this._refreshView = function() {
+    var years = new Array(range), date;
+
+    for (var i = 0, start = getStartingYear(this.activeDate.getFullYear()); i < range; i++) {
+      date = new Date(this.activeDate);
+      date.setFullYear(start + i, 0, 1);
+      years[i] = angular.extend(this.createDateObject(date, this.formatYear), {
+        uid: scope.uniqueId + '-' + i
+      });
+    }
+
+    scope.title = [years[0].label, years[range - 1].label].join(' - ');
+    scope.rows = this.split(years, columns);
+    scope.columns = columns;
+  };
+
+  this.compare = function(date1, date2) {
+    return date1.getFullYear() - date2.getFullYear();
+  };
+
+  this.handleKeyDown = function(key, evt) {
+    var date = this.activeDate.getFullYear();
+
+    if (key === 'left') {
+      date = date - 1;
+    } else if (key === 'up') {
+      date = date - columns;
+    } else if (key === 'right') {
+      date = date + 1;
+    } else if (key === 'down') {
+      date = date + columns;
+    } else if (key === 'pageup' || key === 'pagedown') {
+      date += (key === 'pageup' ? - 1 : 1) * range;
+    } else if (key === 'home') {
+      date = getStartingYear(this.activeDate.getFullYear());
+    } else if (key === 'end') {
+      date = getStartingYear(this.activeDate.getFullYear()) + range - 1;
+    }
+    this.activeDate.setFullYear(date);
+  };
+}])
+
+.directive('uibDatepicker', function() {
+  return {
+    replace: true,
+    templateUrl: function(element, attrs) {
+      return attrs.templateUrl || 'uib/template/datepicker/datepicker.html';
+    },
+    scope: {
+      datepickerOptions: '=?'
+    },
+    require: ['uibDatepicker', '^ngModel'],
+    controller: 'UibDatepickerController',
+    controllerAs: 'datepicker',
+    link: function(scope, element, attrs, ctrls) {
+      var datepickerCtrl = ctrls[0], ngModelCtrl = ctrls[1];
+
+      datepickerCtrl.init(ngModelCtrl);
+    }
+  };
+})
+
+.directive('uibDaypicker', function() {
+  return {
+    replace: true,
+    templateUrl: function(element, attrs) {
+      return attrs.templateUrl || 'uib/template/datepicker/day.html';
+    },
+    require: ['^uibDatepicker', 'uibDaypicker'],
+    controller: 'UibDaypickerController',
+    link: function(scope, element, attrs, ctrls) {
+      var datepickerCtrl = ctrls[0],
+        daypickerCtrl = ctrls[1];
+
+      daypickerCtrl.init(datepickerCtrl);
+    }
+  };
+})
+
+.directive('uibMonthpicker', function() {
+  return {
+    replace: true,
+    templateUrl: function(element, attrs) {
+      return attrs.templateUrl || 'uib/template/datepicker/month.html';
+    },
+    require: ['^uibDatepicker', 'uibMonthpicker'],
+    controller: 'UibMonthpickerController',
+    link: function(scope, element, attrs, ctrls) {
+      var datepickerCtrl = ctrls[0],
+        monthpickerCtrl = ctrls[1];
+
+      monthpickerCtrl.init(datepickerCtrl);
+    }
+  };
+})
+
+.directive('uibYearpicker', function() {
+  return {
+    replace: true,
+    templateUrl: function(element, attrs) {
+      return attrs.templateUrl || 'uib/template/datepicker/year.html';
+    },
+    require: ['^uibDatepicker', 'uibYearpicker'],
+    controller: 'UibYearpickerController',
+    link: function(scope, element, attrs, ctrls) {
+      var ctrl = ctrls[0];
+      angular.extend(ctrl, ctrls[1]);
+      ctrl.yearpickerInit();
+
+      ctrl.refreshView();
+    }
+  };
+});
+
 angular.module('ui.bootstrap.position', [])
 
 /**
@@ -58626,6 +59281,11 @@ angular.module('ui.bootstrap.position', [])
      * Do not access this variable directly, use scrollbarWidth() instead.
      */
     var SCROLLBAR_WIDTH;
+    /**
+     * scrollbar on body and html element in IE and Edge overlay
+     * content and should be considered 0 width.
+     */
+    var BODY_SCROLLBAR_WIDTH;
     var OVERFLOW_REGEX = {
       normal: /(auto|scroll)/,
       hidden: /(auto|scroll|hidden)/
@@ -58636,6 +59296,7 @@ angular.module('ui.bootstrap.position', [])
       secondary: /^(top|bottom|left|right|center)$/,
       vertical: /^(top|bottom)$/
     };
+    var BODY_REGEX = /(HTML|BODY)/;
 
     return {
 
@@ -58689,10 +59350,23 @@ angular.module('ui.bootstrap.position', [])
       /**
        * Provides the scrollbar width, concept from TWBS measureScrollbar()
        * function in https://github.com/twbs/bootstrap/blob/master/js/modal.js
+       * In IE and Edge, scollbar on body and html element overlay and should
+       * return a width of 0.
        *
        * @returns {number} The width of the browser scollbar.
        */
-      scrollbarWidth: function() {
+      scrollbarWidth: function(isBody) {
+        if (isBody) {
+          if (angular.isUndefined(BODY_SCROLLBAR_WIDTH)) {
+            var bodyElem = $document.find('body');
+            bodyElem.addClass('uib-position-body-scrollbar-measure');
+            BODY_SCROLLBAR_WIDTH = $window.innerWidth - bodyElem[0].clientWidth;
+            BODY_SCROLLBAR_WIDTH = isFinite(BODY_SCROLLBAR_WIDTH) ? BODY_SCROLLBAR_WIDTH : 0;
+            bodyElem.removeClass('uib-position-body-scrollbar-measure');
+          }
+          return BODY_SCROLLBAR_WIDTH;
+        }
+
         if (angular.isUndefined(SCROLLBAR_WIDTH)) {
           var scrollElem = angular.element('<div class="uib-position-scrollbar-measure"></div>');
           $document.find('body').append(scrollElem);
@@ -58702,6 +59376,40 @@ angular.module('ui.bootstrap.position', [])
         }
 
         return SCROLLBAR_WIDTH;
+      },
+
+      /**
+       * Provides the padding required on an element to replace the scrollbar.
+       *
+       * @returns {object} An object with the following properties:
+       *   <ul>
+       *     <li>**scrollbarWidth**: the width of the scrollbar</li>
+       *     <li>**widthOverflow**: whether the the width is overflowing</li>
+       *     <li>**right**: the amount of right padding on the element needed to replace the scrollbar</li>
+       *     <li>**rightOriginal**: the amount of right padding currently on the element</li>
+       *     <li>**heightOverflow**: whether the the height is overflowing</li>
+       *     <li>**bottom**: the amount of bottom padding on the element needed to replace the scrollbar</li>
+       *     <li>**bottomOriginal**: the amount of bottom padding currently on the element</li>
+       *   </ul>
+       */
+      scrollbarPadding: function(elem) {
+        elem = this.getRawNode(elem);
+
+        var elemStyle = $window.getComputedStyle(elem);
+        var paddingRight = this.parseStyle(elemStyle.paddingRight);
+        var paddingBottom = this.parseStyle(elemStyle.paddingBottom);
+        var scrollParent = this.scrollParent(elem, false, true);
+        var scrollbarWidth = this.scrollbarWidth(scrollParent, BODY_REGEX.test(scrollParent.tagName));
+
+        return {
+          scrollbarWidth: scrollbarWidth,
+          widthOverflow: scrollParent.scrollWidth > scrollParent.clientWidth,
+          right: paddingRight + scrollbarWidth,
+          originalRight: paddingRight,
+          heightOverflow: scrollParent.scrollHeight > scrollParent.clientHeight,
+          bottom: paddingBottom + scrollbarWidth,
+          originalBottom: paddingBottom
+         };
       },
 
       /**
@@ -58729,15 +59437,20 @@ angular.module('ui.bootstrap.position', [])
        * @param {element} elem - The element to find the scroll parent of.
        * @param {boolean=} [includeHidden=false] - Should scroll style of 'hidden' be considered,
        *   default is false.
+       * @param {boolean=} [includeSelf=false] - Should the element being passed be
+       * included in the scrollable llokup.
        *
        * @returns {element} A HTML element.
        */
-      scrollParent: function(elem, includeHidden) {
+      scrollParent: function(elem, includeHidden, includeSelf) {
         elem = this.getRawNode(elem);
 
         var overflowRegex = includeHidden ? OVERFLOW_REGEX.hidden : OVERFLOW_REGEX.normal;
         var documentEl = $document[0].documentElement;
         var elemStyle = $window.getComputedStyle(elem);
+        if (includeSelf && overflowRegex.test(elemStyle.overflow + elemStyle.overflowY + elemStyle.overflowX)) {
+          return elem;
+        }
         var excludeStatic = elemStyle.position === 'absolute';
         var scrollParent = elem.parentElement || documentEl;
 
@@ -59155,754 +59868,9 @@ angular.module('ui.bootstrap.position', [])
     };
   }]);
 
-angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootstrap.isClass', 'ui.bootstrap.position'])
+angular.module('ui.bootstrap.datepickerPopup', ['ui.bootstrap.datepicker', 'ui.bootstrap.position'])
 
-.value('$datepickerSuppressError', false)
-.value('uibDatepickerAttributeWarning', true)
-
-.constant('uibDatepickerConfig', {
-  datepickerMode: 'day',
-  formatDay: 'dd',
-  formatMonth: 'MMMM',
-  formatYear: 'yyyy',
-  formatDayHeader: 'EEE',
-  formatDayTitle: 'MMMM yyyy',
-  formatMonthTitle: 'yyyy',
-  maxDate: null,
-  maxMode: 'year',
-  minDate: null,
-  minMode: 'day',
-  ngModelOptions: {},
-  shortcutPropagation: false,
-  showWeeks: true,
-  yearColumns: 5,
-  yearRows: 4
-})
-
-.controller('UibDatepickerController', ['$scope', '$attrs', '$parse', '$interpolate', '$locale', '$log', 'dateFilter', 'uibDatepickerConfig', '$datepickerSuppressError', 'uibDatepickerAttributeWarning', 'uibDateParser',
-  function($scope, $attrs, $parse, $interpolate, $locale, $log, dateFilter, datepickerConfig, $datepickerSuppressError, datepickerAttributeWarning, dateParser) {
-  var self = this,
-      ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl;
-      ngModelOptions = {},
-      watchListeners = [],
-      optionsUsed = !!$attrs.datepickerOptions;
-
-  // Modes chain
-  this.modes = ['day', 'month', 'year'];
-
-  if (optionsUsed) {
-    [
-      'customClass',
-      'dateDisabled',
-      'datepickerMode',
-      'formatDay',
-      'formatDayHeader',
-      'formatDayTitle',
-      'formatMonth',
-      'formatMonthTitle',
-      'formatYear',
-      'initDate',
-      'maxDate',
-      'maxMode',
-      'minDate',
-      'minMode',
-      'showWeeks',
-      'shortcutPropagation',
-      'startingDay',
-      'yearColumns',
-      'yearRows'
-    ].forEach(function(key) {
-      switch (key) {
-        case 'customClass':
-        case 'dateDisabled':
-          $scope[key] = $scope.datepickerOptions[key] || angular.noop;
-          break;
-        case 'datepickerMode':
-          $scope.datepickerMode = angular.isDefined($scope.datepickerOptions.datepickerMode) ?
-            $scope.datepickerOptions.datepickerMode : datepickerConfig.datepickerMode;
-          break;
-        case 'formatDay':
-        case 'formatDayHeader':
-        case 'formatDayTitle':
-        case 'formatMonth':
-        case 'formatMonthTitle':
-        case 'formatYear':
-          self[key] = angular.isDefined($scope.datepickerOptions[key]) ?
-            $interpolate($scope.datepickerOptions[key])($scope.$parent) :
-            datepickerConfig[key];
-          break;
-        case 'showWeeks':
-        case 'shortcutPropagation':
-        case 'yearColumns':
-        case 'yearRows':
-          self[key] = angular.isDefined($scope.datepickerOptions[key]) ?
-            $scope.datepickerOptions[key] : datepickerConfig[key];
-          break;
-        case 'startingDay':
-          if (angular.isDefined($scope.datepickerOptions.startingDay)) {
-            self.startingDay = $scope.datepickerOptions.startingDay;
-          } else if (angular.isNumber(datepickerConfig.startingDay)) {
-            self.startingDay = datepickerConfig.startingDay;
-          } else {
-            self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
-          }
-
-          break;
-        case 'maxDate':
-        case 'minDate':
-          if ($scope.datepickerOptions[key]) {
-            $scope.$watch(function() { return $scope.datepickerOptions[key]; }, function(value) {
-              if (value) {
-                if (angular.isDate(value)) {
-                  self[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
-                } else {
-                  self[key] = new Date(dateFilter(value, 'medium'));
-                }
-              } else {
-                self[key] = null;
-              }
-
-              self.refreshView();
-            });
-          } else {
-            self[key] = datepickerConfig[key] ? dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) : null;
-          }
-
-          break;
-        case 'maxMode':
-        case 'minMode':
-          if ($scope.datepickerOptions[key]) {
-            $scope.$watch(function() { return $scope.datepickerOptions[key]; }, function(value) {
-              self[key] = $scope[key] = angular.isDefined(value) ? value : datepickerOptions[key];
-              if (key === 'minMode' && self.modes.indexOf($scope.datepickerOptions.datepickerMode) < self.modes.indexOf(self[key]) ||
-                key === 'maxMode' && self.modes.indexOf($scope.datepickerOptions.datepickerMode) > self.modes.indexOf(self[key])) {
-                $scope.datepickerMode = self[key];
-                $scope.datepickerOptions.datepickerMode = self[key];
-              }
-            });
-          } else {
-            self[key] = $scope[key] = datepickerConfig[key] || null;
-          }
-
-          break;
-        case 'initDate':
-          if ($scope.datepickerOptions.initDate) {
-            self.activeDate = dateParser.fromTimezone($scope.datepickerOptions.initDate, ngModelOptions.timezone) || new Date();
-            $scope.$watch(function() { return $scope.datepickerOptions.initDate; }, function(initDate) {
-              if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
-                self.activeDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
-                self.refreshView();
-              }
-            });
-          } else {
-            self.activeDate = new Date();
-          }
-      }
-    });
-  } else {
-    // Interpolated configuration attributes
-    angular.forEach(['formatDay', 'formatMonth', 'formatYear', 'formatDayHeader', 'formatDayTitle', 'formatMonthTitle'], function(key) {
-      self[key] = angular.isDefined($attrs[key]) ? $interpolate($attrs[key])($scope.$parent) : datepickerConfig[key];
-
-      if (angular.isDefined($attrs[key]) && datepickerAttributeWarning) {
-        $log.warn('uib-datepicker ' + key + ' attribute usage is deprecated, use datepicker-options attribute instead');
-      }
-    });
-
-    // Evaled configuration attributes
-    angular.forEach(['showWeeks', 'yearRows', 'yearColumns', 'shortcutPropagation'], function(key) {
-      self[key] = angular.isDefined($attrs[key]) ?
-        $scope.$parent.$eval($attrs[key]) : datepickerConfig[key];
-
-      if (angular.isDefined($attrs[key]) && datepickerAttributeWarning) {
-        $log.warn('uib-datepicker ' + key + ' attribute usage is deprecated, use datepicker-options attribute instead');
-      }
-    });
-
-    angular.forEach(['dateDisabled', 'customClass'], function(key) {
-      if (angular.isDefined($attrs[key]) && datepickerAttributeWarning) {
-        $log.warn('uib-datepicker ' + key + ' attribute usage is deprecated, use datepicker-options attribute instead');
-      }
-    });
-
-    if (angular.isDefined($attrs.startingDay)) {
-      if (datepickerAttributeWarning) {
-        $log.warn('uib-datepicker startingDay attribute usage is deprecated, use datepicker-options attribute instead');
-      }
-
-      self.startingDay = $scope.$parent.$eval($attrs.startingDay);
-    } else if (angular.isNumber(datepickerConfig.startingDay)) {
-      self.startingDay = datepickerConfig.startingDay;
-    } else {
-      self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
-    }
-
-    // Watchable date attributes
-    angular.forEach(['minDate', 'maxDate'], function(key) {
-      if ($attrs[key]) {
-        if (datepickerAttributeWarning) {
-          $log.warn('uib-datepicker ' + key + ' attribute usage is deprecated, use datepicker-options attribute instead');
-        }
-
-        watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
-          if (value) {
-            if (angular.isDate(value)) {
-              self[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
-            } else {
-              self[key] = new Date(dateFilter(value, 'medium'));
-            }
-          } else {
-            self[key] = null;
-          }
-
-          self.refreshView();
-        }));
-      } else {
-        self[key] = datepickerConfig[key] ? dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) : null;
-      }
-    });
-
-    angular.forEach(['minMode', 'maxMode'], function(key) {
-      if ($attrs[key]) {
-        if (datepickerAttributeWarning) {
-          $log.warn('uib-datepicker ' + key + ' attribute usage is deprecated, use datepicker-options attribute instead');
-        }
-
-        watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
-          self[key] = $scope[key] = angular.isDefined(value) ? value : $attrs[key];
-          if (key === 'minMode' && self.modes.indexOf($scope.datepickerMode) < self.modes.indexOf(self[key]) ||
-            key === 'maxMode' && self.modes.indexOf($scope.datepickerMode) > self.modes.indexOf(self[key])) {
-            $scope.datepickerMode = self[key];
-          }
-        }));
-      } else {
-        self[key] = $scope[key] = datepickerConfig[key] || null;
-      }
-    });
-
-    if (angular.isDefined($attrs.initDate)) {
-      if (datepickerAttributeWarning) {
-        $log.warn('uib-datepicker initDate attribute usage is deprecated, use datepicker-options attribute instead');
-      }
-
-      var initDate = dateParser.fromTimezone($scope.$parent.$eval($attrs.initDate), ngModelOptions.timezone);
-      this.activeDate = !isNaN(initDate) ? initDate : new Date();
-      watchListeners.push($scope.$parent.$watch($attrs.initDate, function(initDate) {
-        if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
-          initDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
-          self.activeDate = !isNaN(initDate) ? initDate : new Date();
-          self.refreshView();
-        }
-      }));
-    } else {
-      this.activeDate = new Date();
-    }
-
-    if ($attrs.datepickerMode && datepickerAttributeWarning) {
-      $log.warn('uib-datepicker datepickerMode attribute usage is deprecated, use datepicker-options attribute instead');
-    }
-
-    $scope.datepickerMode = $scope.datepickerMode ||
-      datepickerConfig.datepickerMode;
-  }
-
-  $scope.uniqueId = 'datepicker-' + $scope.$id + '-' + Math.floor(Math.random() * 10000);
-
-  $scope.disabled = angular.isDefined($attrs.disabled) || false;
-  if (angular.isDefined($attrs.ngDisabled)) {
-    watchListeners.push($scope.$parent.$watch($attrs.ngDisabled, function(disabled) {
-      $scope.disabled = disabled;
-      self.refreshView();
-    }));
-  }
-
-  $scope.isActive = function(dateObject) {
-    if (self.compare(dateObject.date, self.activeDate) === 0) {
-      $scope.activeDateId = dateObject.uid;
-      return true;
-    }
-    return false;
-  };
-
-  this.init = function(ngModelCtrl_) {
-    ngModelCtrl = ngModelCtrl_;
-    ngModelOptions = ngModelCtrl_.$options || datepickerConfig.ngModelOptions;
-
-    this.activeDate = ngModelCtrl.$modelValue ?
-      dateParser.fromTimezone(new Date(ngModelCtrl.$modelValue), ngModelOptions.timezone) :
-      dateParser.fromTimezone(new Date(), ngModelOptions.timezone);
-
-    ngModelCtrl.$render = function() {
-      self.render();
-    };
-  };
-
-  this.render = function() {
-    if (ngModelCtrl.$viewValue) {
-      var date = new Date(ngModelCtrl.$viewValue),
-          isValid = !isNaN(date);
-
-      if (isValid) {
-        this.activeDate = dateParser.fromTimezone(date, ngModelOptions.timezone);
-      } else if (!$datepickerSuppressError) {
-        $log.error('Datepicker directive: "ng-model" value must be a Date object');
-      }
-    }
-    this.refreshView();
-  };
-
-  this.refreshView = function() {
-    if (this.element) {
-      $scope.selectedDt = null;
-      this._refreshView();
-      if ($scope.activeDt) {
-        $scope.activeDateId = $scope.activeDt.uid;
-      }
-
-      var date = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : null;
-      date = dateParser.fromTimezone(date, ngModelOptions.timezone);
-      ngModelCtrl.$setValidity('dateDisabled', !date ||
-        this.element && !this.isDisabled(date));
-    }
-  };
-
-  this.createDateObject = function(date, format) {
-    var model = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : null;
-    model = dateParser.fromTimezone(model, ngModelOptions.timezone);
-    var today = new Date();
-    today = dateParser.fromTimezone(today, ngModelOptions.timezone);
-    var time = this.compare(date, today);
-    var dt = {
-      date: date,
-      label: dateParser.filter(date, format),
-      selected: model && this.compare(date, model) === 0,
-      disabled: this.isDisabled(date),
-      past: time < 0,
-      current: time === 0,
-      future: time > 0,
-      customClass: this.customClass(date) || null
-    };
-
-    if (model && this.compare(date, model) === 0) {
-      $scope.selectedDt = dt;
-    }
-
-    if (self.activeDate && this.compare(dt.date, self.activeDate) === 0) {
-      $scope.activeDt = dt;
-    }
-
-    return dt;
-  };
-
-  this.isDisabled = function(date) {
-    return $scope.disabled ||
-      this.minDate && this.compare(date, this.minDate) < 0 ||
-      this.maxDate && this.compare(date, this.maxDate) > 0 ||
-      $scope.dateDisabled && $scope.dateDisabled({date: date, mode: $scope.datepickerMode});
-  };
-
-  this.customClass = function(date) {
-    return $scope.customClass({date: date, mode: $scope.datepickerMode});
-  };
-
-  // Split array into smaller arrays
-  this.split = function(arr, size) {
-    var arrays = [];
-    while (arr.length > 0) {
-      arrays.push(arr.splice(0, size));
-    }
-    return arrays;
-  };
-
-  $scope.select = function(date) {
-    if ($scope.datepickerMode === self.minMode) {
-      var dt = ngModelCtrl.$viewValue ? dateParser.fromTimezone(new Date(ngModelCtrl.$viewValue), ngModelOptions.timezone) : new Date(0, 0, 0, 0, 0, 0, 0);
-      dt.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
-      dt = dateParser.toTimezone(dt, ngModelOptions.timezone);
-      ngModelCtrl.$setViewValue(dt);
-      ngModelCtrl.$render();
-    } else {
-      self.activeDate = date;
-      setMode(self.modes[self.modes.indexOf($scope.datepickerMode) - 1]);
-
-      $scope.$emit('uib:datepicker.mode');
-    }
-  };
-
-  $scope.move = function(direction) {
-    var year = self.activeDate.getFullYear() + direction * (self.step.years || 0),
-        month = self.activeDate.getMonth() + direction * (self.step.months || 0);
-    self.activeDate.setFullYear(year, month, 1);
-    self.refreshView();
-  };
-
-  $scope.toggleMode = function(direction) {
-    direction = direction || 1;
-
-    if ($scope.datepickerMode === self.maxMode && direction === 1 ||
-      $scope.datepickerMode === self.minMode && direction === -1) {
-      return;
-    }
-
-    setMode(self.modes[self.modes.indexOf($scope.datepickerMode) + direction]);
-
-    $scope.$emit('uib:datepicker.mode');
-  };
-
-  // Key event mapper
-  $scope.keys = { 13: 'enter', 32: 'space', 33: 'pageup', 34: 'pagedown', 35: 'end', 36: 'home', 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
-
-  var focusElement = function() {
-    self.element[0].focus();
-  };
-
-  // Listen for focus requests from popup directive
-  $scope.$on('uib:datepicker.focus', focusElement);
-
-  $scope.keydown = function(evt) {
-    var key = $scope.keys[evt.which];
-
-    if (!key || evt.shiftKey || evt.altKey || $scope.disabled) {
-      return;
-    }
-
-    evt.preventDefault();
-    if (!self.shortcutPropagation) {
-      evt.stopPropagation();
-    }
-
-    if (key === 'enter' || key === 'space') {
-      if (self.isDisabled(self.activeDate)) {
-        return; // do nothing
-      }
-      $scope.select(self.activeDate);
-    } else if (evt.ctrlKey && (key === 'up' || key === 'down')) {
-      $scope.toggleMode(key === 'up' ? 1 : -1);
-    } else {
-      self.handleKeyDown(key, evt);
-      self.refreshView();
-    }
-  };
-
-  $scope.$on("$destroy", function() {
-    //Clear all watch listeners on destroy
-    while (watchListeners.length) {
-      watchListeners.shift()();
-    }
-  });
-
-  function setMode(mode) {
-    $scope.datepickerMode = mode;
-    if (optionsUsed) {
-      $scope.datepickerOptions.datepickerMode = mode;
-    }
-  }
-}])
-
-.controller('UibDaypickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
-  var DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-  this.step = { months: 1 };
-  this.element = $element;
-  function getDaysInMonth(year, month) {
-    return month === 1 && year % 4 === 0 &&
-      (year % 100 !== 0 || year % 400 === 0) ? 29 : DAYS_IN_MONTH[month];
-  }
-
-  this.init = function(ctrl) {
-    angular.extend(ctrl, this);
-    scope.showWeeks = ctrl.showWeeks;
-    ctrl.refreshView();
-  };
-
-  this.getDates = function(startDate, n) {
-    var dates = new Array(n), current = new Date(startDate), i = 0, date;
-    while (i < n) {
-      date = new Date(current);
-      dates[i++] = date;
-      current.setDate(current.getDate() + 1);
-    }
-    return dates;
-  };
-
-  this._refreshView = function() {
-    var year = this.activeDate.getFullYear(),
-      month = this.activeDate.getMonth(),
-      firstDayOfMonth = new Date(this.activeDate);
-
-    firstDayOfMonth.setFullYear(year, month, 1);
-
-    var difference = this.startingDay - firstDayOfMonth.getDay(),
-      numDisplayedFromPreviousMonth = difference > 0 ?
-        7 - difference : - difference,
-      firstDate = new Date(firstDayOfMonth);
-
-    if (numDisplayedFromPreviousMonth > 0) {
-      firstDate.setDate(-numDisplayedFromPreviousMonth + 1);
-    }
-
-    // 42 is the number of days on a six-week calendar
-    var days = this.getDates(firstDate, 42);
-    for (var i = 0; i < 42; i ++) {
-      days[i] = angular.extend(this.createDateObject(days[i], this.formatDay), {
-        secondary: days[i].getMonth() !== month,
-        uid: scope.uniqueId + '-' + i
-      });
-    }
-
-    scope.labels = new Array(7);
-    for (var j = 0; j < 7; j++) {
-      scope.labels[j] = {
-        abbr: dateFilter(days[j].date, this.formatDayHeader),
-        full: dateFilter(days[j].date, 'EEEE')
-      };
-    }
-
-    scope.title = dateFilter(this.activeDate, this.formatDayTitle);
-    scope.rows = this.split(days, 7);
-
-    if (scope.showWeeks) {
-      scope.weekNumbers = [];
-      var thursdayIndex = (4 + 7 - this.startingDay) % 7,
-          numWeeks = scope.rows.length;
-      for (var curWeek = 0; curWeek < numWeeks; curWeek++) {
-        scope.weekNumbers.push(
-          getISO8601WeekNumber(scope.rows[curWeek][thursdayIndex].date));
-      }
-    }
-  };
-
-  this.compare = function(date1, date2) {
-    var _date1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
-    var _date2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
-    _date1.setFullYear(date1.getFullYear());
-    _date2.setFullYear(date2.getFullYear());
-    return _date1 - _date2;
-  };
-
-  function getISO8601WeekNumber(date) {
-    var checkDate = new Date(date);
-    checkDate.setDate(checkDate.getDate() + 4 - (checkDate.getDay() || 7)); // Thursday
-    var time = checkDate.getTime();
-    checkDate.setMonth(0); // Compare with Jan 1
-    checkDate.setDate(1);
-    return Math.floor(Math.round((time - checkDate) / 86400000) / 7) + 1;
-  }
-
-  this.handleKeyDown = function(key, evt) {
-    var date = this.activeDate.getDate();
-
-    if (key === 'left') {
-      date = date - 1;
-    } else if (key === 'up') {
-      date = date - 7;
-    } else if (key === 'right') {
-      date = date + 1;
-    } else if (key === 'down') {
-      date = date + 7;
-    } else if (key === 'pageup' || key === 'pagedown') {
-      var month = this.activeDate.getMonth() + (key === 'pageup' ? - 1 : 1);
-      this.activeDate.setMonth(month, 1);
-      date = Math.min(getDaysInMonth(this.activeDate.getFullYear(), this.activeDate.getMonth()), date);
-    } else if (key === 'home') {
-      date = 1;
-    } else if (key === 'end') {
-      date = getDaysInMonth(this.activeDate.getFullYear(), this.activeDate.getMonth());
-    }
-    this.activeDate.setDate(date);
-  };
-}])
-
-.controller('UibMonthpickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
-  this.step = { years: 1 };
-  this.element = $element;
-
-  this.init = function(ctrl) {
-    angular.extend(ctrl, this);
-    ctrl.refreshView();
-  };
-
-  this._refreshView = function() {
-    var months = new Array(12),
-        year = this.activeDate.getFullYear(),
-        date;
-
-    for (var i = 0; i < 12; i++) {
-      date = new Date(this.activeDate);
-      date.setFullYear(year, i, 1);
-      months[i] = angular.extend(this.createDateObject(date, this.formatMonth), {
-        uid: scope.uniqueId + '-' + i
-      });
-    }
-
-    scope.title = dateFilter(this.activeDate, this.formatMonthTitle);
-    scope.rows = this.split(months, 3);
-  };
-
-  this.compare = function(date1, date2) {
-    var _date1 = new Date(date1.getFullYear(), date1.getMonth());
-    var _date2 = new Date(date2.getFullYear(), date2.getMonth());
-    _date1.setFullYear(date1.getFullYear());
-    _date2.setFullYear(date2.getFullYear());
-    return _date1 - _date2;
-  };
-
-  this.handleKeyDown = function(key, evt) {
-    var date = this.activeDate.getMonth();
-
-    if (key === 'left') {
-      date = date - 1;
-    } else if (key === 'up') {
-      date = date - 3;
-    } else if (key === 'right') {
-      date = date + 1;
-    } else if (key === 'down') {
-      date = date + 3;
-    } else if (key === 'pageup' || key === 'pagedown') {
-      var year = this.activeDate.getFullYear() + (key === 'pageup' ? - 1 : 1);
-      this.activeDate.setFullYear(year);
-    } else if (key === 'home') {
-      date = 0;
-    } else if (key === 'end') {
-      date = 11;
-    }
-    this.activeDate.setMonth(date);
-  };
-}])
-
-.controller('UibYearpickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
-  var columns, range;
-  this.element = $element;
-
-  function getStartingYear(year) {
-    return parseInt((year - 1) / range, 10) * range + 1;
-  }
-
-  this.yearpickerInit = function() {
-    columns = this.yearColumns;
-    range = this.yearRows * columns;
-    this.step = { years: range };
-  };
-
-  this._refreshView = function() {
-    var years = new Array(range), date;
-
-    for (var i = 0, start = getStartingYear(this.activeDate.getFullYear()); i < range; i++) {
-      date = new Date(this.activeDate);
-      date.setFullYear(start + i, 0, 1);
-      years[i] = angular.extend(this.createDateObject(date, this.formatYear), {
-        uid: scope.uniqueId + '-' + i
-      });
-    }
-
-    scope.title = [years[0].label, years[range - 1].label].join(' - ');
-    scope.rows = this.split(years, columns);
-    scope.columns = columns;
-  };
-
-  this.compare = function(date1, date2) {
-    return date1.getFullYear() - date2.getFullYear();
-  };
-
-  this.handleKeyDown = function(key, evt) {
-    var date = this.activeDate.getFullYear();
-
-    if (key === 'left') {
-      date = date - 1;
-    } else if (key === 'up') {
-      date = date - columns;
-    } else if (key === 'right') {
-      date = date + 1;
-    } else if (key === 'down') {
-      date = date + columns;
-    } else if (key === 'pageup' || key === 'pagedown') {
-      date += (key === 'pageup' ? - 1 : 1) * range;
-    } else if (key === 'home') {
-      date = getStartingYear(this.activeDate.getFullYear());
-    } else if (key === 'end') {
-      date = getStartingYear(this.activeDate.getFullYear()) + range - 1;
-    }
-    this.activeDate.setFullYear(date);
-  };
-}])
-
-.directive('uibDatepicker', function() {
-  return {
-    replace: true,
-    templateUrl: function(element, attrs) {
-      return attrs.templateUrl || 'uib/template/datepicker/datepicker.html';
-    },
-    scope: {
-      datepickerMode: '=?',
-      datepickerOptions: '=?',
-      dateDisabled: '&',
-      customClass: '&',
-      shortcutPropagation: '&?'
-    },
-    require: ['uibDatepicker', '^ngModel'],
-    controller: 'UibDatepickerController',
-    controllerAs: 'datepicker',
-    link: function(scope, element, attrs, ctrls) {
-      var datepickerCtrl = ctrls[0], ngModelCtrl = ctrls[1];
-
-      datepickerCtrl.init(ngModelCtrl);
-    }
-  };
-})
-
-.directive('uibDaypicker', function() {
-  return {
-    replace: true,
-    templateUrl: function(element, attrs) {
-      return attrs.templateUrl || 'uib/template/datepicker/day.html';
-    },
-    require: ['^uibDatepicker', 'uibDaypicker'],
-    controller: 'UibDaypickerController',
-    link: function(scope, element, attrs, ctrls) {
-      var datepickerCtrl = ctrls[0],
-        daypickerCtrl = ctrls[1];
-
-      daypickerCtrl.init(datepickerCtrl);
-    }
-  };
-})
-
-.directive('uibMonthpicker', function() {
-  return {
-    replace: true,
-    templateUrl: function(element, attrs) {
-      return attrs.templateUrl || 'uib/template/datepicker/month.html';
-    },
-    require: ['^uibDatepicker', 'uibMonthpicker'],
-    controller: 'UibMonthpickerController',
-    link: function(scope, element, attrs, ctrls) {
-      var datepickerCtrl = ctrls[0],
-        monthpickerCtrl = ctrls[1];
-
-      monthpickerCtrl.init(datepickerCtrl);
-    }
-  };
-})
-
-.directive('uibYearpicker', function() {
-  return {
-    replace: true,
-    templateUrl: function(element, attrs) {
-      return attrs.templateUrl || 'uib/template/datepicker/year.html';
-    },
-    require: ['^uibDatepicker', 'uibYearpicker'],
-    controller: 'UibYearpickerController',
-    link: function(scope, element, attrs, ctrls) {
-      var ctrl = ctrls[0];
-      angular.extend(ctrl, ctrls[1]);
-      ctrl.yearpickerInit();
-
-      ctrl.refreshView();
-    }
-  };
-})
-
-.value('uibDatepickerPopupAttributeWarning', true)
+.value('$datepickerPopupLiteralWarning', true)
 
 .constant('uibDatepickerPopupConfig', {
   altInputFormats: [],
@@ -59912,7 +59880,7 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   closeText: 'Done',
   currentText: 'Today',
   datepickerPopup: 'yyyy-MM-dd',
-  datepickerPopupTemplateUrl: 'uib/template/datepicker/popup.html',
+  datepickerPopupTemplateUrl: 'uib/template/datepickerPopup/popup.html',
   datepickerTemplateUrl: 'uib/template/datepicker/datepicker.html',
   html5Types: {
     date: 'yyyy-MM-dd',
@@ -59924,19 +59892,18 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   placement: 'auto bottom-left'
 })
 
-.controller('UibDatepickerPopupController', ['$scope', '$element', '$attrs', '$compile', '$log', '$parse', '$window', '$document', '$rootScope', '$uibPosition', 'dateFilter', 'uibDateParser', 'uibDatepickerPopupConfig', '$timeout', 'uibDatepickerConfig', 'uibDatepickerPopupAttributeWarning',
-function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $rootScope, $position, dateFilter, dateParser, datepickerPopupConfig, $timeout, datepickerConfig, datepickerPopupAttributeWarning) {
+.controller('UibDatepickerPopupController', ['$scope', '$element', '$attrs', '$compile', '$log', '$parse', '$window', '$document', '$rootScope', '$uibPosition', 'dateFilter', 'uibDateParser', 'uibDatepickerPopupConfig', '$timeout', 'uibDatepickerConfig', '$datepickerPopupLiteralWarning',
+function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $rootScope, $position, dateFilter, dateParser, datepickerPopupConfig, $timeout, datepickerConfig, $datepickerPopupLiteralWarning) {
   var cache = {},
     isHtml5DateInput = false;
   var dateFormat, closeOnDateSelection, appendToBody, onOpenFocus,
     datepickerPopupTemplateUrl, datepickerTemplateUrl, popupEl, datepickerEl, scrollParentEl,
-    ngModel, ngModelOptions, $popup, altInputFormats, watchListeners = [];
-
-  $scope.watchData = {};
+    ngModel, ngModelOptions, $popup, altInputFormats, watchListeners = [],
+    timezone;
 
   this.init = function(_ngModel_) {
     ngModel = _ngModel_;
-    ngModelOptions = _ngModel_.$options || datepickerConfig.ngModelOptions;
+    ngModelOptions = _ngModel_.$options;
     closeOnDateSelection = angular.isDefined($attrs.closeOnDateSelection) ?
       $scope.$parent.$eval($attrs.closeOnDateSelection) :
       datepickerPopupConfig.closeOnDateSelection;
@@ -59988,16 +59955,22 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
 
     // popup element used to display calendar
     popupEl = angular.element('<div uib-datepicker-popup-wrap><div uib-datepicker></div></div>');
-    $scope.ngModelOptions = angular.copy(ngModelOptions);
-    $scope.ngModelOptions.timezone = null;
-    if ($scope.ngModelOptions.updateOnDefault === true) {
-      $scope.ngModelOptions.updateOn = $scope.ngModelOptions.updateOn ?
-        $scope.ngModelOptions.updateOn + ' default' : 'default';
+    if (ngModelOptions) {
+      timezone = ngModelOptions.timezone;
+      $scope.ngModelOptions = angular.copy(ngModelOptions);
+      $scope.ngModelOptions.timezone = null;
+      if ($scope.ngModelOptions.updateOnDefault === true) {
+        $scope.ngModelOptions.updateOn = $scope.ngModelOptions.updateOn ?
+          $scope.ngModelOptions.updateOn + ' default' : 'default';
+      }
+
+      popupEl.attr('ng-model-options', 'ngModelOptions');
+    } else {
+      timezone = null;
     }
 
     popupEl.attr({
       'ng-model': 'date',
-      'ng-model-options': 'ngModelOptions',
       'ng-change': 'dateSelection(date)',
       'template-url': datepickerPopupTemplateUrl
     });
@@ -60006,98 +59979,18 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
     datepickerEl = angular.element(popupEl.children()[0]);
     datepickerEl.attr('template-url', datepickerTemplateUrl);
 
+    if (!$scope.datepickerOptions) {
+      $scope.datepickerOptions = {};
+    }
+
     if (isHtml5DateInput) {
       if ($attrs.type === 'month') {
-        datepickerEl.attr('datepicker-mode', '"month"');
-        datepickerEl.attr('min-mode', 'month');
+        $scope.datepickerOptions.datepickerMode = 'month';
+        $scope.datepickerOptions.minMode = 'month';
       }
     }
 
-    if ($scope.datepickerOptions) {
-      datepickerEl.attr('datepicker-options', 'datepickerOptions');
-    }
-
-    angular.forEach(['minMode', 'maxMode', 'datepickerMode', 'shortcutPropagation'], function(key) {
-      if ($attrs[key]) {
-        if (datepickerPopupAttributeWarning) {
-          $log.warn('uib-datepicker settings via uib-datepicker-popup attributes are deprecated and will be removed in UI Bootstrap 1.3, use datepicker-options attribute instead');
-        }
-
-        var getAttribute = $parse($attrs[key]);
-        var propConfig = {
-          get: function() {
-            return getAttribute($scope.$parent);
-          }
-        };
-
-        datepickerEl.attr(cameltoDash(key), 'watchData.' + key);
-
-        // Propagate changes from datepicker to outside
-        if (key === 'datepickerMode') {
-          var setAttribute = getAttribute.assign;
-          propConfig.set = function(v) {
-            setAttribute($scope.$parent, v);
-          };
-        }
-
-        Object.defineProperty($scope.watchData, key, propConfig);
-      }
-    });
-
-    angular.forEach(['minDate', 'maxDate', 'initDate'], function(key) {
-      if ($attrs[key]) {
-        if (datepickerPopupAttributeWarning) {
-          $log.warn('uib-datepicker settings via uib-datepicker-popup attributes are deprecated and will be removed in UI Bootstrap 1.3, use datepicker-options attribute instead');
-        }
-
-        var getAttribute = $parse($attrs[key]);
-
-        watchListeners.push($scope.$parent.$watch(getAttribute, function(value) {
-          if (key === 'minDate' || key === 'maxDate') {
-            if (value === null) {
-              cache[key] = null;
-            } else if (angular.isDate(value)) {
-              cache[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
-            } else {
-              cache[key] = new Date(dateFilter(value, 'medium'));
-            }
-
-            $scope.watchData[key] = value === null ? null : cache[key];
-          } else {
-            var date = value ? new Date(value) : new Date();
-            $scope.watchData[key] = dateParser.fromTimezone(date, ngModelOptions.timezone);
-          }
-        }));
-
-        datepickerEl.attr(cameltoDash(key), 'watchData.' + key);
-      }
-    });
-
-    if ($attrs.dateDisabled) {
-      if (datepickerPopupAttributeWarning) {
-        $log.warn('uib-datepicker settings via uib-datepicker-popup attributes are deprecated and will be removed in UI Bootstrap 1.3, use datepicker-options attribute instead');
-      }
-
-      datepickerEl.attr('date-disabled', 'dateDisabled({ date: date, mode: mode })');
-    }
-
-    angular.forEach(['formatDay', 'formatMonth', 'formatYear', 'formatDayHeader', 'formatDayTitle', 'formatMonthTitle', 'showWeeks', 'startingDay', 'yearRows', 'yearColumns'], function(key) {
-      if (angular.isDefined($attrs[key])) {
-        if (datepickerPopupAttributeWarning) {
-          $log.warn('uib-datepicker settings via uib-datepicker-popup attributes are deprecated and will be removed in UI Bootstrap 1.3, use datepicker-options attribute instead');
-        }
-
-        datepickerEl.attr(cameltoDash(key), $attrs[key]);
-      }
-    });
-
-    if ($attrs.customClass) {
-      if (datepickerPopupAttributeWarning) {
-        $log.warn('uib-datepicker settings via uib-datepicker-popup attributes are deprecated and will be removed in UI Bootstrap 1.3, use datepicker-options attribute instead');
-      }
-
-      datepickerEl.attr('custom-class', 'customClass({ date: date, mode: mode })');
-    }
+    datepickerEl.attr('datepicker-options', 'datepickerOptions');
 
     if (!isHtml5DateInput) {
       // Internal API to maintain the correct ng-invalid-[key] class
@@ -60110,7 +60003,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
           return value;
         }
 
-        $scope.date = dateParser.fromTimezone(value, ngModelOptions.timezone);
+        $scope.date = dateParser.fromTimezone(value, timezone);
 
         if (angular.isNumber($scope.date)) {
           $scope.date = new Date($scope.date);
@@ -60120,7 +60013,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
       });
     } else {
       ngModel.$formatters.push(function(value) {
-        $scope.date = dateParser.fromTimezone(value, ngModelOptions.timezone);
+        $scope.date = dateParser.fromTimezone(value, timezone);
         return value;
       });
     }
@@ -60172,17 +60065,27 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
 
   $scope.isDisabled = function(date) {
     if (date === 'today') {
-      date = dateParser.fromTimezone(new Date(), ngModelOptions.timezone);
+      date = dateParser.fromTimezone(new Date(), timezone);
     }
 
-    if ($scope.datepickerOptions) {
-      return $scope.datepickerOptions &&
-        $scope.datepickerOptions.minDate && $scope.compare(date, $scope.datepickerOptions.minDate) < 0 ||
-        $scope.datepickerOptions.maxDate && $scope.compare(date, $scope.datepickerOptions.maxDate) > 0;
-    }
+    var dates = {};
+    angular.forEach(['minDate', 'maxDate'], function(key) {
+      if ($scope.datepickerOptions[key] === null) {
+        dates[key] = null;
+      } else if (angular.isDate($scope.datepickerOptions[key])) {
+        dates[key] = dateParser.fromTimezone(new Date($scope.datepickerOptions[key]), timezone);
+      } else {
+        if ($datepickerPopupLiteralWarning) {
+          $log.warn('Literal date support has been deprecated, please switch to date object usage');
+        }
 
-    return $scope.watchData.minDate && $scope.compare(date, cache.minDate) < 0 ||
-      $scope.watchData.maxDate && $scope.compare(date, cache.maxDate) > 0;
+        dates[key] = new Date(dateFilter($scope.datepickerOptions[key], 'medium'));
+      }
+    });
+
+    return $scope.datepickerOptions &&
+      dates.minDate && $scope.compare(date, dates.minDate) < 0 ||
+      dates.maxDate && $scope.compare(date, dates.maxDate) > 0;
   };
 
   $scope.compare = function(date1, date2) {
@@ -60250,6 +60153,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
           if (onOpenFocus) {
             $scope.$broadcast('uib:datepicker.focus');
           }
+
           $document.on('click', documentClickBind);
 
           var placement = $attrs.popupPlacement ? $attrs.popupPlacement : datepickerPopupConfig.placement;
@@ -60310,7 +60214,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
     if (angular.isString(viewValue)) {
       var date = parseDateString(viewValue);
       if (!isNaN(date)) {
-        return dateParser.toTimezone(date, ngModelOptions.timezone);
+        return dateParser.toTimezone(date, timezone);
       }
     }
 
@@ -60403,9 +60307,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
       isOpen: '=?',
       currentText: '@',
       clearText: '@',
-      closeText: '@',
-      dateDisabled: '&',
-      customClass: '&'
+      closeText: '@'
     },
     link: function(scope, element, attrs, ctrls) {
       var ngModel = ctrls[0],
@@ -60421,7 +60323,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
     replace: true,
     transclude: true,
     templateUrl: function(element, attrs) {
-      return attrs.templateUrl || 'uib/template/datepicker/popup.html';
+      return attrs.templateUrl || 'uib/template/datepickerPopup/popup.html';
     }
   };
 });
@@ -60718,12 +60620,6 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
       setIsOpen($scope, isOpen);
     }
   });
-
-  $scope.$on('$locationChangeSuccess', function() {
-    if (scope.getAutoClose() !== 'disabled') {
-      scope.isOpen = false;
-    }
-  });
 }])
 
 .directive('uibDropdown', function() {
@@ -60849,7 +60745,7 @@ angular.module('ui.bootstrap.stackedMap', [])
       }
     };
   });
-angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
+angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.position'])
 /**
  * A helper, internal data structure that stores all references attached to key
  */
@@ -61098,8 +60994,8 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
   })
 
   .factory('$uibModalStack', ['$animate', '$animateCss', '$document',
-    '$compile', '$rootScope', '$q', '$$multiMap', '$$stackedMap',
-    function($animate, $animateCss, $document, $compile, $rootScope, $q, $$multiMap, $$stackedMap) {
+    '$compile', '$rootScope', '$q', '$$multiMap', '$$stackedMap', '$uibPosition',
+    function($animate, $animateCss, $document, $compile, $rootScope, $q, $$multiMap, $$stackedMap, $uibPosition) {
       var OPENED_MODAL_CLASS = 'modal-open';
 
       var backdropDomEl, backdropScope;
@@ -61108,11 +61004,14 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
       var $modalStack = {
         NOW_CLOSING_EVENT: 'modal.stack.now-closing'
       };
+      var topModalIndex = 0;
+      var previousTopOpenedModal = null;
 
       //Modal focus behavior
       var tabableSelector = 'a[href], area[href], input:not([disabled]), ' +
         'button:not([disabled]),select:not([disabled]), textarea:not([disabled]), ' +
         'iframe, object, embed, *[tabindex], *[contenteditable=true]';
+      var scrollbarPadding;
 
       function isVisible(element) {
         return !!(element.offsetWidth ||
@@ -61127,6 +61026,12 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
           if (openedWindows.get(opened[i]).value.backdrop) {
             topBackdropIndex = i;
           }
+        }
+
+        // If any backdrop exist, ensure that it's index is always
+        // right below the top modal
+        if (topBackdropIndex > -1 && topBackdropIndex < topModalIndex) {
+          topBackdropIndex = topModalIndex;
         }
         return topBackdropIndex;
       }
@@ -61143,11 +61048,23 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
 
         //clean up the stack
         openedWindows.remove(modalInstance);
+        previousTopOpenedModal = openedWindows.top();
+        if (previousTopOpenedModal) {
+          topModalIndex = parseInt(previousTopOpenedModal.value.modalDomEl.attr('index'), 10);
+        }
 
         removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, function() {
           var modalBodyClass = modalWindow.openedClass || OPENED_MODAL_CLASS;
           openedClasses.remove(modalBodyClass, modalInstance);
           appendToElement.toggleClass(modalBodyClass, openedClasses.hasKey(modalBodyClass));
+          if (scrollbarPadding && scrollbarPadding.heightOverflow && scrollbarPadding.scrollbarWidth) {
+            if (scrollbarPadding.originalRight) {
+              appendToElement.css({paddingRight: scrollbarPadding.originalRight + 'px'});
+            } else {
+              appendToElement.css({paddingRight: ''});
+            }
+            scrollbarPadding = null;
+          }
           toggleTopWindowClass(true);
         }, modalWindow.closedDeferred);
         checkRemoveBackdrop();
@@ -61274,6 +61191,10 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
           modalBodyClass = modal.openedClass || OPENED_MODAL_CLASS;
 
         toggleTopWindowClass(false);
+        
+        // Store the current top first, to determine what index we ought to use
+        // for the current top modal
+        previousTopOpenedModal = openedWindows.top();
 
         openedWindows.add(modalInstance, {
           deferred: modal.deferred,
@@ -61310,25 +61231,27 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
           $animate.enter(backdropDomEl, appendToElement);
         }
 
+        // Set the top modal index based on the index of the previous top modal
+        topModalIndex = previousTopOpenedModal ? parseInt(previousTopOpenedModal.value.modalDomEl.attr('index'), 10) + 1 : 0;
         var angularDomEl = angular.element('<div uib-modal-window="modal-window"></div>');
         angularDomEl.attr({
           'template-url': modal.windowTemplateUrl,
           'window-class': modal.windowClass,
           'window-top-class': modal.windowTopClass,
           'size': modal.size,
-          'index': openedWindows.length() - 1,
+          'index': topModalIndex,
           'animate': 'animate'
         }).html(modal.content);
         if (modal.animation) {
           angularDomEl.attr('modal-animation', 'true');
         }
 
-        $animate.enter($compile(angularDomEl)(modal.scope), appendToElement)
-          .then(function() {
-            if (!modal.scope.$$uibDestructionScheduled) {
-              $animate.addClass(appendToElement, modalBodyClass);
-            }
-          });
+        scrollbarPadding = $uibPosition.scrollbarPadding(appendToElement);
+        if (scrollbarPadding.heightOverflow && scrollbarPadding.scrollbarWidth) {
+          appendToElement.css({paddingRight: scrollbarPadding.right + 'px'});
+        }
+        appendToElement.addClass(modalBodyClass);
+        $animate.enter($compile(angularDomEl)(modal.scope), appendToElement);
 
         openedWindows.top().value.modalDomEl = angularDomEl;
         openedWindows.top().value.modalOpener = modalOpener;
@@ -61923,7 +61846,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
   /**
    * This allows you to extend the set of trigger mappings available. E.g.:
    *
-   *   $tooltipProvider.setTriggers( 'openTrigger': 'closeTrigger' );
+   *   $tooltipProvider.setTriggers( { 'openTrigger': 'closeTrigger' } );
    */
   this.setTriggers = function setTriggers(triggers) {
     angular.extend(triggerMap, triggers);
@@ -61996,15 +61919,15 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
       var startSym = $interpolate.startSymbol();
       var endSym = $interpolate.endSymbol();
       var template =
-        '<div '+ directiveName + '-popup '+
-          'title="' + startSym + 'title' + endSym + '" '+
+        '<div '+ directiveName + '-popup ' +
+          'uib-title="' + startSym + 'title' + endSym + '" ' +
           (options.useContentExp ?
             'content-exp="contentExp()" ' :
             'content="' + startSym + 'content' + endSym + '" ') +
-          'placement="' + startSym + 'placement' + endSym + '" '+
-          'popup-class="' + startSym + 'popupClass' + endSym + '" '+
+          'placement="' + startSym + 'placement' + endSym + '" ' +
+          'popup-class="' + startSym + 'popupClass' + endSym + '" ' +
           'animation="animation" ' +
-          'is-open="isOpen"' +
+          'is-open="isOpen" ' +
           'origin-scope="origScope" ' +
           'class="uib-position-measure"' +
           '>' +
@@ -62579,7 +62502,7 @@ angular.module('ui.bootstrap.popover', ['ui.bootstrap.tooltip'])
 .directive('uibPopoverTemplatePopup', function() {
   return {
     replace: true,
-    scope: { title: '@', contentExp: '&', placement: '@', popupClass: '@', animation: '&', isOpen: '&',
+    scope: { uibTitle: '@', contentExp: '&', placement: '@', popupClass: '@', animation: '&', isOpen: '&',
       originScope: '&' },
     templateUrl: 'uib/template/popover/popover-template.html'
   };
@@ -62594,7 +62517,7 @@ angular.module('ui.bootstrap.popover', ['ui.bootstrap.tooltip'])
 .directive('uibPopoverHtmlPopup', function() {
   return {
     replace: true,
-    scope: { contentExp: '&', title: '@', placement: '@', popupClass: '@', animation: '&', isOpen: '&' },
+    scope: { contentExp: '&', uibTitle: '@', placement: '@', popupClass: '@', animation: '&', isOpen: '&' },
     templateUrl: 'uib/template/popover/popover-html.html'
   };
 })
@@ -62608,7 +62531,7 @@ angular.module('ui.bootstrap.popover', ['ui.bootstrap.tooltip'])
 .directive('uibPopoverPopup', function() {
   return {
     replace: true,
-    scope: { title: '@', content: '@', placement: '@', popupClass: '@', animation: '&', isOpen: '&' },
+    scope: { uibTitle: '@', content: '@', placement: '@', popupClass: '@', animation: '&', isOpen: '&' },
     templateUrl: 'uib/template/popover/popover.html'
   };
 })
@@ -62850,6 +62773,9 @@ angular.module('ui.bootstrap.tabs', [])
         previousSelected.tab.onDeselect({
           $event: evt
         });
+        if (evt && evt.isDefaultPrevented()) {
+          return;
+        }
         previousSelected.tab.active = false;
       }
 
@@ -62892,9 +62818,15 @@ angular.module('ui.bootstrap.tabs', [])
   };
 
   ctrl.removeTab = function removeTab(tab) {
-    var index = findTabIndex(tab.index);
+    var index;
+    for (var i = 0; i < ctrl.tabs.length; i++) {
+      if (ctrl.tabs[i].tab === tab) {
+        index = i;
+        break;
+      }
+    }
 
-    if (tab.index === ctrl.active) {
+    if (ctrl.tabs[index].index === ctrl.active) {
       var newActiveTabIndex = index === ctrl.tabs.length - 1 ?
         index - 1 : index + 1 % ctrl.tabs.length;
       ctrl.select(newActiveTabIndex);
@@ -63233,7 +63165,7 @@ angular.module('ui.bootstrap.timepicker', [])
     var hours = +$scope.hours;
     var valid = $scope.showMeridian ? hours > 0 && hours < 13 :
       hours >= 0 && hours < 24;
-    if (!valid) {
+    if (!valid || $scope.hours === '') {
       return undefined;
     }
 
@@ -63250,7 +63182,11 @@ angular.module('ui.bootstrap.timepicker', [])
 
   function getMinutesFromTemplate() {
     var minutes = +$scope.minutes;
-    return minutes >= 0 && minutes < 60 ? minutes : undefined;
+    var valid = minutes >= 0 && minutes < 60;
+    if (!valid || $scope.minutes === '') {
+      return undefined;
+    }
+    return minutes;
   }
 
   function getSecondsFromTemplate() {
@@ -63390,7 +63326,9 @@ angular.module('ui.bootstrap.timepicker', [])
 
     hoursInputEl.bind('blur', function(e) {
       ngModelCtrl.$setTouched();
-      if ($scope.hours === null || $scope.hours === '') {
+      if (modelIsEmpty()) {
+        makeValid();
+      } else if ($scope.hours === null || $scope.hours === '') {
         invalidate(true);
       } else if (!$scope.invalidHours && $scope.hours < 10) {
         $scope.$apply(function() {
@@ -63420,7 +63358,9 @@ angular.module('ui.bootstrap.timepicker', [])
 
     minutesInputEl.bind('blur', function(e) {
       ngModelCtrl.$setTouched();
-      if ($scope.minutes === null) {
+      if (modelIsEmpty()) {
+        makeValid();
+      } else if ($scope.minutes === null) {
         invalidate(undefined, true);
       } else if (!$scope.invalidMinutes && $scope.minutes < 10) {
         $scope.$apply(function() {
@@ -63443,7 +63383,9 @@ angular.module('ui.bootstrap.timepicker', [])
     };
 
     secondsInputEl.bind('blur', function(e) {
-      if (!$scope.invalidSeconds && $scope.seconds < 10) {
+      if (modelIsEmpty()) {
+        makeValid();
+      } else if (!$scope.invalidSeconds && $scope.seconds < 10) {
         $scope.$apply( function() {
           $scope.seconds = pad($scope.seconds);
         });
@@ -63530,6 +63472,12 @@ angular.module('ui.bootstrap.timepicker', [])
     var newDate = new Date(date);
     newDate.setHours(dt.getHours(), dt.getMinutes(), dt.getSeconds());
     return newDate;
+  }
+
+  function modelIsEmpty() {
+    return ($scope.hours === null || $scope.hours === '') &&
+      ($scope.minutes === null || $scope.minutes === '') &&
+      (!$scope.showSeconds || $scope.showSeconds && ($scope.seconds === null || $scope.seconds === ''));
   }
 
   $scope.showSpinners = angular.isDefined($attrs.showSpinners) ?
@@ -64313,11 +64261,11 @@ angular.module("uib/template/carousel/carousel.html", []).run(["$templateCache",
   $templateCache.put("uib/template/carousel/carousel.html",
     "<div ng-mouseenter=\"pause()\" ng-mouseleave=\"play()\" class=\"carousel\" ng-swipe-right=\"prev()\" ng-swipe-left=\"next()\">\n" +
     "  <div class=\"carousel-inner\" ng-transclude></div>\n" +
-    "  <a role=\"button\" href class=\"left carousel-control\" ng-click=\"prev()\" ng-show=\"slides.length > 1\">\n" +
+    "  <a role=\"button\" href class=\"left carousel-control\" ng-click=\"prev()\" ng-class=\"{ disabled: isPrevDisabled() }\" ng-show=\"slides.length > 1\">\n" +
     "    <span aria-hidden=\"true\" class=\"glyphicon glyphicon-chevron-left\"></span>\n" +
     "    <span class=\"sr-only\">previous</span>\n" +
     "  </a>\n" +
-    "  <a role=\"button\" href class=\"right carousel-control\" ng-click=\"next()\" ng-show=\"slides.length > 1\">\n" +
+    "  <a role=\"button\" href class=\"right carousel-control\" ng-click=\"next()\" ng-class=\"{ disabled: isNextDisabled() }\" ng-show=\"slides.length > 1\">\n" +
     "    <span aria-hidden=\"true\" class=\"glyphicon glyphicon-chevron-right\"></span>\n" +
     "    <span class=\"sr-only\">next</span>\n" +
     "  </a>\n" +
@@ -64413,23 +64361,6 @@ angular.module("uib/template/datepicker/month.html", []).run(["$templateCache", 
     "");
 }]);
 
-angular.module("uib/template/datepicker/popup.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("uib/template/datepicker/popup.html",
-    "<div>\n" +
-    "  <ul class=\"uib-datepicker-popup dropdown-menu uib-position-measure\" dropdown-nested ng-if=\"isOpen\" ng-keydown=\"keydown($event)\" ng-click=\"$event.stopPropagation()\">\n" +
-    "    <li ng-transclude></li>\n" +
-    "    <li ng-if=\"showButtonBar\" class=\"uib-button-bar\">\n" +
-    "      <span class=\"btn-group pull-left\">\n" +
-    "        <button type=\"button\" class=\"btn btn-sm btn-info uib-datepicker-current\" ng-click=\"select('today', $event)\" ng-disabled=\"isDisabled('today')\">{{ getText('current') }}</button>\n" +
-    "        <button type=\"button\" class=\"btn btn-sm btn-danger uib-clear\" ng-click=\"select(null, $event)\">{{ getText('clear') }}</button>\n" +
-    "      </span>\n" +
-    "      <button type=\"button\" class=\"btn btn-sm btn-success pull-right uib-close\" ng-click=\"close($event)\">{{ getText('close') }}</button>\n" +
-    "    </li>\n" +
-    "  </ul>\n" +
-    "</div>\n" +
-    "");
-}]);
-
 angular.module("uib/template/datepicker/year.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("uib/template/datepicker/year.html",
     "<table class=\"uib-yearpicker\" role=\"grid\" aria-labelledby=\"{{::uniqueId}}-title\" aria-activedescendant=\"{{activeDateId}}\">\n" +
@@ -64460,6 +64391,23 @@ angular.module("uib/template/datepicker/year.html", []).run(["$templateCache", f
     "");
 }]);
 
+angular.module("uib/template/datepickerPopup/popup.html", []).run(["$templateCache", function($templateCache) {
+  $templateCache.put("uib/template/datepickerPopup/popup.html",
+    "<div>\n" +
+    "  <ul class=\"uib-datepicker-popup dropdown-menu uib-position-measure\" dropdown-nested ng-if=\"isOpen\" ng-keydown=\"keydown($event)\" ng-click=\"$event.stopPropagation()\">\n" +
+    "    <li ng-transclude></li>\n" +
+    "    <li ng-if=\"showButtonBar\" class=\"uib-button-bar\">\n" +
+    "      <span class=\"btn-group pull-left\">\n" +
+    "        <button type=\"button\" class=\"btn btn-sm btn-info uib-datepicker-current\" ng-click=\"select('today', $event)\" ng-disabled=\"isDisabled('today')\">{{ getText('current') }}</button>\n" +
+    "        <button type=\"button\" class=\"btn btn-sm btn-danger uib-clear\" ng-click=\"select(null, $event)\">{{ getText('clear') }}</button>\n" +
+    "      </span>\n" +
+    "      <button type=\"button\" class=\"btn btn-sm btn-success pull-right uib-close\" ng-click=\"close($event)\">{{ getText('close') }}</button>\n" +
+    "    </li>\n" +
+    "  </ul>\n" +
+    "</div>\n" +
+    "");
+}]);
+
 angular.module("uib/template/modal/backdrop.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("uib/template/modal/backdrop.html",
     "<div class=\"modal-backdrop\"\n" +
@@ -64483,15 +64431,6 @@ angular.module("uib/template/modal/window.html", []).run(["$templateCache", func
 
 angular.module("uib/template/pager/pager.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("uib/template/pager/pager.html",
-    "<ul class=\"pager\">\n" +
-    "  <li ng-class=\"{disabled: noPrevious()||ngDisabled, previous: align}\"><a href ng-click=\"selectPage(page - 1, $event)\">{{::getText('previous')}}</a></li>\n" +
-    "  <li ng-class=\"{disabled: noNext()||ngDisabled, next: align}\"><a href ng-click=\"selectPage(page + 1, $event)\">{{::getText('next')}}</a></li>\n" +
-    "</ul>\n" +
-    "");
-}]);
-
-angular.module("uib/template/pagination/pager.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("uib/template/pagination/pager.html",
     "<ul class=\"pager\">\n" +
     "  <li ng-class=\"{disabled: noPrevious()||ngDisabled, previous: align}\"><a href ng-click=\"selectPage(page - 1, $event)\">{{::getText('previous')}}</a></li>\n" +
     "  <li ng-class=\"{disabled: noNext()||ngDisabled, next: align}\"><a href ng-click=\"selectPage(page + 1, $event)\">{{::getText('next')}}</a></li>\n" +
@@ -64558,7 +64497,7 @@ angular.module("uib/template/popover/popover-html.html", []).run(["$templateCach
     "  <div class=\"arrow\"></div>\n" +
     "\n" +
     "  <div class=\"popover-inner\">\n" +
-    "      <h3 class=\"popover-title\" ng-bind=\"title\" ng-if=\"title\"></h3>\n" +
+    "      <h3 class=\"popover-title\" ng-bind=\"uibTitle\" ng-if=\"uibTitle\"></h3>\n" +
     "      <div class=\"popover-content\" ng-bind-html=\"contentExp()\"></div>\n" +
     "  </div>\n" +
     "</div>\n" +
@@ -64574,7 +64513,7 @@ angular.module("uib/template/popover/popover-template.html", []).run(["$template
     "  <div class=\"arrow\"></div>\n" +
     "\n" +
     "  <div class=\"popover-inner\">\n" +
-    "      <h3 class=\"popover-title\" ng-bind=\"title\" ng-if=\"title\"></h3>\n" +
+    "      <h3 class=\"popover-title\" ng-bind=\"uibTitle\" ng-if=\"uibTitle\"></h3>\n" +
     "      <div class=\"popover-content\"\n" +
     "        uib-tooltip-template-transclude=\"contentExp()\"\n" +
     "        tooltip-template-transclude-scope=\"originScope()\"></div>\n" +
@@ -64592,7 +64531,7 @@ angular.module("uib/template/popover/popover.html", []).run(["$templateCache", f
     "  <div class=\"arrow\"></div>\n" +
     "\n" +
     "  <div class=\"popover-inner\">\n" +
-    "      <h3 class=\"popover-title\" ng-bind=\"title\" ng-if=\"title\"></h3>\n" +
+    "      <h3 class=\"popover-title\" ng-bind=\"uibTitle\" ng-if=\"uibTitle\"></h3>\n" +
     "      <div class=\"popover-content\" ng-bind=\"content\"></div>\n" +
     "  </div>\n" +
     "</div>\n" +
@@ -64708,8 +64647,9 @@ angular.module("uib/template/typeahead/typeahead-popup.html", []).run(["$templat
     "");
 }]);
 angular.module('ui.bootstrap.carousel').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibCarouselCss && angular.element(document).find('head').prepend('<style type="text/css">.ng-animate.item:not(.left):not(.right){-webkit-transition:0s ease-in-out left;transition:0s ease-in-out left}</style>'); angular.$$uibCarouselCss = true; });
-angular.module('ui.bootstrap.position').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibPositionCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-position-measure{display:block !important;visibility:hidden !important;position:absolute !important;top:-9999px !important;left:-9999px !important;}.uib-position-scrollbar-measure{position:absolute;top:-9999px;width:50px;height:50px;overflow:scroll;}</style>'); angular.$$uibPositionCss = true; });
-angular.module('ui.bootstrap.datepicker').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibDatepickerCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-datepicker .uib-title{width:100%;}.uib-day button,.uib-month button,.uib-year button{min-width:100%;}.uib-datepicker-popup.dropdown-menu{display:block;float:none;margin:0;}.uib-button-bar{padding:10px 9px 2px;}.uib-left,.uib-right{width:100%}</style>'); angular.$$uibDatepickerCss = true; });
+angular.module('ui.bootstrap.datepicker').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibDatepickerCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-datepicker .uib-title{width:100%;}.uib-day button,.uib-month button,.uib-year button{min-width:100%;}.uib-left,.uib-right{width:100%}</style>'); angular.$$uibDatepickerCss = true; });
+angular.module('ui.bootstrap.position').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibPositionCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-position-measure{display:block !important;visibility:hidden !important;position:absolute !important;top:-9999px !important;left:-9999px !important;}.uib-position-scrollbar-measure{position:absolute !important;top:-9999px !important;width:50px !important;height:50px !important;overflow:scroll !important;}.uib-position-body-scrollbar-measure{overflow:scroll !important;}</style>'); angular.$$uibPositionCss = true; });
+angular.module('ui.bootstrap.datepickerPopup').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibDatepickerpopupCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-datepicker-popup.dropdown-menu{display:block;float:none;margin:0;}.uib-button-bar{padding:10px 9px 2px;}</style>'); angular.$$uibDatepickerpopupCss = true; });
 angular.module('ui.bootstrap.tooltip').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTooltipCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-tooltip-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-popup].tooltip.right-bottom > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-html-popup].tooltip.right-bottom > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.top-left > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.top-right > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.bottom-left > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.bottom-right > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.left-top > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.left-bottom > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.right-top > .tooltip-arrow,[uib-tooltip-template-popup].tooltip.right-bottom > .tooltip-arrow,[uib-popover-popup].popover.top-left > .arrow,[uib-popover-popup].popover.top-right > .arrow,[uib-popover-popup].popover.bottom-left > .arrow,[uib-popover-popup].popover.bottom-right > .arrow,[uib-popover-popup].popover.left-top > .arrow,[uib-popover-popup].popover.left-bottom > .arrow,[uib-popover-popup].popover.right-top > .arrow,[uib-popover-popup].popover.right-bottom > .arrow,[uib-popover-html-popup].popover.top-left > .arrow,[uib-popover-html-popup].popover.top-right > .arrow,[uib-popover-html-popup].popover.bottom-left > .arrow,[uib-popover-html-popup].popover.bottom-right > .arrow,[uib-popover-html-popup].popover.left-top > .arrow,[uib-popover-html-popup].popover.left-bottom > .arrow,[uib-popover-html-popup].popover.right-top > .arrow,[uib-popover-html-popup].popover.right-bottom > .arrow,[uib-popover-template-popup].popover.top-left > .arrow,[uib-popover-template-popup].popover.top-right > .arrow,[uib-popover-template-popup].popover.bottom-left > .arrow,[uib-popover-template-popup].popover.bottom-right > .arrow,[uib-popover-template-popup].popover.left-top > .arrow,[uib-popover-template-popup].popover.left-bottom > .arrow,[uib-popover-template-popup].popover.right-top > .arrow,[uib-popover-template-popup].popover.right-bottom > .arrow{top:auto;bottom:auto;left:auto;right:auto;margin:0;}[uib-popover-popup].popover,[uib-popover-html-popup].popover,[uib-popover-template-popup].popover{display:block !important;}</style>'); angular.$$uibTooltipCss = true; });
 angular.module('ui.bootstrap.timepicker').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTimepickerCss && angular.element(document).find('head').prepend('<style type="text/css">.uib-time input{width:50px;}</style>'); angular.$$uibTimepickerCss = true; });
 angular.module('ui.bootstrap.typeahead').run(function() {!angular.$$csp().noInlineStyle && !angular.$$uibTypeaheadCss && angular.element(document).find('head').prepend('<style type="text/css">[uib-typeahead-popup].dropdown-menu{display:block;}</style>'); angular.$$uibTypeaheadCss = true; });
@@ -81688,9 +81628,9 @@ angular.module('ui.router.state')
   .filter('includedByState', $IncludedByStateFilter);
 })(window, window.angular);
 /*!
-angular-xeditable - 0.1.10
+angular-xeditable - 0.1.11
 Edit-in-place for angular.js
-Build date: 2016-02-16 
+Build date: 2016-03-24 
 */
 /**
  * Angular-xeditable module 
@@ -83841,6 +83781,7 @@ Editable themes:
 - default
 - bootstrap 2
 - bootstrap 3
+- semantic-ui
 
 Note: in postrender() `this` is instance of editableController
 */
@@ -83907,6 +83848,7 @@ angular.module('xeditable').factory('editableThemes', function() {
           case 'editableTime':
           case 'editableMonth':
           case 'editableWeek':
+          case 'editablePassword':
             this.inputEl.addClass('form-control');
             if(this.theme.inputClass) {
               // don`t apply `input-sm` and `input-lg` to select multiple
@@ -83927,6 +83869,20 @@ angular.module('xeditable').factory('editableThemes', function() {
           this.buttonsEl.find('button').addClass(this.theme.buttonsClass);
         }
       }
+    },
+    
+    //semantic-ui
+    'semantic': {
+      formTpl:     '<form class="editable-wrap ui form" ng-class="{\'error\': $error}" role="form"></form>',
+      noformTpl:   '<span class="editable-wrap"></span>',
+      controlsTpl: '<div class="editable-controls ui fluid input" ng-class="{\'error\': $error}"></div>',
+      inputTpl:    '',
+      errorTpl:    '<div class="editable-error ui error message" ng-show="$error" ng-bind="$error"></div>',
+      buttonsTpl:  '<span class="mini ui buttons"></span>',
+      submitTpl:   '<button type="submit" class="ui primary button"><i class="ui check icon"></i></button>',
+      cancelTpl:   '<button type="button" class="ui button" ng-click="$form.$cancel()">'+
+                      '<i class="ui cancel icon"></i>'+
+                   '</button>'
     }
   };
 
@@ -86105,7 +86061,7 @@ angular.module('debounce', [])
 
 /**
  * Useful filters for AngularJS
- * @version v1.2.0 - 2015-01-30 * @link https://github.com/exceptionless/angular-filters
+ * @version v1.3.0 - 2016-04-04 * @link https://github.com/exceptionless/angular-filters
  * @author Blake Niemyjski <biemyjski@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
  */(function () {
@@ -86170,6 +86126,30 @@ angular.module('debounce', [])
                 });
 
                 return filtered.join(separator || ',');
+            };
+        }]);
+}());
+
+(function () {
+    'use strict';
+
+    angular.module('angular-filters')
+        .filter('percentage', ['$filter', function ($filter) {
+            return function(input) {
+                if (isNaN(input) || input === null || input === '' || input === false || input === true) {
+                    return '0%';
+                }
+
+                if (input > 0.0 && input < 1) {
+                    // Shift
+                    input = input.toString().split('e');
+                    input = Math.ceil(+(input[0] + 'e' + (input[1] ? (+input[1] + 1) : 1)));
+                    // Shift back
+                    input = input.toString().split('e');
+                    return +(input[0] + 'e' + (input[1] ? (+input[1] - 1) : -1)) + '%';
+                }
+
+                return $filter('number')(input, (input % 1 === 0) ? 0 : 1) + '%';
             };
         }]);
 }());
@@ -103882,6 +103862,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'app.status'
   ])
   .config(['$locationProvider', '$stateProvider', '$uiViewScrollProvider', '$urlRouterProvider', 'dialogsProvider', 'gravatarServiceProvider', 'RestangularProvider', 'BASE_URL', 'EXCEPTIONLESS_API_KEY', '$ExceptionlessClient', 'stripeProvider', 'STRIPE_PUBLISHABLE_KEY', 'USE_HTML5_MODE', function ($locationProvider, $stateProvider, $uiViewScrollProvider, $urlRouterProvider, dialogsProvider, gravatarServiceProvider, RestangularProvider, BASE_URL, EXCEPTIONLESS_API_KEY, $ExceptionlessClient, stripeProvider, STRIPE_PUBLISHABLE_KEY, USE_HTML5_MODE) {
+    function setRouteFilter(filterService, organizationId, projectId, type) {
+      filterService.setOrganizationId(organizationId, true);
+      filterService.setProjectId(projectId, true);
+      filterService.setEventType(type, true);
+    }
+
     if (EXCEPTIONLESS_API_KEY) {
       var config = $ExceptionlessClient.config;
       config.apiKey = EXCEPTIONLESS_API_KEY;
@@ -103923,417 +103909,78 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
     });
 
-    var title = 'Dashboard';
-    $stateProvider.state('app.dashboard', {
-      title: title,
-      url: '/dashboard',
-      controller: 'app.Dashboard',
-      controllerAs: 'vm',
-      templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['filterService', function (filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-      }]
-    });
+    var routes = [
+      { key: 'dashboard', title: 'Dashboard', controller: 'app.Dashboard' },
+      { key: 'frequent', title: 'Most Frequent', controller: 'app.Frequent' },
+      { key: 'new', title: 'New', controller: 'app.New' },
+      { key: 'recent', title: 'Most Recent', controller: 'app.Recent' },
+      { key: 'users', title: 'Most Users', controller: 'app.Users' }
+    ];
+    var resetEventTypeOnExit = ['filterService', function (filterService) { filterService.setEventType(null, true); }];
+    routes.forEach(function(route) {
+      var routeDefaults = {
+        controller: route.controller,
+        controllerAs: 'vm',
+        templateUrl: 'app/' + route.key + '.tpl.html',
+        title: route.title
+      };
 
-    $stateProvider.state('app.project-dashboard', {
-      title: title,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/dashboard',
-      controller: 'app.Dashboard',
-      controllerAs: 'vm',
-      templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
+      $stateProvider.state('app.' + route.key, angular.extend({}, {
+        url: '/' + route.key,
+        onEnter: ['filterService', function (filterService) {
+          setRouteFilter(filterService, null, null, null);
         }]
-      }
-    });
+      }, routeDefaults));
 
-    $stateProvider.state('app.project-type-dashboard', {
-      title: title,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/dashboard',
-      controller: 'app.Dashboard',
-      controllerAs: 'vm',
-      templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
-        if ($stateParams.type === 'session') {
-          return $state.go('app.session-project-dashboard', $stateParams);
-        }
-
-        filterService.setProjectId($stateParams.projectId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
+      $stateProvider.state('app.project-' + route.key, angular.extend({}, {
+        url: '/project/{projectId:[0-9a-fA-F]{24}}/' + route.key,
+        onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
+          setRouteFilter(filterService, null, $stateParams.projectId, null);
         }]
-      }
-    });
+      }, routeDefaults));
 
-    $stateProvider.state('app.organization-dashboard', {
-      title: title,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/dashboard',
-      controller: 'app.Dashboard',
-      controllerAs: 'vm',
-      templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
+      $stateProvider.state('app.project-type-'+ route.key, angular.extend({}, {
+        url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/'+ route.key,
+        onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
+          if ($stateParams.type === 'session') {
+            return $state.go('app.session-project-dashboard', $stateParams);
+          }
+
+          setRouteFilter(filterService, null, $stateParams.projectId, $stateParams.type);
+        }],
+        onExit: resetEventTypeOnExit
+      }, routeDefaults));
+
+      $stateProvider.state('app.organization-' + route.key, angular.extend({}, {
+        url: '/organization/{organizationId:[0-9a-fA-F]{24}}/' + route.key,
+        onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
+          setRouteFilter(filterService, $stateParams.organizationId, null, null);
         }]
-      }
-    });
+      }, routeDefaults));
 
-    $stateProvider.state('app.organization-type-dashboard', {
-      title: title,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/dashboard',
-      controller: 'app.Dashboard',
-      controllerAs: 'vm',
-      templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
-        if ($stateParams.type === 'session') {
-          return $state.go('app.session-organization-dashboard', $stateParams);
-        }
+      $stateProvider.state('app.organization-type-' + route.key, angular.extend({}, {
+        url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/' + route.key,
+        onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
+          if ($stateParams.type === 'session') {
+            return $state.go('app.session-organization-dashboard', $stateParams);
+          }
 
-        filterService.setOrganizationId($stateParams.organizationId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
+          setRouteFilter(filterService, $stateParams.organizationId, null, $stateParams.type);
+        }],
+        onExit: resetEventTypeOnExit
+      }, routeDefaults));
 
-    $stateProvider.state('app.type-dashboard', {
-      title: title,
-      url: '/type/:type/dashboard',
-      controller: 'app.Dashboard',
-      controllerAs: 'vm',
-      templateUrl: 'app/dashboard.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }]
-    });
+      $stateProvider.state('app.type-' + route.key, angular.extend({}, {
+        url: '/type/:type/' + route.key,
+        onEnter: ['$state', '$stateParams', 'filterService', function ($state, $stateParams, filterService) {
+          if ($stateParams.type === 'session') {
+            return $state.go('app.session-dashboard', $stateParams);
+          }
 
-    var frequentTitle = 'Most Frequent';
-    $stateProvider.state('app.frequent', {
-      title: frequentTitle,
-      url: '/frequent',
-      controller: 'app.Frequent',
-      controllerAs: 'vm',
-      templateUrl: 'app/frequent.tpl.html',
-      onEnter: ['filterService', function (filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-      }]
-    });
-
-    $stateProvider.state('app.project-frequent', {
-      title: frequentTitle,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/frequent',
-      controller: 'app.Frequent',
-      controllerAs: 'vm',
-      templateUrl: 'app/frequent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.project-type-frequent', {
-      title: frequentTitle,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/frequent',
-      controller: 'app.Frequent',
-      controllerAs: 'vm',
-      templateUrl: 'app/frequent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.organization-frequent', {
-      title: frequentTitle,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/frequent',
-      controller: 'app.Frequent',
-      controllerAs: 'vm',
-      templateUrl: 'app/frequent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.organization-type-frequent', {
-      title: frequentTitle,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/frequent',
-      controller: 'app.Frequent',
-      controllerAs: 'vm',
-      templateUrl: 'app/frequent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.type-frequent', {
-      title: frequentTitle,
-      url: '/type/:type/frequent',
-      controller: 'app.Frequent',
-      controllerAs: 'vm',
-      templateUrl: 'app/frequent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }]
-    });
-
-    var newTitle = 'New';
-    $stateProvider.state('app.new', {
-      title: newTitle,
-      url: '/new',
-      controller: 'app.New',
-      controllerAs: 'vm',
-      templateUrl: 'app/new.tpl.html',
-      onEnter: ['filterService', function (filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-      }]
-    });
-
-    $stateProvider.state('app.project-new', {
-      title: newTitle,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/new',
-      controller: 'app.New',
-      controllerAs: 'vm',
-      templateUrl: 'app/new.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.project-type-new', {
-      title: newTitle,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/new',
-      controller: 'app.New',
-      controllerAs: 'vm',
-      templateUrl: 'app/new.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.organization-new', {
-      title: newTitle,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/new',
-      controller: 'app.New',
-      controllerAs: 'vm',
-      templateUrl: 'app/new.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.organization-type-new', {
-      title: newTitle,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/new',
-      controller: 'app.New',
-      controllerAs: 'vm',
-      templateUrl: 'app/new.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.type-new', {
-      title: newTitle,
-      url: '/type/:type/new',
-      controller: 'app.New',
-      controllerAs: 'vm',
-      templateUrl: 'app/new.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }]
-    });
-
-    var recentTitle = 'Most Recent';
-    $stateProvider.state('app.recent', {
-      title: recentTitle,
-      url: '/recent',
-      controller: 'app.Recent',
-      controllerAs: 'vm',
-      templateUrl: 'app/recent.tpl.html',
-      onEnter: ['filterService', function (filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-      }]
-    });
-
-    $stateProvider.state('app.project-recent', {
-      title: recentTitle,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/recent',
-      controller: 'app.Recent',
-      controllerAs: 'vm',
-      templateUrl: 'app/recent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.project-type-recent', {
-      title: recentTitle,
-      url: '/project/{projectId:[0-9a-fA-F]{24}}/:type/recent',
-      controller: 'app.Recent',
-      controllerAs: 'vm',
-      templateUrl: 'app/recent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setProjectId($stateParams.projectId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'projectService', function($stateParams, projectService) {
-          return projectService.getById($stateParams.projectId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.organization-recent', {
-      title: recentTitle,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/recent',
-      controller: 'app.Recent',
-      controllerAs: 'vm',
-      templateUrl: 'app/recent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.organization-type-recent', {
-      title: recentTitle,
-      url: '/organization/{organizationId:[0-9a-fA-F]{24}}/:type/recent',
-      controller: 'app.Recent',
-      controllerAs: 'vm',
-      templateUrl: 'app/recent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId($stateParams.organizationId, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }],
-      resolve: {
-        project: ['$stateParams', 'organizationService', function($stateParams, organizationService) {
-          return organizationService.getById($stateParams.organizationId, true);
-        }]
-      }
-    });
-
-    $stateProvider.state('app.type-recent', {
-      title: recentTitle,
-      url: '/type/:type/recent',
-      controller: 'app.Recent',
-      controllerAs: 'vm',
-      templateUrl: 'app/recent.tpl.html',
-      onEnter: ['$stateParams', 'filterService', function ($stateParams, filterService) {
-        filterService.setOrganizationId(null, true);
-        filterService.setProjectId(null, true);
-        filterService.setEventType($stateParams.type, true);
-      }],
-      onExit: ['filterService', function (filterService) {
-        filterService.setEventType(null, true);
-      }]
+          setRouteFilter(filterService, null, null, $stateParams.type);
+        }],
+        onExit: resetEventTypeOnExit
+      }, routeDefaults));
     });
 
     var onEnter = ['authService', '$location', '$state', '$timeout', function (authService, $location, $state, $timeout) {
@@ -107220,6 +106867,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
             return 'recent';
           }
 
+          if ($state.current.name.endsWith('users')) {
+            return 'users';
+          }
+
           return 'dashboard';
         }
 
@@ -108307,6 +107958,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       return Restangular.one('stacks').all('frequent').getList(filterService.apply(options));
     }
 
+    function getUsers(options) {
+      return Restangular.one('stacks').all('users').getList(filterService.apply(options));
+    }
+
     function getNew(options) {
       return Restangular.one('stacks').all('new').getList(filterService.apply(options));
     }
@@ -108354,6 +108009,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       getAll: getAll,
       getById: getById,
       getFrequent: getFrequent,
+      getUsers: getUsers,
       getNew: getNew,
       markCritical: markCritical,
       markNotCritical: markNotCritical,
@@ -108548,6 +108204,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('exceptionless.stacks', [
+    'angular-filters',
     'checklist-model',
     'ui.bootstrap',
 
@@ -109015,7 +108672,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         restrict: 'A',
         link: function (scope, element, attrs) {
           var truncate = debounce(function () {
-            angular.element(element).trunk8({lines: attrs.lines || 1});
+            angular.element(element).trunk8({ lines: attrs.lines || 1, tooltip: (attrs.overwriteTooltip !== undefined ? attrs.overwriteTooltip === true : true) });
           }, 150);
 
           // TODO: Fix this bug: http://branchandbound.net/blog/web/2013/08/some-angularjs-pitfalls/
@@ -109855,8 +109512,12 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return billingService.changePlan(organizationId);
       }
 
+      function getFilterUrl(route, type) {
+        return urlService.buildFilterUrl({ route: route, projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
+      }
+
       function getDashboardUrl(type) {
-        return urlService.buildFilterUrl({ route: 'dashboard', projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
+        return getFilterUrl('dashboard', type);
       }
 
       function getSessionDashboardUrl() {
@@ -109864,15 +109525,19 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function getRecentUrl(type) {
-        return urlService.buildFilterUrl({ route: 'recent', projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
+        return getFilterUrl('recent', type);
       }
 
       function getFrequentUrl(type) {
-        return urlService.buildFilterUrl({ route: 'frequent', projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
+        return getFilterUrl('frequent', type);
+      }
+
+      function getUsersUrl(type) {
+        return getFilterUrl('users', type);
       }
 
       function getNewUrl(type) {
-        return urlService.buildFilterUrl({ route: 'new', projectId: filterService.getProjectId(), organizationId: filterService.getOrganizationId(),  type: type });
+        return getFilterUrl('new', type);
       }
 
       function getOrganizations() {
@@ -109911,19 +109576,16 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return !!SYSTEM_NOTIFICATION_MESSAGE;
       }
 
+      var dashboards = ['dashboard', 'frequent', 'new', 'recent', 'users'];
       function isAllMenuActive() {
-        return $state.includes('app.dashboard', $stateParams) ||
-          $state.includes('app.project-dashboard', $stateParams) ||
-          $state.includes('app.organization-dashboard', $stateParams) ||
-          $state.includes('app.frequent', $stateParams) ||
-          $state.includes('app.project-frequent', $stateParams) ||
-          $state.includes('app.organization-frequent', $stateParams) ||
-          $state.includes('app.new', $stateParams) ||
-          $state.includes('app.project-new', $stateParams) ||
-          $state.includes('app.organization-new', $stateParams) ||
-          $state.includes('app.recent', $stateParams) ||
-          $state.includes('app.project-recent', $stateParams) ||
-          $state.includes('app.organization-recent', $stateParams);
+        for (var dashboard in dashboards) {
+          if ($state.includes('app.' + dashboard, $stateParams) ||
+            $state.includes('app.project-' + dashboard, $stateParams) ||
+            $state.includes('app.organization-' + dashboard, $stateParams)) {
+            return true;
+          }
+        }
+        return false;
       }
 
       function isAdminMenuActive() {
@@ -109951,18 +109613,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       function isTypeMenuActive(type) {
         var params = angular.extend({}, $stateParams, { type: type });
 
-        return $state.includes('app.type-dashboard', params) ||
-          $state.includes('app.project-type-dashboard', params) ||
-          $state.includes('app.organization-type-dashboard', params) ||
-          $state.includes('app.type-frequent', params) ||
-          $state.includes('app.project-type-frequent', params) ||
-          $state.includes('app.organization-type-frequent', params) ||
-          $state.includes('app.type-new', params) ||
-          $state.includes('app.project-type-new', params) ||
-          $state.includes('app.organization-type-new', params) ||
-          $state.includes('app.type-recent', params) ||
-          $state.includes('app.project-type-recent', params) ||
-          $state.includes('app.organization-type-recent', params);
+        for (var dashboard in dashboards) {
+          if ($state.includes('app.type-' + dashboard, params) ||
+            $state.includes('app.project-type-' + dashboard, params) ||
+            $state.includes('app.organization-type-' + dashboard, params)) {
+            return true;
+          }
+        }
+        return false;
       }
 
       function startSignalR() {
@@ -110005,6 +109663,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.getSessionDashboardUrl = getSessionDashboardUrl;
       vm.getRecentUrl = getRecentUrl;
       vm.getFrequentUrl = getFrequentUrl;
+      vm.getUsersUrl = getUsersUrl;
       vm.getNewUrl = getNewUrl;
       vm.getOrganizations = getOrganizations;
       vm.getUser = getUser;
@@ -110213,6 +109872,23 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           mode: 'summary'
         },
         source: 'app.Recent'
+      };
+    }]);
+}());
+
+(function () {
+  'use strict';
+
+  angular.module('app')
+    .controller('app.Users', ['stackService', function (stackService) {
+      var vm = this;
+      vm.mostUsers = {
+        get: stackService.getUsers,
+        options: {
+          limit: 20,
+          mode: 'summary'
+        },
+        source: 'app.MostUsers'
       };
     }]);
 }());
@@ -110632,6 +110308,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   angular.module('app.account', [
     'directives.inputMatch',
     'ngMessages',
+    'ui.bootstrap',
     'ui.router',
 
     'exceptionless',
@@ -110677,9 +110354,20 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       var vm = this;
 
       function activateTab(tabName) {
-        vm.tabExternalActive = tabName === 'external';
-        vm.tabNotificationsActive = tabName === 'notifications';
-        vm.tabPasswordActive = tabName === 'password';
+        switch (tabName) {
+          case 'notifications':
+            vm.activeTabIndex = 1;
+            break;
+          case 'password':
+            vm.activeTabIndex = 2;
+            break;
+          case 'external':
+            vm.activeTabIndex = 3;
+            break;
+          default:
+            vm.activeTabIndex = 0;
+            break;
+        }
       }
 
       function authenticate(provider) {
@@ -110952,6 +110640,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return authService.unlink(account.provider, account.provider_user_id).then(onSuccess, onFailure);
       }
 
+      vm.activeTabIndex = 0;
       vm.authenticate = authenticate;
       vm.canRemoveOAuthAccount = canRemoveOAuthAccount;
       vm.changePassword = changePassword;
@@ -110976,9 +110665,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.saveEnableEmailNotification = saveEnableEmailNotification;
       vm.saveUser = saveUser;
       vm.showChangePlanDialog = showChangePlanDialog;
-      vm.tabExternalActive = false;
-      vm.tabNotificationsActive = false;
-      vm.tabPasswordActive = false;
       vm.unlink = unlink;
       vm.user = {};
 
@@ -111174,26 +110860,27 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function buildTabs(tabNameToActivate) {
-        var tabs = [{title: 'Overview', template_key: 'overview'}];
+        var tabIndex = 0;
+        var tabs = [{index: tabIndex, title: 'Overview', template_key: 'overview'}];
 
         if (vm.event.reference_id && isSessionStart()) {
-          tabs.push({title: 'Session Events', template_key: 'session'});
+          tabs.push({index: ++tabIndex, title: 'Session Events', template_key: 'session'});
         }
 
         if (isError()) {
           if (vm.event.data['@error']) {
-            tabs.push({title: 'Exception', template_key: 'error'});
+            tabs.push({index: ++tabIndex, title: 'Exception', template_key: 'error'});
           } else if (vm.event.data['@simple_error']) {
-            tabs.push({title: 'Exception', template_key: 'simple-error'});
+            tabs.push({index: ++tabIndex, title: 'Exception', template_key: 'simple-error'});
           }
         }
 
         if (hasRequestInfo()) {
-          tabs.push({title: isSessionStart() ? 'Browser' : 'Request', template_key: 'request'});
+          tabs.push({index: ++tabIndex, title: isSessionStart() ? 'Browser' : 'Request', template_key: 'request'});
         }
 
         if (hasEnvironmentInfo()) {
-          tabs.push({title: 'Environment', template_key: 'environment'});
+          tabs.push({index: ++tabIndex, title: 'Environment', template_key: 'environment'});
         }
 
         var extendedDataItems = [];
@@ -111207,26 +110894,29 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           }
 
           if (isPromoted(key)) {
-            tabs.push({ title: key, template_key: 'promoted', data: data});
+            tabs.push({index: ++tabIndex, title: key, template_key: 'promoted', data: data});
           } else if (_knownDataKeys.indexOf(key) < 0) {
             extendedDataItems.push({title: key, data: data});
           }
         }, tabs);
 
         if (extendedDataItems.length > 0) {
-          tabs.push({title: 'Extended Data', template_key: 'extended-data', data: extendedDataItems});
+          tabs.push({index: ++tabIndex, title: 'Extended Data', template_key: 'extended-data', data: extendedDataItems});
         }
 
+        vm.tabs = tabs;
         for(var index = 0; index < tabs.length; index++) {
           if (tabs[index].title !== tabNameToActivate) {
             continue;
           }
 
-          tabs[index].active = true;
+          vm.activeTabIndex = tabs[index].index;
           break;
         }
 
-        vm.tabs = tabs;
+        if (vm.activeTabIndex >= vm.tabs.length) {
+          vm.activeTabIndex = 0;
+        }
       }
 
       function canRefresh(data) {
@@ -111281,8 +110971,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function getCurrentTab() {
-        var tab = vm.tabs.filter(function(t) { return t.active; })[0];
-        return tab ? tab.title : null;
+        var tab = vm.tabs.filter(function(t) { return t.index === vm.activeTabIndex; })[0];
+        return tab && tab.index > 0 ? tab.title : null;
       }
 
       function getDuration() {
@@ -111506,6 +111196,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
       $scope.$on('$destroy', removeHotKeys);
 
+      vm.activeTabIndex = 0;
       vm.canRefresh = canRefresh;
       vm.demoteTab = demoteTab;
       vm.event = {};
@@ -112031,9 +111722,20 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       var vm = this;
 
       function activateTab(tabName) {
-        vm.tabBillingActive = tabName === 'billing';
-        vm.tabProjectsActive = tabName === 'projects';
-        vm.tabUsersActive = tabName === 'users';
+        switch (tabName) {
+          case 'projects':
+            vm.activeTabIndex = 1;
+            break;
+          case 'users':
+            vm.activeTabIndex = 2;
+            break;
+          case 'billing':
+            vm.activeTabIndex = 3;
+            break;
+          default:
+            vm.activeTabIndex = 0;
+            break;
+        }
       }
 
       function addUser() {
@@ -112190,6 +111892,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return organizationService.update(_organizationId, vm.organization).catch(onFailure);
       }
 
+      vm.activeTabIndex = 0;
       vm.addUser = addUser;
       vm.canChangePlan = canChangePlan;
       vm.changePlan = changePlan;
@@ -112308,9 +112011,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       };
       vm.removeOrganization = removeOrganization;
       vm.save = save;
-      vm.tabBillingActive = false;
-      vm.tabProjectsActive = false;
-      vm.tabUsersActive = false;
       vm.users = {
         get: function (options, useCache) {
           return userService.getByOrganizationId(_organizationId, options, useCache);
@@ -113562,9 +113262,23 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         return stackService.getById(_stackId).then(onSuccess, onFailure);
       }
 
+      function getProjectUserStats() {
+        function optionsCallback(options) {
+          options.filter = 'project:' + vm.stack.project_id;
+          return options;
+        }
+
+        function onSuccess(response) {
+          vm.total_users = response.data.numbers[0] || 0;
+          return response;
+        }
+
+        return statService.get('distinct:user.raw', optionsCallback).then(onSuccess);
+      }
+
       function getStats() {
         function buildFields(options) {
-          return options.filter(function(option) { return option.selected; })
+          return 'distinct:user.raw' + options.filter(function(option) { return option.selected; })
             .reduce(function(fields, option) { fields.push(option.field); return fields; }, [])
             .join(',');
         }
@@ -113588,7 +113302,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
                 name: option.name,
                 stroke: 'rgba(0, 0, 0, 0.15)',
                 data: vm.stats.timeline.map(function (item) {
-                  return { x: moment.utc(item.date).unix(), y: (index === 0 ? item.total : item.numbers[index - 1]), data: item };
+                  return { x: moment.utc(item.date).unix(), y: (index === 0 ? item.total : item.numbers[index]), data: item };
                 })
               });
 
@@ -113605,9 +113319,11 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
               seri.color = colors[index];
               return seri;
             });
+
+          return response;
         }
 
-        return statService.getTimeline(buildFields(vm.chartOptions), optionsCallback).then(onSuccess);
+        return statService.getTimeline(buildFields(vm.chartOptions), optionsCallback).then(onSuccess).then(getProjectUserStats);
       }
 
       function hasTags() {
@@ -113920,6 +113636,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       };
       vm.stack = {};
       vm.stats = {};
+      vm.total_users = 0;
       vm.updateIsCritical = updateIsCritical;
       vm.updateIsFixed = updateIsFixed;
       vm.updateIsHidden = updateIsHidden;
@@ -114043,7 +113760,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
   'use strict';
 
   $templateCache.put('app/account/manage.tpl.html',
-    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"img-thumbnail\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\" active=\"vm.tabNotificationsActive\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\" active=\"vm.tabPasswordActive\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" active=\"vm.tabExternalActive\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
+    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\" active=\"vm.activeTabIndex\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"img-thumbnail\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
   );
 
 
@@ -114083,7 +113800,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/blocks/nav.tpl.html',
-    "<ul class=\"nav\"> <li ng-class=\"{active: appVm.isTypeMenuActive('error')}\"> <a href=\"#\" class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-warning fa-fw\"></i> <span>Exceptions</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Exceptions</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('error')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('error')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('error')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('error')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('log')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-file-text-o fa-fw\"></i> <span>Log Messages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Log Messages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('log')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('log')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('log')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('log')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('404')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-unlink fa-fw\"></i> <span>Broken Links</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Broken Links</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('404')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('404')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('404')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('404')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('usage')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-check-square-o fa-fw\"></i> <span>Feature Usages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Feature Usages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('usage')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('usage')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('usage')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAllMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-calendar fa-fw\"></i> <span>All Events</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">All Events</li> <li> <a ng-href=\"{{appVm.getDashboardUrl()}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl()}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl()}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl()}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isReportsMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-book fa-fw\"></i> <span>Reports</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Reports</li> <li> <a ng-href=\"{{appVm.getSessionDashboardUrl()}}\"> <i class=\"fa fa-heartbeat fa-fw\"></i> <span>Sessions</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAdminMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-cog fa-fw\"></i> <span>Admin</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Admin</li> <li> <a ui-sref=\"app.project.list\"> <i class=\"fa fa-briefcase fa-fw\"></i> <span>Projects</span> </a> </li> <li> <a ui-sref=\"app.organization.list\"> <i class=\"fa fa-group fa-fw\"></i> <span>Organizations</span> </a> </li> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> <span>My Account</span> </a> </li> </ul> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\" title=\"Documentation\"> <i class=\"fa fa-book fa-fw\"></i> <span>Documentation</span> </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\" title=\"Support\"> <i class=\"fa fa-comment fa-fw\"></i> <span>Support</span> </a> </li> </ul>"
+    "<ul class=\"nav\"> <li ng-class=\"{active: appVm.isTypeMenuActive('error')}\"> <a href=\"#\" class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-warning fa-fw\"></i> <span>Exceptions</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Exceptions</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('error')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('error')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('error')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getUsersUrl('error')}}\"> <i class=\"fa fa-users fa-fw\"></i> <span>Most Users</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('error')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('log')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-file-text-o fa-fw\"></i> <span>Log Messages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Log Messages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('log')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('log')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('log')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getUsersUrl('log')}}\"> <i class=\"fa fa-users fa-fw\"></i> <span>Most Users</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('log')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('404')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-unlink fa-fw\"></i> <span>Broken Links</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Broken Links</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('404')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('404')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('404')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getUsersUrl('404')}}\"> <i class=\"fa fa-users fa-fw\"></i> <span>Most Users</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('404')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isTypeMenuActive('usage')}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-check-square-o fa-fw\"></i> <span>Feature Usages</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Feature Usages</li> <li> <a ng-href=\"{{appVm.getDashboardUrl('usage')}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl('usage')}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl('usage')}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getUsersUrl('usage')}}\"> <i class=\"fa fa-users fa-fw\"></i> <span>Most Users</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl('usage')}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAllMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-calendar fa-fw\"></i> <span>All Events</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">All Events</li> <li> <a ng-href=\"{{appVm.getDashboardUrl()}}\"> <i class=\"fa fa-dashboard fa-fw\"></i> <span>Dashboard</span> </a> </li> <li> <a ng-href=\"{{appVm.getRecentUrl()}}\"> <i class=\"fa fa-calendar fa-fw\"></i> <span>Most Recent</span> </a> </li> <li> <a ng-href=\"{{appVm.getFrequentUrl()}}\"> <i class=\"fa fa-signal fa-fw\"></i> <span>Most Frequent</span> </a> </li> <li> <a ng-href=\"{{appVm.getUsersUrl()}}\"> <i class=\"fa fa-users fa-fw\"></i> <span>Most Users</span> </a> </li> <li> <a ng-href=\"{{appVm.getNewUrl()}}\"> <i class=\"fa fa-asterisk fa-fw\"></i> <span>New</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isReportsMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-book fa-fw\"></i> <span>Reports</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Reports</li> <li> <a ng-href=\"{{appVm.getSessionDashboardUrl()}}\"> <i class=\"fa fa-heartbeat fa-fw\"></i> <span>Sessions</span> </a> </li> </ul> </li> <li ng-class=\"{active: appVm.isAdminMenuActive()}\"> <a href class=\"auto\"> <span class=\"pull-right text-muted\"> <i class=\"fa fa-fw fa-angle-right text\"></i> <i class=\"fa fa-fw fa-angle-down text-active\"></i> </span> <i class=\"fa fa-cog fa-fw\"></i> <span>Admin</span> </a> <ul class=\"nav nav-sub dk\" auto-active> <li class=\"nav-sub-header\">Admin</li> <li> <a ui-sref=\"app.project.list\"> <i class=\"fa fa-briefcase fa-fw\"></i> <span>Projects</span> </a> </li> <li> <a ui-sref=\"app.organization.list\"> <i class=\"fa fa-group fa-fw\"></i> <span>Organizations</span> </a> </li> <li> <a ui-sref=\"app.account.manage\"> <i class=\"fa fa-user fa-fw\"></i> <span>My Account</span> </a> </li> </ul> </li> <li> <a href=\"https://github.com/exceptionless/Exceptionless/wiki\" target=\"_blank\" title=\"Documentation\"> <i class=\"fa fa-book fa-fw\"></i> <span>Documentation</span> </a> </li> <li ng-if=\"appVm.isIntercomEnabled()\"> <a ng-click=\"appVm.showIntercom()\" title=\"Support\"> <i class=\"fa fa-comment fa-fw\"></i> <span>Support</span> </a> </li> </ul>"
   );
 
 
@@ -114098,7 +113815,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/event/event.tpl.html',
-    "<organization-notifications organization-id=\"vm.event.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> <i class=\"fa fa-calendar\"></i> Event Occurrence <div class=\"pull-right hidden-print\"> <a ui-sref=\"app.stack({ id: vm.event.stack_id })\" class=\"btn btn-default btn-xs fa fa-fw fa-caret-up\" role=\"button\" title=\"Go To Stack\"></a> <a ui-sref=\"app.event({ id: vm.previous, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.previous}\" class=\"btn btn-default btn-xs fa fa-fw fa-caret-left\" role=\"button\" title=\"Previous Occurrence\"></a> <a ui-sref=\"app.event({ id: vm.next, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.next}\" class=\"btn btn-default btn-xs fa fa-fw fa-caret-right\" role=\"button\" title=\"Next Occurrence\"></a> </div> </div> <div class=\"panel-body\"> <uib-tabset class=\"tab-container hidden-xs\"> <uib-tab ng-repeat=\"tab in vm.tabs\" heading=\"{{::tab.title | toSpacedWords}}\" active=\"tab.active\"> <div ng-include=\"'app/event/tabs/' + tab.template_key + '.tpl.html'\"></div> </uib-tab> </uib-tabset> <uib-accordion class=\"visible-xs\"> <uib-accordion-group ng-repeat=\"tab in vm.tabs\" heading=\"{{::tab.title | toSpacedWords}}\" is-open=\"tab.active\"> <div ng-include=\"'app/event/tabs/' + tab.template_key + '.tpl.html'\"></div> </uib-accordion-group> </uib-accordion> </div> <footer class=\"panel-footer hidden-xs\"> <div class=\"pull-right\"> <a ui-sref=\"app.stack({ id: vm.event.stack_id })\" class=\"btn btn-default\" role=\"button\">Go To Stack</a> </div> <a ui-sref=\"app.event({ id: vm.previous, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.previous}\" class=\"btn btn-primary\" role=\"button\">Previous Occurrence</a> <a ui-sref=\"app.event({ id: vm.next, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.next}\" class=\"btn btn-primary\" role=\"button\">Next Occurrence</a> </footer> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.event.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> <i class=\"fa fa-calendar\"></i> Event Occurrence <div class=\"pull-right hidden-print\"> <a ui-sref=\"app.stack({ id: vm.event.stack_id })\" class=\"btn btn-default btn-xs fa fa-fw fa-caret-up\" role=\"button\" title=\"Go To Stack\"></a> <a ui-sref=\"app.event({ id: vm.previous, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.previous}\" class=\"btn btn-default btn-xs fa fa-fw fa-caret-left\" role=\"button\" title=\"Previous Occurrence\"></a> <a ui-sref=\"app.event({ id: vm.next, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.next}\" class=\"btn btn-default btn-xs fa fa-fw fa-caret-right\" role=\"button\" title=\"Next Occurrence\"></a> </div> </div> <div class=\"panel-body\"> <uib-tabset class=\"tab-container hidden-xs\" active=\"vm.activeTabIndex\"> <uib-tab ng-repeat=\"tab in vm.tabs\" heading=\"{{::tab.title | toSpacedWords}}\"> <div ng-include=\"'app/event/tabs/' + tab.template_key + '.tpl.html'\"></div> </uib-tab> </uib-tabset> <uib-accordion class=\"visible-xs\"> <uib-accordion-group ng-repeat=\"tab in vm.tabs\" heading=\"{{::tab.title | toSpacedWords}}\" is-open=\"tab.index === vm.activeTabIndex\"> <div ng-include=\"'app/event/tabs/' + tab.template_key + '.tpl.html'\"></div> </uib-accordion-group> </uib-accordion> </div> <footer class=\"panel-footer hidden-xs\"> <div class=\"pull-right\"> <a ui-sref=\"app.stack({ id: vm.event.stack_id })\" class=\"btn btn-default\" role=\"button\">Go To Stack</a> </div> <a ui-sref=\"app.event({ id: vm.previous, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.previous}\" class=\"btn btn-primary\" role=\"button\">Previous Occurrence</a> <a ui-sref=\"app.event({ id: vm.next, tab: vm.getCurrentTab() })\" ng-class=\"{'disabled': !vm.next}\" class=\"btn btn-primary\" role=\"button\">Next Occurrence</a> </footer> </div> </div> </div>"
   );
 
 
@@ -114188,7 +113905,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/organization/manage/manage.tpl.html',
-    "<organization-notifications organization-id=\"vm.organization.id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-th-list\"></i> Manage {{ vm.organization.name ? 'Organization \"' + vm.organization.name + '\"' : 'Organization'}}</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\"> <uib-tab heading=\"General\"> <form name=\"vm.organizationForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group m-b-none\"> <label for=\"name\">Organization Name</label> <div ng-class=\"{'input-group': vm.organizationForm.$pending }\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Organization Name\" ng-model=\"vm.organization.name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.save(vm.organizationForm.$valid)\" organization-name-available-validator ng-required=\"true\" autofocus> <span class=\"input-group-addon\" ng-if=\"vm.organizationForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.organizationForm.name.$error\" ng-if=\"vm.organizationForm.$submitted || vm.organizationForm.name.$touched\"> <small ng-message=\"required\">Organization Name is required.</small> <small ng-message=\"unique\">A organizations with this name already exists.</small> </div> </div> </form> <div ng-show=\"vm.hasMonthlyUsage\"> <h4 style=\"margin-top: 20px\">Monthly Usage</h4> <p> You are currently on the <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\"><strong>{{vm.organization.plan_name}}</strong> plan</a> with <b ng-class=\"{'text-warning': vm.getRemainingEventLimit() === 0}\">{{vm.getRemainingEventLimit() | number}}</b> events remaining until this billing period's limit is reset on <b>{{vm.next_billing_date | date: 'longDate'}}</b> (<timeago date=\"vm.next_billing_date\"></timeago>). <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Click here to change your plan or billing information.</a> </p> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> <br class=\"clearfix\"> <h6><em>The usage data above is refreshed periodically and may not reflect current totals.</em></h6> </div> </uib-tab> <uib-tab heading=\"Projects\" active=\"vm.tabProjectsActive\"> <projects settings=\"vm.projects\"></projects> <a ui-sref=\"app.project.add\" class=\"btn btn-primary\" role=\"button\">Add New Project</a> </uib-tab> <uib-tab heading=\"Users\" active=\"vm.tabUsersActive\"> <users settings=\"vm.users\"></users> <button type=\"button\" role=\"button\" ng-click=\"vm.addUser()\" class=\"btn btn-primary\">Invite User</button> </uib-tab> <uib-tab heading=\"Billing\" active=\"vm.tabBillingActive\"> <p>You are currently on the <strong>{{vm.organization.plan_name}}</strong> plan. <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Change your plan or billing information.</a></p> <invoices settings=\"vm.invoices\"></invoices> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.organization-dashboard({ organizationId: vm.organization.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-remove\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\"> <li><a ng-click=\"vm.leaveOrganization(appVm.user)\" role=\"button\">Leave Organization</a></li> <li><a ng-click=\"vm.removeOrganization()\" role=\"button\">Delete Organization</a></li> </ul> </div> </footer> </div> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.organization.id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"OrganizationChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-th-list\"></i> Manage {{ vm.organization.name ? 'Organization \"' + vm.organization.name + '\"' : 'Organization'}}</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\" active=\"vm.activeTabIndex\"> <uib-tab heading=\"General\"> <form name=\"vm.organizationForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group m-b-none\"> <label for=\"name\">Organization Name</label> <div ng-class=\"{'input-group': vm.organizationForm.$pending }\"> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" placeholder=\"Organization Name\" ng-model=\"vm.organization.name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.save(vm.organizationForm.$valid)\" organization-name-available-validator ng-required=\"true\" autofocus> <span class=\"input-group-addon\" ng-if=\"vm.organizationForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.organizationForm.name.$error\" ng-if=\"vm.organizationForm.$submitted || vm.organizationForm.name.$touched\"> <small ng-message=\"required\">Organization Name is required.</small> <small ng-message=\"unique\">A organizations with this name already exists.</small> </div> </div> </form> <div ng-show=\"vm.hasMonthlyUsage\"> <h4 style=\"margin-top: 20px\">Monthly Usage</h4> <p> You are currently on the <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\"><strong>{{vm.organization.plan_name}}</strong> plan</a> with <b ng-class=\"{'text-warning': vm.getRemainingEventLimit() === 0}\">{{vm.getRemainingEventLimit() | number}}</b> events remaining until this billing period's limit is reset on <b>{{vm.next_billing_date | date: 'longDate'}}</b> (<timeago date=\"vm.next_billing_date\"></timeago>). <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Click here to change your plan or billing information.</a> </p> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> <br class=\"clearfix\"> <h6><em>The usage data above is refreshed periodically and may not reflect current totals.</em></h6> </div> </uib-tab> <uib-tab heading=\"Projects\"> <projects settings=\"vm.projects\"></projects> <a ui-sref=\"app.project.add\" class=\"btn btn-primary\" role=\"button\">Add New Project</a> </uib-tab> <uib-tab heading=\"Users\"> <users settings=\"vm.users\"></users> <button type=\"button\" role=\"button\" ng-click=\"vm.addUser()\" class=\"btn btn-primary\">Invite User</button> </uib-tab> <uib-tab heading=\"Billing\"> <p>You are currently on the <strong>{{vm.organization.plan_name}}</strong> plan. <a ng-if=\"vm.canChangePlan()\" ng-click=\"vm.changePlan()\">Change your plan or billing information.</a></p> <invoices settings=\"vm.invoices\"></invoices> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <a ui-sref=\"app.organization-dashboard({ organizationId: vm.organization.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-remove\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\"> <li><a ng-click=\"vm.leaveOrganization(appVm.user)\" role=\"button\">Leave Organization</a></li> <li><a ng-click=\"vm.removeOrganization()\" role=\"button\">Delete Organization</a></li> </ul> </div> </footer> </div> </div> </div> </div>"
   );
 
 
@@ -114268,12 +113985,17 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('app/stack/stack.tpl.html',
-    "<organization-notifications organization-id=\"vm.stack.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"StackChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"1000\"> <div class=\"wrapper-md\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"row\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-left fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">First</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.first_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">NA</span> </span> </div> </div> </div> <div class=\"col-xs-4\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-right fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Last</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.last_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">NA</span> </span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> Stack <span class=\"labels\"> <span class=\"label label-success\" ng-if=\"vm.isFixed()\"> <span class=\"hidden-xs\">FIXED</span> <span class=\"visible-xs\">F</span> </span> <span class=\"label label-success\" ng-if=\"vm.isRegressed()\"> <span class=\"hidden-xs\">REGRESSED</span> <span class=\"visible-xs\">R</span> </span> <span class=\"label label-success\" ng-if=\"vm.isHidden()\"> <span class=\"hidden-xs\">HIDDEN</span> <span class=\"visible-xs\">H</span> </span> </span> <div class=\"btn-toolbar pull-right hidden-print\" role=\"toolbar\" aria-label=\"Stack Options\"> <div class=\"btn-group btn-group-sm\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" title=\"{{vm.isFixed() ? 'Mark this stack as not fixed' : 'Mark this stack as fixed'}}\" promise-button=\"vm.updateIsFixed()\" promise-button-busy-text=\"{{vm.isFixed() ? 'Marking Not Fixed' : 'Marking Fixed' }}\" promise-button-busy-spinner-class=\"fa-size-sm\"> {{vm.isFixed() ? 'Mark Not Fixed' : 'Mark Fixed' }} </button> </div> <div class=\"btn-group btn-group-sm\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear fa-size-sm\"></i></span> <span class=\"hidden-xs\">Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.updateIsHidden()\" title=\"Hide this stack from reports and mutes occurrence notifications\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isHidden()}\"></i>Hide</a></li> <li><a ng-click=\"vm.updateIsCritical()\" title=\"All future occurrences will be marked as critical\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isCritical()}\"></i>Future Occurrences Are Critical</a></li> <li><a ng-click=\"vm.updateNotifications()\" title=\"Stop sending occurrence notifications for this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.notificationsDisabled()}\"></i>Disable Notifications</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.promoteToExternal()\" title=\"Used to promote stacks to external systems.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Promote To External</a></li> <li><a ng-click=\"vm.addReferenceLink()\" title=\"Add a reference link to an external resource.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Add Reference Link</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.remove()\" title=\"Delete this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Delete</a></li> </ul> </div> </div> </div> <div class=\"panel-body\"> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr> <th>Title</th> <td><span truncate lines=\"3\">{{vm.stack.title}}</span></td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.isFixed()\"> <th>Date Fixed</th> <td><span>{{vm.stack.date_fixed | date: 'medium'}}</span></td> </tr> <tr ng-if=\"vm.stack.description\"> <th>Description</th> <td><span truncate lines=\"2\">{{vm.stack.description}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.stack.tags track by tag\">{{tag}}</span></td> </tr> <tr ng-if=\"vm.hasReference()\"> <th>{{vm.hasReferences() ? 'Reference Links' : 'Reference Link'}}</th> <td> <ul ng-if=\"vm.hasReferences()\"> <li ng-repeat=\"reference in vm.stack.references track by reference\"> <a ng-href=\"{{::reference}}\" target=\"_blank\">{{::reference}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(reference)\"><i class=\"fa fa-fw fa-times\"></i></a> </li> </ul> <div ng-if=\"!vm.hasReferences()\"> <a ng-href=\"{{::vm.stack.references[0]}}\" target=\"_blank\">{{::vm.stack.references[0]}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(vm.stack.references[0])\"><i class=\"fa fa-fw fa-times\"></i></a> </div> </td> </tr> </tbody> </table> <h4>Stacking Information</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr ng-repeat=\"(key, value) in vm.stack.signature_info track by key\"> <th>{{key}}</th> <td>{{value}}</td> </tr> </tbody> </table> <div> <div class=\"btn-group btn-group-xs pull-right\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"hidden-xs\">Chart Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li ng-repeat=\"o in vm.chartOptions | filter: { render: true } track by o.field\"> <a ng-click=\"o.selected = !o.selected; vm.getStats();\" title=\"{{::o.title}}\"><i class=\"fa fa-fw\" ng-class=\"{'fa-check': o.selected}\" ng-if=\"vm.hasSelectedChartOption()\"></i>Show {{::o.name}}</a> </li> </ul> </div> <div class=\"clearfix\"></div> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-fw fa-calendar\"></i> Recent Occurrences</div> <events settings=\"vm.recentOccurrences\"></events> </div> </div> </div>"
+    "<organization-notifications organization-id=\"vm.stack.organization_id\"></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\" refresh-on=\"StackChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"1000\"> <div class=\"wrapper-md\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <div class=\"row\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(data)\" refresh-throttle=\"10000\"> <div class=\"col-sm-12\"> <div class=\"row row-sm text-center\"> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-calendar fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Total</span> <span class=\"sub\">{{vm.stats.total || 0 | number : 0}}</span> </div> </div> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-users fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Users</span> <span class=\"sub\"> <abbr title=\"{{vm.stats.numbers[0] || 0 | number : 0}} of {{vm.total_users | number:0}} users\">{{(vm.total_users > 0 ? (vm.stats.numbers[0] || 0) / vm.total_users * 100.0 : 0) | percentage}}</abbr> </span> </div> </div> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-left fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">First</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.first_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.first_occurrence)\">{{vm.stats.first_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.first_occurrence)\">NA</span> </span> </div> </div> </div> <div class=\"col-md-3 col-sm-6 col-xs-6\"> <div class=\"dashboard-block\"> <div class=\"rotate\"> <i class=\"fa fa-arrow-circle-right fa-4x\"></i> </div> <div class=\"details\"> <span class=\"title\">Last</span> <span class=\"sub visible-md visible-lg\"><timeago date=\"vm.stats.last_occurrence\"></timeago></span> <span class=\"sub visible-sm\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'shortDate' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">never</span> </span> <span class=\"sub visible-xs\"> <span ng-if=\"vm.isValidDate(vm.stats.last_occurrence)\">{{vm.stats.last_occurrence | date:'M/d' }}</span> <span ng-if=\"!vm.isValidDate(vm.stats.last_occurrence)\">NA</span> </span> </div> </div> </div> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"> Stack <span class=\"labels\"> <span class=\"label label-success\" ng-if=\"vm.isFixed()\"> <span class=\"hidden-xs\">FIXED</span> <span class=\"visible-xs\">F</span> </span> <span class=\"label label-success\" ng-if=\"vm.isRegressed()\"> <span class=\"hidden-xs\">REGRESSED</span> <span class=\"visible-xs\">R</span> </span> <span class=\"label label-success\" ng-if=\"vm.isHidden()\"> <span class=\"hidden-xs\">HIDDEN</span> <span class=\"visible-xs\">H</span> </span> </span> <div class=\"btn-toolbar pull-right hidden-print\" role=\"toolbar\" aria-label=\"Stack Options\"> <div class=\"btn-group btn-group-sm\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default\" title=\"{{vm.isFixed() ? 'Mark this stack as not fixed' : 'Mark this stack as fixed'}}\" promise-button=\"vm.updateIsFixed()\" promise-button-busy-text=\"{{vm.isFixed() ? 'Marking Not Fixed' : 'Marking Fixed' }}\" promise-button-busy-spinner-class=\"fa-size-sm\"> {{vm.isFixed() ? 'Mark Not Fixed' : 'Mark Fixed' }} </button> </div> <div class=\"btn-group btn-group-sm\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear fa-size-sm\"></i></span> <span class=\"hidden-xs\">Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ng-click=\"vm.updateIsHidden()\" title=\"Hide this stack from reports and mutes occurrence notifications\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isHidden()}\"></i>Hide</a></li> <li><a ng-click=\"vm.updateIsCritical()\" title=\"All future occurrences will be marked as critical\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.isCritical()}\"></i>Future Occurrences Are Critical</a></li> <li><a ng-click=\"vm.updateNotifications()\" title=\"Stop sending occurrence notifications for this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\" ng-class=\"{'fa-check': vm.notificationsDisabled()}\"></i>Disable Notifications</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.promoteToExternal()\" title=\"Used to promote stacks to external systems.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Promote To External</a></li> <li><a ng-click=\"vm.addReferenceLink()\" title=\"Add a reference link to an external resource.\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Add Reference Link</a></li> <li class=\"divider\"></li> <li><a ng-click=\"vm.remove()\" title=\"Delete this stack\"><i ng-if=\"vm.hasSelectedOption()\" class=\"fa fa-fw\"></i>Delete</a></li> </ul> </div> </div> </div> <div class=\"panel-body\"> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr> <th>Title</th> <td><span truncate lines=\"3\">{{vm.stack.title}}</span></td> </tr> <tr> <th>Project</th> <td><a ui-sref=\"app.project-dashboard({ projectId: vm.project.id })\">{{vm.project.name}}</a></td> </tr> <tr ng-if=\"vm.isFixed()\"> <th>Date Fixed</th> <td><span>{{vm.stack.date_fixed | date: 'medium'}}</span></td> </tr> <tr ng-if=\"vm.stack.description\"> <th>Description</th> <td><span truncate lines=\"2\">{{vm.stack.description}}</span></td> </tr> <tr ng-if=\"vm.hasTags()\"> <th>Tags</th> <td><span class=\"label label-info\" ng-repeat=\"tag in vm.stack.tags track by tag\">{{tag}}</span></td> </tr> <tr ng-if=\"vm.hasReference()\"> <th>{{vm.hasReferences() ? 'Reference Links' : 'Reference Link'}}</th> <td> <ul ng-if=\"vm.hasReferences()\"> <li ng-repeat=\"reference in vm.stack.references track by reference\"> <a ng-href=\"{{::reference}}\" target=\"_blank\">{{::reference}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(reference)\"><i class=\"fa fa-fw fa-times\"></i></a> </li> </ul> <div ng-if=\"!vm.hasReferences()\"> <a ng-href=\"{{::vm.stack.references[0]}}\" target=\"_blank\">{{::vm.stack.references[0]}}</a> <a class=\"delete-link\" ng-click=\"vm.removeReferenceLink(vm.stack.references[0])\"><i class=\"fa fa-fw fa-times\"></i></a> </div> </td> </tr> </tbody> </table> <h4>Stacking Information</h4> <table class=\"table table-striped table-bordered table-fixed table-key-value b-t\"> <tbody> <tr ng-repeat=\"(key, value) in vm.stack.signature_info track by key\"> <th>{{key}}</th> <td>{{value}}</td> </tr> </tbody> </table> <div> <div class=\"btn-group btn-group-xs pull-right\" role=\"group\"> <button type=\"button\" role=\"button\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> <span class=\"visible-xs-inline\"><i class=\"fa fa-fw fa-gear\"></i></span> <span class=\"hidden-xs\">Chart Options</span> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li ng-repeat=\"o in vm.chartOptions | filter: { render: true } track by o.field\"> <a ng-click=\"o.selected = !o.selected; vm.getStats();\" title=\"{{::o.title}}\"><i class=\"fa fa-fw\" ng-class=\"{'fa-check': o.selected}\" ng-if=\"vm.hasSelectedChartOption()\"></i>Show {{::o.name}}</a> </li> </ul> </div> <div class=\"clearfix\"></div> <rickshaw options=\"vm.chart.options\" features=\"vm.chart.features\"></rickshaw> </div> </div> </div> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-fw fa-calendar\"></i> Recent Occurrences</div> <events settings=\"vm.recentOccurrences\"></events> </div> </div> </div>"
   );
 
 
   $templateCache.put('app/status/status.tpl.html',
     "<div class=\"container w-auto-xs\"> <div class=\"text-center\"> <a href=\"http://exceptionless.io\"> <img src=\"/img/exceptionless-350.png\" alt=\"logo\"> </a> </div> <div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading text-center\"><strong>Service Status</strong></div> <div class=\"panel-body\"> {{vm.getMessage()}} </div> </div> </div> </div> </div> </div>"
+  );
+
+
+  $templateCache.put('app/users.tpl.html',
+    "<organization-notifications></organization-notifications> <div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-users\"></i> Most Users</div> <stacks settings=\"vm.mostUsers\"></stacks> </div> </div> </div> </div>"
   );
 
 
@@ -114303,7 +114025,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/events/events-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th class=\"selection hidden-xs\" ng-if=\"vm.actions.length > 0\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th ng-class=\"vm.relativeTo() ? 'relative-date' : 'date'\">{{::vm.timeHeaderText}}</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(event.id, $event)\"> <span ng-if=\"vm.hideSessionStartTime && event.data.Type === 'session'\">--</span> <span ng-if=\"!vm.hideSessionStartTime || event.data.Type !== 'session'\"> <abbr title=\"{{::event.date | date : 'medium'}}\"> <span ng-if=\"vm.relativeTo()\">after <relative-time to=\"vm.relativeTo()\" date=\"event.date\"></relative-time></span> <span ng-if=\"!vm.relativeTo()\"><timeago date=\"event.date\"></timeago></span> </abbr> </span> </td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"2\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No events were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\" ng-if=\"vm.actions.length > 0\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead refresh-on=\"PersistentEventChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <tr> <th class=\"selection hidden-xs\" ng-if=\"vm.actions.length > 0\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasEvents()\"><i></i> </label> </th> <th>Summary</th> <th class=\"action-xl hidden-xs\">User</th> <th ng-class=\"vm.relativeTo() ? 'relative-date' : 'date'\">{{::vm.timeHeaderText}}</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"event in vm.events track by event.id\" ng-if=\"vm.hasEvents()\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"event.id\"><i></i></label></td> <td ng-click=\"vm.open(event.id, $event)\"> <summary source=\"event\" show-type=\"vm.showType\"></summary> </td> <td class=\"hidden-xs\" ng-click=\"vm.open(event.id, $event)\"> <abbr ng-if=\"event.data.Name && event.data.Identity\" title=\"{{::event.data.Name}} ({{::event.data.Identity}})\" truncate overwrite-tooltip=\"false\">{{::event.data.Name}}</abbr> <span ng-if=\"!event.data.Name || !event.data.Identity\" truncate>{{::(event.data.Name || event.data.Identity)}}</span> </td> <td ng-click=\"vm.open(event.id, $event)\"> <span ng-if=\"vm.hideSessionStartTime && event.data.Type === 'session'\">--</span> <span ng-if=\"!vm.hideSessionStartTime || event.data.Type !== 'session'\"> <abbr title=\"{{::event.date | date : 'medium'}}\"> <span ng-if=\"vm.relativeTo()\">after <relative-time to=\"vm.relativeTo()\" date=\"event.date\"></relative-time></span> <span ng-if=\"!vm.relativeTo()\"><timeago date=\"event.date\"></timeago></span> </abbr> </span> </td> </tr> <tr ng-if=\"!vm.hasEvents() || vm.loading\"> <td class=\"hidden-xs\" ng-if=\"vm.actions.length > 0\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"3\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No events were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\" ng-if=\"vm.actions.length > 0\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -114323,7 +114045,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/projects/projects-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <table class=\"table table-striped table-bordered table-fixed b-t\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"10000\"> <thead> <tr> <th>Name</th> <th ng-show=\"vm.includeOrganizationName\">Organization</th> <th class=\"number hidden-xs\">Stacks</th> <th class=\"number hidden-xs\">Events</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"project in vm.projects | orderBy: 'name' track by project.id\" ng-if=\"vm.hasProjects()\"> <td ng-click=\"vm.open(project.id, $event)\">{{project.name}}</td> <td ng-show=\"vm.includeOrganizationName\" ng-click=\"vm.open(project.id, $event)\">{{project.organization_name}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.stack_count | number:0}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.event_count | number:0}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ui-sref=\"app.project-dashboard({ projectId: project.id })\"><i class=\"fa fa-fw fa-dashboard\"></i> Dashboard</a></li> <li><a ui-sref=\"app.project.manage({ id: project.id })\"><i class=\"fa fa-fw fa-edit\"></i> Edit</a></li> <li><a ui-sref=\"app.project.configure({ id: project.id })\"><i class=\"fa fa-fw fa-cloud-download\"></i> Download & Configure Client</a></li> <li><a ng-click=\"vm.remove(project)\"><i class=\"fa fa-fw fa-times\"></i> Delete</a></li> </ul> </div> </td> </tr> <tr ng-if=\"!vm.hasProjects()\"> <td class=\"hidden-xs\" colspan=\"5\" ng-if=\"vm.includeOrganizationName || vm.loading\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td class=\"visible-xs\" colspan=\"3\" ng-if=\"vm.includeOrganizationName || vm.loading\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td class=\"hidden-xs\" colspan=\"4\" ng-if=\"!vm.includeOrganizationName || vm.loading\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td class=\"visible-xs\" colspan=\"2\" ng-if=\"!vm.includeOrganizationName || vm.loading\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"OrganizationChanged ProjectChanged\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <table class=\"table table-striped table-bordered table-fixed b-t\" refresh-on=\"PersistentEventChanged PlanChanged\" refresh-action=\"vm.get(vm.currentOptions, false)\" refresh-throttle=\"10000\"> <thead> <tr> <th>Name</th> <th ng-if=\"vm.includeOrganizationName\">Organization</th> <th class=\"number hidden-xs\">Stacks</th> <th class=\"number hidden-xs\">Events</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"project in vm.projects | orderBy: 'name' track by project.id\" ng-if=\"vm.hasProjects()\"> <td ng-click=\"vm.open(project.id, $event)\">{{project.name}}</td> <td ng-if=\"vm.includeOrganizationName\" ng-click=\"vm.open(project.id, $event)\">{{project.organization_name}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.stack_count | number:0}}</td> <td ng-click=\"vm.open(project.id, $event)\" class=\"number hidden-xs\">{{project.event_count | number:0}}</td> <td> <div class=\"btn-group\"> <button type=\"button\" role=\"button\" class=\"btn btn-sm btn-primary dropdown-toggle\" data-toggle=\"dropdown\"> <i class=\"fa fa-fw fa-edit\"></i> <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu dropdown-menu-right\" role=\"menu\"> <li><a ui-sref=\"app.project-dashboard({ projectId: project.id })\"><i class=\"fa fa-fw fa-dashboard\"></i> Dashboard</a></li> <li><a ui-sref=\"app.project.manage({ id: project.id })\"><i class=\"fa fa-fw fa-edit\"></i> Edit</a></li> <li><a ui-sref=\"app.project.configure({ id: project.id })\"><i class=\"fa fa-fw fa-cloud-download\"></i> Download & Configure Client</a></li> <li><a ng-click=\"vm.remove(project)\"><i class=\"fa fa-fw fa-times\"></i> Delete</a></li> </ul> </div> </td> </tr> <tr ng-if=\"!vm.hasProjects() && vm.includeOrganizationName\"> <td class=\"hidden-xs\" colspan=\"5\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td class=\"visible-xs\" colspan=\"3\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> <tr ng-if=\"!vm.hasProjects() && !vm.includeOrganizationName\"> <td class=\"hidden-xs\" colspan=\"4\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td class=\"visible-xs\" colspan=\"2\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No projects were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\" ng-if=\"vm.previous || vm.next\"> <div class=\"row\"> <div class=\"col-sm-8 col-xs-8 text-center\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -114348,7 +114070,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/stacks/stacks-directive.tpl.html',
-    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead> <tr> <th class=\"selection hidden-xs\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasStacks()\"><i></i> </label> </th> <th>Summary</th> <th class=\"number\">Count</th> <th class=\"date hidden-xs\">First</th> <th class=\"date\">Last</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"stack in vm.stacks track by stack.id\" ng-if=\"vm.hasStacks()\"> <td class=\"hidden-xs\"> <label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"stack.id\"><i></i></label> </td> <td ng-click=\"vm.open(stack.id, $event)\"> <summary source=\"stack\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"number\">{{stack.total | number:0}}</td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"hidden-xs\"> <abbr title=\"{{::stack.first_occurrence | date : 'medium'}}\"> <timeago date=\"stack.first_occurrence\"></timeago> </abbr> </td> <td ng-click=\"vm.open(stack.id, $event)\"><abbr title=\"{{::stack.last_occurrence | date : 'medium'}}\"> <timeago date=\"stack.last_occurrence\"></timeago> </abbr></td> </tr> <tr ng-if=\"!vm.hasStacks() || vm.loading\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"4\" class=\"hidden-xs\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No stacks were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td colspan=\"3\" class=\"visible-xs\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No stacks were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
+    "<div class=\"table-responsive\" refresh-on=\"filterChanged\" refresh-action=\"vm.get()\"> <table class=\"table table-striped table-bordered table-selectable table-fixed b-t table-hover table-clickable\" refresh-on=\"StackChanged PlanChanged\" refresh-if=\"vm.canRefresh(data)\" refresh-action=\"vm.get(vm.currentOptions)\" refresh-throttle=\"10000\"> <thead> <tr> <th class=\"selection hidden-xs\"> <label class=\"i-checks m-b-none\"> <input type=\"checkbox\" ng-click=\"vm.updateSelection()\" ng-checked=\"vm.hasSelection()\" ng-disabled=\"!vm.hasStacks()\"><i></i> </label> </th> <th>Summary</th> <th class=\"percentage\">Users</th> <th class=\"number\">Count</th> <th class=\"date hidden-xs\">First</th> <th class=\"date hidden-xs\">Last</th> </tr> </thead> <tbody> <tr class=\"row-clickable\" ng-repeat=\"stack in vm.stacks track by stack.id\" ng-if=\"vm.hasStacks()\"> <td class=\"hidden-xs\"> <label class=\"i-checks m-b-none\"><input type=\"checkbox\" checklist-model=\"vm.selectedIds\" checklist-value=\"stack.id\"><i></i></label> </td> <td ng-click=\"vm.open(stack.id, $event)\"> <summary source=\"stack\" show-type=\"vm.showType\"></summary> </td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"number\"> <abbr title=\"{{stack.users | number:0}} of {{stack.total_users | number:0}} users\">{{(stack.total_users > 0 ? stack.users / stack.total_users * 100.0 : 0) | percentage}}</abbr> </td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"number\">{{stack.total | number:0}}</td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"hidden-xs\"> <abbr title=\"{{::stack.first_occurrence | date : 'medium'}}\"> <timeago date=\"stack.first_occurrence\"></timeago> </abbr> </td> <td ng-click=\"vm.open(stack.id, $event)\" class=\"hidden-xs\"><abbr title=\"{{::stack.last_occurrence | date : 'medium'}}\"> <timeago date=\"stack.last_occurrence\"></timeago> </abbr></td> </tr> <tr ng-if=\"!vm.hasStacks() || vm.loading\"> <td class=\"hidden-xs\"><label class=\"i-checks m-b-none\"><input type=\"checkbox\" disabled><i></i></label></td> <td colspan=\"5\" class=\"hidden-xs\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No stacks were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> <td colspan=\"3\" class=\"visible-xs\"> <strong ng-if=\"vm.loading\">Loading...</strong> <strong ng-if=\"!vm.loading\">No stacks were found{{vm.hasFilter ? ' with the current filter': ''}}.</strong> </td> </tr> </tbody> </table> <div class=\"table-footer\"> <div class=\"row\"> <div class=\"col-sm-4 hidden-xs\"> <div class=\"dropdown\"> <button type=\"button\" role=\"button\" id=\"bulkActions\" class=\"btn btn-default btn-sm dropdown-toggle\" data-toggle=\"dropdown\" aria-expanded=\"false\"> Bulk Action <span class=\"caret\"></span> </button> <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"bulkActions\"> <li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" ng-repeat=\"action in vm.actions\" ng-click=\"vm.save(action)\">{{::action.name}}</a></li> </ul> </div> </div> <div class=\"col-sm-4 text-center\" ng-class=\"vm.previous || vm.next ? 'col-xs-8': 'col-xs-12'\" ng-if=\"vm.pageSummary\"> <small class=\"text-muted inline m-t-xs\">{{vm.pageSummary}}</small> </div> <div class=\"col-sm-4 col-xs-4 text-right\" ng-if=\"vm.previous || vm.next\"> <ul class=\"pagination pagination-sm m-t-none m-b-none\"> <li ng-show=\"vm.currentOptions.page && vm.currentOptions.page > 2\"><a ng-click=\"vm.get()\"><i class=\"fa fa-fast-backward\"></i></a></li> <li ng-class=\"{'disabled': !vm.previous}\"><a ng-disabled=\"!vm.previous\" ng-click=\"!vm.previous || vm.previousPage()\"><i class=\"fa fa-chevron-left\"></i></a></li> <li ng-class=\"{'disabled': !vm.next}\"><a ng-disabled=\"!vm.next\" ng-click=\"!vm.next || vm.nextPage()\"><i class=\"fa fa-chevron-right\"></i></a></li> </ul> </div> </div> </div> </div>"
   );
 
 
@@ -114373,7 +114095,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('components/summary/templates/event-session-summary.tpl.html',
-    "<span ng-if=\"showType\"><strong>Session<span ng-if=\"source.data.Type === 'sessionend'\"> End</span><span ng-if=\"source.data.Type === 'heartbeat'\"> Heartbeat</span></strong>:&nbsp;</span><a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\">{{::(source.data.Name || source.data.Identity || source.data.SessionId)}}<span ng-if=\"source.data.Name && source.data.Identity\" class=\"text-muted\"> ({{::source.data.Identity}})</span></a>"
+    "<span ng-if=\"showType\"> <strong>Session <span ng-if=\"source.data.Type === 'sessionend'\"> End</span> <span ng-if=\"source.data.Type === 'heartbeat'\"> Heartbeat</span> </strong>:&nbsp; </span> <a ui-sref=\"app.event({ id: source.id })\" truncate lines=\"2\"> {{::(source.data.Name || source.data.Identity || source.data.SessionId)}} <span ng-if=\"source.data.Name && source.data.Identity\" class=\"text-muted\"> ({{::source.data.Identity}})</span> </a>"
   );
 
 
