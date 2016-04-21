@@ -108815,9 +108815,14 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       var vm = this;
 
       function addHotKeys() {
+        hotkeys.del('mod+up');
+        hotkeys.del('mod+left');
+        hotkeys.del('mod+right');
+        hotkeys.del('mod+shift+c');
+
         if (vm.event.stack_id) {
-          hotkeys.add({
-            combo: 'ctrl+up',
+          hotkeys.bindTo($scope).add({
+            combo: 'mod+up',
             description: 'Go To Stack',
             callback: function () {
               $ExceptionlessClient.createFeatureUsage(source + '.hotkeys.GoToStack')
@@ -108830,8 +108835,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           });
 
           if (clipboard.supported) {
-            hotkeys.add({
-              combo: 'ctrl+shift+c',
+            hotkeys.bindTo($scope).add({
+              combo: 'mod+shift+c',
               description: 'Copy Event JSON to Clipboard',
               callback: function () {
                 $ExceptionlessClient.createFeatureUsage(source + '.hotkeys.CopyEventJSON')
@@ -108848,8 +108853,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         if (vm.previous) {
-          hotkeys.add({
-            combo: 'ctrl+left',
+          hotkeys.bindTo($scope).add({
+            combo: 'mod+left',
             description: 'Previous Occurrence',
             callback: function () {
               $ExceptionlessClient.createFeatureUsage(source + '.hotkeys.PreviousOccurrence')
@@ -108863,8 +108868,8 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         }
 
         if (vm.next) {
-          hotkeys.add({
-            combo: 'ctrl+right',
+          hotkeys.bindTo($scope).add({
+            combo: 'mod+right',
             description: 'Next Occurrence',
             callback: function () {
               $ExceptionlessClient.createFeatureUsage(source + '.hotkeys.NextOccurrence')
@@ -109036,8 +109041,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function getEvent() {
-        removeHotKeys();
-
         function optionsCallback(options) {
           if (options.filter) {
             options.filter += ' stack:current';
@@ -109229,15 +109232,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
 
         return projectService.promoteTab(vm.project.id, tabName).then(onSuccess, onFailure);
       }
-
-      function removeHotKeys() {
-        hotkeys.del('ctrl+up');
-        hotkeys.del('ctrl+left');
-        hotkeys.del('ctrl+right');
-        hotkeys.del('ctrl+shift+c');
-      }
-
-      $scope.$on('$destroy', removeHotKeys);
 
       vm.activeTabIndex = 0;
       vm.canRefresh = canRefresh;
