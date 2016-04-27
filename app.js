@@ -14759,15 +14759,6 @@ return exports;
         Twix._extend(options, inopts || {});
         fs = [];
         needsMeridiem = options.hourFormat && options.hourFormat[0] === 'h';
-        if (options.showTime != null) {
-          options.hideTime = !options.showTime;
-        }
-        if (options.showYear != null) {
-          options.hideYear = !options.showYear;
-        }
-        if (options.showDate != null) {
-          options.implicitDate = !options.showDate;
-        }
         goesIntoTheMorning = options.lastNightEndsAt > 0 && !this.allDay && this.end().startOf('d').valueOf() === this.start().add(1, 'd').startOf('d').valueOf() && this._start.hours() > 12 && this._end.hours() < options.lastNightEndsAt;
         needDate = !options.hideDate && (!options.implicitDate || this.start().startOf('d').valueOf() !== moment().startOf('d').valueOf() || !(this.isSame('d') || goesIntoTheMorning));
         if (this.allDay && this.isSame('d') && (options.implicitDate || options.explicitAllDay)) {
@@ -62670,7 +62661,7 @@ return angular.module('angular-clipboard', [])
                 onCopied: '&',
                 onError: '&',
                 text: '=',
-                supported: '='
+                supported: '=?'
             },
             link: function (scope, element) {
                 scope.supported = clipboard.supported;
@@ -62692,6 +62683,7 @@ return angular.module('angular-clipboard', [])
     }]);
 
 }));
+
 angular.module("dialogs.default-translations",["pascalprecht.translate"]).config(["$translateProvider",function(O){O.translations("de-DE",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"Ein unbekannter Fehler ist aufgetreten.",DIALOGS_CLOSE:"Schließen",DIALOGS_PLEASE_WAIT:"Bitte warten",DIALOGS_PLEASE_WAIT_ELIPS:"Bitte warten...",DIALOGS_PLEASE_WAIT_MSG:"Warte auf Fertigstellung der Operation.",DIALOGS_PERCENT_COMPLETE:"% fertig",DIALOGS_NOTIFICATION:"Benachrichtigung",DIALOGS_NOTIFICATION_MSG:"Unbekannte Anwendungsbenachrichtigung.",DIALOGS_CONFIRMATION:"Bestätigung",DIALOGS_CONFIRMATION_MSG:"Bestätigung erforderlich.",DIALOGS_OK:"OK",DIALOGS_YES:"Ja",DIALOGS_NO:"Nein"}),O.translations("en-US",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"An unknown error has occurred.",DIALOGS_CLOSE:"Close",DIALOGS_PLEASE_WAIT:"Please Wait",DIALOGS_PLEASE_WAIT_ELIPS:"Please Wait...",DIALOGS_PLEASE_WAIT_MSG:"Waiting on operation to complete.",DIALOGS_PERCENT_COMPLETE:"% Complete",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Unknown application notification.",DIALOGS_CONFIRMATION:"Confirmation",DIALOGS_CONFIRMATION_MSG:"Confirmation required.",DIALOGS_OK:"OK",DIALOGS_YES:"Yes",DIALOGS_NO:"No"}),O.translations("es-ES",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"Se ha producido un error.",DIALOGS_CLOSE:"Cerrar",DIALOGS_PLEASE_WAIT:"Espere por favor",DIALOGS_PLEASE_WAIT_ELIPS:"Espere por favor...",DIALOGS_PLEASE_WAIT_MSG:"Completando operación.",DIALOGS_PERCENT_COMPLETE:"% Completado",DIALOGS_NOTIFICATION:"Notificación",DIALOGS_NOTIFICATION_MSG:"Notificación de una aplicación desconocida.",DIALOGS_CONFIRMATION:"Confirmación",DIALOGS_CONFIRMATION_MSG:"Se requiere confirmacion.",DIALOGS_OK:"Aceptar",DIALOGS_YES:"Sí",DIALOGS_NO:"No"}),O.translations("fr-FR",{DIALOGS_ERROR:"Erreur",DIALOGS_ERROR_MSG:"Une erreur inconnue s'est produite.",DIALOGS_CLOSE:"Fermer",DIALOGS_PLEASE_WAIT:"Patientez svp",DIALOGS_PLEASE_WAIT_ELIPS:"Patienter svp...",DIALOGS_PLEASE_WAIT_MSG:"En attente de la fin de l'opération.",DIALOGS_PERCENT_COMPLETE:"% Terminer",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Notification de l'application inconnue",DIALOGS_CONFIRMATION:"Confirmer",DIALOGS_CONFIRMATION_MSG:"Merci de confirmer",DIALOGS_OK:"OK",DIALOGS_YES:"Oui",DIALOGS_NO:"Non"}),O.translations("pt-BR",{DIALOGS_ERROR:"Erro",DIALOGS_ERROR_MSG:"Ocorreu um erro inesperado.",DIALOGS_CLOSE:"Fechar",DIALOGS_PLEASE_WAIT:"Por favor aguarde",DIALOGS_PLEASE_WAIT_ELIPS:"Por favor aguarde...",DIALOGS_PLEASE_WAIT_MSG:"Aguardando que a operação termine.",DIALOGS_PERCENT_COMPLETE:"% Completados",DIALOGS_NOTIFICATION:"Notificação",DIALOGS_NOTIFICATION_MSG:"Notificação de aplicação desconhecida.",DIALOGS_CONFIRMATION:"Confirmação",DIALOGS_CONFIRMATION_MSG:"Confirmação requerida.",DIALOGS_OK:"OK",DIALOGS_YES:"Sim",DIALOGS_NO:"Não"}),O.translations("zh-CN",{DIALOGS_ERROR:"错误",DIALOGS_ERROR_MSG:"出现未知错误。",DIALOGS_CLOSE:"关闭",DIALOGS_PLEASE_WAIT:"请稍候",DIALOGS_PLEASE_WAIT_ELIPS:"请稍候...",DIALOGS_PLEASE_WAIT_MSG:"请等待操作完成。",DIALOGS_PERCENT_COMPLETE:"% 已完成",DIALOGS_NOTIFICATION:"通知",DIALOGS_NOTIFICATION_MSG:"未知应用程序的通知。",DIALOGS_CONFIRMATION:"确认",DIALOGS_CONFIRMATION_MSG:"确认要求。",DIALOGS_OK:"确定",DIALOGS_YES:"确认",DIALOGS_NO:"取消"}),O.preferredLanguage("en-US")}]);
 !function(){"use strict";var a=angular.module("translate.sub",[]);a.provider("$translate",[function(){var a=[],n="en-US";this.translations=function(e,s){angular.isDefined(e)&&angular.isDefined(s)&&(a[e]=angular.copy(s),n=e)},this.$get=[function(){return{instant:function(e){return angular.isDefined(e)&&angular.isDefined(a[n][e])?a[n][e]:""}}}]}]),a.filter("translate",["$translate",function(a){return function(n){return a.instant(n)}}]);var n;try{angular.module("pascalprecht.translate"),n=angular.module("dialogs.controllers",["ui.bootstrap.modal","pascalprecht.translate"])}catch(e){n=angular.module("dialogs.controllers",["ui.bootstrap.modal","translate.sub"])}n.controller("errorDialogCtrl",["$scope","$uibModalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_ERROR"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_ERROR_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-warning":"glyphicon glyphicon-warning-sign",a.close=function(){n.close(),a.$destroy()}}]),n.controller("waitDialogCtrl",["$scope","$uibModalInstance","$translate","$timeout","data",function(a,n,e,s,t){a.header=angular.isDefined(t.header)?t.header:e.instant("DIALOGS_PLEASE_WAIT_ELIPS"),a.msg=angular.isDefined(t.msg)?t.msg:e.instant("DIALOGS_PLEASE_WAIT_MSG"),a.progress=angular.isDefined(t.progress)?t.progress:100,a.icon=angular.isDefined(t.fa)&&angular.equals(t.fa,!0)?"fa fa-clock-o":"glyphicon glyphicon-time",a.$on("dialogs.wait.complete",function(){s(function(){n.close(),a.$destroy()})}),a.$on("dialogs.wait.message",function(n,e){a.msg=angular.isDefined(e.msg)?e.msg:a.msg}),a.$on("dialogs.wait.progress",function(n,e){a.msg=angular.isDefined(e.msg)?e.msg:a.msg,a.progress=angular.isDefined(e.progress)?e.progress:a.progress}),a.getProgress=function(){return{width:a.progress+"%"}}}]),n.controller("notifyDialogCtrl",["$scope","$uibModalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_NOTIFICATION"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_NOTIFICATION_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-info":"glyphicon glyphicon-info-sign",a.close=function(){n.close(),a.$destroy()}}]),n.controller("confirmDialogCtrl",["$scope","$uibModalInstance","$translate","data",function(a,n,e,s){a.header=angular.isDefined(s.header)?s.header:e.instant("DIALOGS_CONFIRMATION"),a.msg=angular.isDefined(s.msg)?s.msg:e.instant("DIALOGS_CONFIRMATION_MSG"),a.icon=angular.isDefined(s.fa)&&angular.equals(s.fa,!0)?"fa fa-check":"glyphicon glyphicon-check",a.no=function(){n.dismiss("no")},a.yes=function(){n.close("yes")}}]),angular.module("dialogs.services",["ui.bootstrap.modal","dialogs.controllers"]).provider("dialogs",[function(){var a=!0,n=!0,e="dialogs-default",s="dialogs-backdrop-default",t=!0,o=null,l="lg",r=!1,i=!1,d=function(t){var o={};return t=t||{},o.kb=angular.isDefined(t.keyboard)?!!t.keyboard:n,o.bd=angular.isDefined(t.backdrop)?t.backdrop:a,o.bdc=angular.isDefined(t.backdropClass)?t.backdropClass:s,o.ws=!angular.isDefined(t.size)||"sm"!==t.size&&"lg"!==t.size&&"md"!==t.size?l:t.size,o.wc=angular.isDefined(t.windowClass)?t.windowClass:e,o.anim=angular.isDefined(t.animation)?!!t.animation:r,o};this.useBackdrop=function(n){angular.isDefined(n)&&(a=n)},this.useEscClose=function(a){angular.isDefined(a)&&(n=angular.equals(a,0)||angular.equals(a,"false")||angular.equals(a,"no")||angular.equals(a,null)||angular.equals(a,!1)?!1:!0)},this.useClass=function(a){angular.isDefined(a)&&(e=a)},this.useCopy=function(a){angular.isDefined(a)&&(t=angular.equals(a,0)||angular.equals(a,"false")||angular.equals(a,"no")||angular.equals(a,null)||angular.equals(a,!1)?!1:!0)},this.setWindowTmpl=function(a){angular.isDefined(a)&&(o=a)},this.setSize=function(a){angular.isDefined(a)&&(l=angular.equals(a,"sm")||angular.equals(a,"lg")||angular.equals(a,"md")?a:l)},this.useAnimation=function(){r=!0},this.useFontAwesome=function(){i=!0},this.$get=["$uibModal",function(a){return{error:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/error.html",controller:"errorDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},wait:function(n,e,s,t){return t=d(t),a.open({templateUrl:"/dialogs/wait.html",controller:"waitDialogCtrl",backdrop:t.bd,backdropClass:t.bdc,keyboard:t.kb,windowClass:t.wc,size:t.ws,animation:t.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),progress:angular.copy(s),fa:i}}}})},notify:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/notify.html",controller:"notifyDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},confirm:function(n,e,s){return s=d(s),a.open({templateUrl:"/dialogs/confirm.html",controller:"confirmDialogCtrl",backdrop:s.bd,backdropClass:s.bdc,keyboard:s.kb,windowClass:s.wc,size:s.ws,animation:s.anim,resolve:{data:function(){return{header:angular.copy(n),msg:angular.copy(e),fa:i}}}})},create:function(n,e,s,o,l){var r=o&&angular.isDefined(o.copy)?o.copy:t;return o=d(o),a.open({templateUrl:n,controller:e,controllerAs:l,keyboard:o.kb,backdrop:o.bd,backdropClass:o.bdc,windowClass:o.wc,size:o.ws,animation:o.anim,resolve:{data:function(){return r?angular.copy(s):s}}})}}}]}]),angular.module("dialogs.main",["dialogs.services","ngSanitize"]).config(["$translateProvider","dialogsProvider",function(a,n){try{angular.module("pascalprecht.translate")}catch(e){a.translations("en-US",{DIALOGS_ERROR:"Error",DIALOGS_ERROR_MSG:"An unknown error has occurred.",DIALOGS_CLOSE:"Close",DIALOGS_PLEASE_WAIT:"Please Wait",DIALOGS_PLEASE_WAIT_ELIPS:"Please Wait...",DIALOGS_PLEASE_WAIT_MSG:"Waiting on operation to complete.",DIALOGS_PERCENT_COMPLETE:"% Complete",DIALOGS_NOTIFICATION:"Notification",DIALOGS_NOTIFICATION_MSG:"Unknown application notification.",DIALOGS_CONFIRMATION:"Confirmation",DIALOGS_CONFIRMATION_MSG:"Confirmation required.",DIALOGS_OK:"OK",DIALOGS_YES:"Yes",DIALOGS_NO:"No"})}try{var s=document.styleSheets;a:for(var t=s.length-1;t>=0;t--){var o=null,l=null;if(!s[t].disabled){if(null!==s[t].href&&(o=s[t].href.match(/font\-*awesome/i)),angular.isArray(o)){n.useFontAwesome();break}l=s[t].cssRules;for(var r=l.length-1;r>=0;r--)if("string"==typeof l[r].selectorText&&".fa"===l[r].selectorText.toLowerCase()){n.useFontAwesome();break a}}}}catch(e){}}]).run(["$templateCache","$interpolate",function(a,n){var e=n.startSymbol(),s=n.endSymbol();a.put("/dialogs/error.html",'<div class="modal-header dialog-header-error"><button type="button" class="close" ng-click="close()">&times;</button><h4 class="modal-title text-danger"><span class="'+e+"icon"+s+'"></span> <span ng-bind-html="header"></span></h4></div><div class="modal-body text-danger" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-default" ng-click="close()">'+e+'"DIALOGS_CLOSE" | translate'+s+"</button></div>"),a.put("/dialogs/wait.html",'<div class="modal-header dialog-header-wait"><h4 class="modal-title"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body"><p ng-bind-html="msg"></p><div class="progress progress-striped active"><div class="progress-bar progress-bar-info" ng-style="getProgress()"></div><span class="sr-only">'+e+"progress"+s+e+'"DIALOGS_PERCENT_COMPLETE" | translate'+s+"</span></div></div>"),a.put("/dialogs/notify.html",'<div class="modal-header dialog-header-notify"><button type="button" class="close" ng-click="close()" class="pull-right">&times;</button><h4 class="modal-title text-info"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body text-info" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-primary" ng-click="close()">'+e+'"DIALOGS_OK" | translate'+s+"</button></div>"),a.put("/dialogs/confirm.html",'<div class="modal-header dialog-header-confirm"><button type="button" class="close" ng-click="no()">&times;</button><h4 class="modal-title"><span class="'+e+"icon"+s+'"></span> '+e+"header"+s+'</h4></div><div class="modal-body" ng-bind-html="msg"></div><div class="modal-footer"><button type="button" class="btn btn-default" ng-click="yes()">'+e+'"DIALOGS_YES" | translate'+s+'</button><button type="button" class="btn btn-primary" ng-click="no()">'+e+'"DIALOGS_NO" | translate'+s+"</button></div>")}])}();
 /**
@@ -103802,24 +103794,24 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
           filters.push('type:' + _eventType);
         }
 
-        if (_raw) {
-          filters.push('(' + _raw + ')');
-        }
-
-        var filter = filters.join(' ');
-        var hasFixed = filter.search(/\bfixed:/i) !== -1;
-        var hasHidden = filter.search(/\bhidden:/i) !== -1;
-        if (!hasFixed || !hasHidden) {
+        var filter = _raw || '';
+        if (!filter || filter.trim() !== '*') {
+          var hasFixed = filter.search(/\bfixed:/i) !== -1;
           if (!hasFixed) {
-            filter += ' fixed:false';
+            filters.push('fixed:false');
           }
 
+          var hasHidden = filter.search(/\bhidden:/i) !== -1;
           if (!hasHidden) {
-            filter += ' hidden:false';
+            filters.push('hidden:false');
+          }
+
+          if (filter) {
+            filters.push('(' + filter + ')');
           }
         }
 
-        return filter.trim();
+        return filters.join(' ').trim();
       }
 
       function clearFilter() {
@@ -106058,7 +106050,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       });
 
       function validate(query) {
-        if (!query) {
+        if (!query || (query.trim && query.trim() === '*')) {
           var deferred = $q.defer();
           $timeout(function() {
             deferred.resolve({
