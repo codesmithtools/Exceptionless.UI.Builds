@@ -105234,7 +105234,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function demoteTab(id, name) {
-        return Restangular.one('projects', id).one('promotedtabs', name).remove();
+        return Restangular.one('projects', id).one('promotedtabs').remove({ name: name });
       }
 
       function getAll(options, useCache) {
@@ -105274,7 +105274,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function promoteTab(id, name) {
-        return Restangular.one('projects', id).one('promotedtabs', name).post();
+        return Restangular.one('projects', id).post('promotedtabs', null, { name: name });
       }
 
       function remove(id) {
@@ -105282,11 +105282,11 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function removeConfig(id, key) {
-        return Restangular.one('projects', id).one('config', key).remove();
+        return Restangular.one('projects', id).one('config').remove({ key: key });
       }
 
       function removeData(id, key) {
-        return Restangular.one('projects', id).one('data', key).remove();
+        return Restangular.one('projects', id).one('data').remove({ key: key });
       }
 
       function removeNotificationSettings(id, userId) {
@@ -105302,15 +105302,15 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function setConfig(id, key, value) {
-        return Restangular.one('projects', id).one('config', key).customPOST(value);
+        return Restangular.one('projects', id).post('config', value, { key: key });
       }
 
       function setData(id, key, value) {
-        return Restangular.one('projects', id).one('data', key).customPOST(value);
+        return Restangular.one('projects', id).post('data', value, { key: key });
       }
 
       function setNotificationSettings(id, userId, settings) {
-        return Restangular.one('users', userId).one('projects', id).one('notifications').customPOST(settings);
+        return Restangular.one('users', userId).one('projects', id).post('notifications', settings);
       }
 
       var service = {
