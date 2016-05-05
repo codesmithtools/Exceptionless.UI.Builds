@@ -88673,7 +88673,7 @@ if (typeof module !== 'undefined' && typeof exports !== 'undefined' && module.ex
 
 !function() {
   var d3 = {
-    version: "3.5.16"
+    version: "3.5.17"
   };
   var d3_arraySlice = [].slice, d3_array = function(list) {
     return d3_arraySlice.call(list);
@@ -92198,7 +92198,7 @@ if (typeof module !== 'undefined' && typeof exports !== 'undefined' && module.ex
         λ0 = λ, sinφ0 = sinφ, cosφ0 = cosφ, point0 = point;
       }
     }
-    return (polarAngle < -ε || polarAngle < ε && d3_geo_areaRingSum < 0) ^ winding & 1;
+    return (polarAngle < -ε || polarAngle < ε && d3_geo_areaRingSum < -ε) ^ winding & 1;
   }
   function d3_geo_clipCircle(radius) {
     var cr = Math.cos(radius), smallRadius = cr > 0, notHemisphere = abs(cr) > ε, interpolate = d3_geo_circleInterpolate(radius, 6 * d3_radians);
@@ -102412,12 +102412,15 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
     'app.stack',
     'app.status'
   ])
-  .config(['$locationProvider', '$stateProvider', '$uiViewScrollProvider', '$urlRouterProvider', '$analyticsProvider', 'dialogsProvider', 'gravatarServiceProvider', 'RestangularProvider', 'BASE_URL', 'EXCEPTIONLESS_API_KEY', '$ExceptionlessClient', 'stripeProvider', 'STRIPE_PUBLISHABLE_KEY', 'USE_HTML5_MODE', function ($locationProvider, $stateProvider, $uiViewScrollProvider, $urlRouterProvider, $analyticsProvider, dialogsProvider, gravatarServiceProvider, RestangularProvider, BASE_URL, EXCEPTIONLESS_API_KEY, $ExceptionlessClient, stripeProvider, STRIPE_PUBLISHABLE_KEY, USE_HTML5_MODE) {
+  .config(['$compileProvider', '$httpProvider', '$locationProvider', '$stateProvider', '$uiViewScrollProvider', '$urlRouterProvider', '$analyticsProvider', 'dialogsProvider', 'gravatarServiceProvider', 'RestangularProvider', 'BASE_URL', 'EXCEPTIONLESS_API_KEY', '$ExceptionlessClient', 'stripeProvider', 'STRIPE_PUBLISHABLE_KEY', 'USE_HTML5_MODE', function ($compileProvider, $httpProvider, $locationProvider, $stateProvider, $uiViewScrollProvider, $urlRouterProvider, $analyticsProvider, dialogsProvider, gravatarServiceProvider, RestangularProvider, BASE_URL, EXCEPTIONLESS_API_KEY, $ExceptionlessClient, stripeProvider, STRIPE_PUBLISHABLE_KEY, USE_HTML5_MODE) {
     function setRouteFilter(filterService, organizationId, projectId, type) {
       filterService.setOrganizationId(organizationId, true);
       filterService.setProjectId(projectId, true);
       filterService.setEventType(type, true);
     }
+
+    $compileProvider.debugInfoEnabled(false);
+    $httpProvider.useApplyAsync(true);
 
     if (EXCEPTIONLESS_API_KEY) {
       var config = $ExceptionlessClient.config;
