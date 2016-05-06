@@ -82180,7 +82180,7 @@ angular.module('checklist-model', [])
  * Mousetrap is a simple keyboard shortcut library for Javascript with
  * no external dependencies
  *
- * @version 1.5.2
+ * @version 1.5.3
  * @url craig.is/killing/mice
  */
 (function(window, document, undefined) {
@@ -82382,12 +82382,25 @@ angular.module('checklist-model', [])
     /**
      * checks if two arrays are equal
      *
-     * @param {Array} modifiers1
-     * @param {Array} modifiers2
+     * @param {Array} arr1
+     * @param {Array} arr2
      * @returns {boolean}
      */
-    function _modifiersMatch(modifiers1, modifiers2) {
-        return modifiers1.sort().join(',') === modifiers2.sort().join(',');
+    function _modifiersMatch(arr1, arr2) {
+        var i,
+            len = arr1.length;
+
+        if (len !== arr2.length) {
+            return false;
+        }
+        arr1 = arr1.sort();
+        arr2 = arr2.sort();
+        for (i = 0; i < len; i++) {
+            if (arr1[i] !== arr2[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -108097,6 +108110,100 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       var _store = locker.driver('local').namespace('app');
       var vm = this;
 
+      function addHotkeys() {
+        function logFeatureUsage(name) {
+          $ExceptionlessClient.createFeatureUsage(source + '.hotkeys' + name).addTags('hotkeys').submit();
+        }
+
+        if (isIntercomEnabled()) {
+          hotkeys.bindTo($scope)
+            .add({
+              combo: 'c',
+              description: 'Chat with Support',
+              callback: function chatWithSupport() {
+                logFeatureUsage('Support');
+                showIntercom();
+              }
+            });
+        }
+
+        hotkeys.bindTo($scope)
+          .add({
+            combo: 'g w',
+            description: 'Go to Documentation',
+            callback: function goToDocumention() {
+              logFeatureUsage('Documentation');
+              $window.open('https://github.com/exceptionless/Exceptionless/wiki', '_blank');
+            }
+          })
+          .add({
+            combo: 's',
+            description: 'Focus Search Bar',
+            callback: function focusSearchBar(event) {
+              event.preventDefault();
+
+              logFeatureUsage('SearchBar');
+              $('#search').focus().select();
+            }
+          })
+          .add({
+            combo: 'g a',
+            description: 'Go to My Account',
+            callback: function goToMyAccount() {
+              logFeatureUsage('Account');
+              $state.go('app.account.manage', { tab: 'general' });
+            }
+          })
+          .add({
+            combo: 'g n',
+            description: 'Go to Notifications',
+            callback: function goToNotifications() {
+              logFeatureUsage('Notifications');
+              $state.go('app.account.manage', { tab: 'notifications' });
+            }
+          })
+          .add({
+            combo: 'g d',
+            description: 'Go to Dashboard',
+            callback: function goToDashboard() {
+              logFeatureUsage('Dashboard');
+              $window.open(getDashboardUrl(), '_self');
+            }
+          })
+          .add({
+            combo: 'g o',
+            description: 'Go to Organizations',
+            callback: function goToOrganizations() {
+              logFeatureUsage('Organizations');
+              $state.go('app.organization.list');
+            }
+          })
+          .add({
+            combo: 'g p',
+            description: 'Go to Projects',
+            callback: function goToProjects() {
+              logFeatureUsage('Projects');
+              $state.go('app.project.list');
+            }
+          })
+          .add({
+            combo: 'g+g',
+            description: 'Go to GitHub project',
+            callback: function goToGitHub() {
+              logFeatureUsage('GitHub');
+              $window.open('https://github.com/exceptionless/Exceptionless', '_blank');
+            }
+          })
+          .add({
+            combo: 'g s',
+            description: 'Go to public slack channel',
+            callback: function goToSlack() {
+              logFeatureUsage('Slack');
+              $window.open('http://slack.exceptionless.com', '_blank');
+            }
+          });
+      }
+
       function canChangePlan() {
         return !!STRIPE_PUBLISHABLE_KEY && vm.organizations && vm.organizations.length > 0;
       }
@@ -108234,6 +108341,10 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       }
 
       function showIntercom() {
+        if (!isIntercomEnabled()) {
+          return;
+        }
+
         $ExceptionlessClient.submitFeatureUsage(source + '.showIntercom');
         $intercom.showNewMessage();
       }
@@ -108242,16 +108353,6 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         vm.isSideNavCollapsed = !vm.isSideNavCollapsed;
         _store.put('sideNavCollapsed', vm.isSideNavCollapsed);
       }
-
-      hotkeys.bindTo($scope)
-        .add({
-          combo: 'f1',
-          description: 'Documentation',
-          callback: function openDocumention() {
-            $ExceptionlessClient.createFeatureUsage(source + '.hotkeys.Documentation').addTags('hotkeys').submit();
-            $window.open('https://github.com/exceptionless/Exceptionless/wiki', '_blank');
-          }
-        });
 
       $scope.$on('$destroy', signalRService.stop);
 
@@ -108279,6 +108380,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
       vm.toggleSideNavCollapsed = toggleSideNavCollapsed;
       vm.user = {};
 
+      addHotkeys();
       getUser().then(getOrganizations).then(startSignalR);
     }]);
 }());
@@ -111768,6 +111870,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.stack', [
+    'cfp.hotkeys',
     'ngMessages',
     'ui.bootstrap',
     'ui.router',
@@ -111814,10 +111917,82 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
   'use strict';
 
   angular.module('app.stack')
-    .controller('Stack', ['$ExceptionlessClient', '$filter', '$state', '$stateParams', 'billingService', 'dialogs', 'dialogService', 'eventService', 'filterService', 'notificationService', 'projectService', 'stackService', 'statService', function ($ExceptionlessClient, $filter, $state, $stateParams, billingService, dialogs, dialogService, eventService, filterService, notificationService, projectService, stackService, statService) {
+    .controller('Stack', ['$scope', '$ExceptionlessClient', '$filter', 'hotkeys', '$state', '$stateParams', 'billingService', 'dialogs', 'dialogService', 'eventService', 'filterService', 'notificationService', 'projectService', 'stackService', 'statService', function ($scope, $ExceptionlessClient, $filter, hotkeys, $state, $stateParams, billingService, dialogs, dialogService, eventService, filterService, notificationService, projectService, stackService, statService) {
       var source = 'app.stack.Stack';
       var _stackId = $stateParams.id;
       var vm = this;
+
+      function addHotkeys() {
+        function logFeatureUsage(name) {
+          $ExceptionlessClient.createFeatureUsage(source + '.hotkeys' + name).addTags('hotkeys').submit();
+        }
+
+        hotkeys.del('shift+h');
+        hotkeys.del('shift+f');
+        hotkeys.del('shift+c');
+        hotkeys.del('shift+m');
+        hotkeys.del('shift+p');
+        hotkeys.del('shift+r');
+        hotkeys.del('shift+Fbackspace');
+
+        hotkeys.bindTo($scope)
+          .add({
+            combo: 'shift+h',
+            description: vm.isHidden() ? 'Mark Stack Unhidden' : 'Mark Stack Hidden',
+            callback: function markHidden() {
+              logFeatureUsage('Hidden');
+              vm.updateIsHidden();
+            }
+          })
+          .add({
+            combo: 'shift+f',
+            description: vm.isFixed() ? 'Mark Stack Not fixed' : 'Mark Stack Fixed',
+            callback: function markFixed() {
+              logFeatureUsage('Fixed');
+              vm.updateIsFixed();
+            }
+          })
+          .add({
+            combo: 'shift+c',
+            description: vm.isCritical() ? 'Future Stack Occurrences are Not Critical' : 'Future Stack Occurrences are Critical',
+            callback: function markCritical() {
+              logFeatureUsage('Critical');
+              vm.updateIsCritical();
+            }
+          })
+          .add({
+            combo: 'shift+m',
+            description: vm.notificationsDisabled() ? 'Enable Stack Notifications' : 'Disable Stack Notifications',
+            callback: function updateNotifications() {
+              logFeatureUsage('Notifications');
+              vm.updateNotifications();
+            }
+          })
+          .add({
+            combo: 'shift+p',
+            description: 'Promote Stack To External',
+            callback: function promote() {
+              logFeatureUsage('Promote');
+              vm.promoteToExternal();
+            }
+          })
+          .add({
+            combo: 'shift+r',
+            description: 'Add Stack Reference Link',
+            callback: function addReferenceLink() {
+              logFeatureUsage('Reference');
+              vm.addReferenceLink();
+            }
+          })
+          .add({
+            combo: 'shift+backspace',
+            description: 'Delete Stack',
+            callback: function deleteStack() {
+              logFeatureUsage('Delete');
+              vm.remove();
+            }
+          });
+      }
 
       function addReferenceLink() {
         $ExceptionlessClient.submitFeatureUsage(source + '.addReferenceLink');
@@ -111883,6 +112058,7 @@ Rickshaw.Series.FixedDuration = Rickshaw.Class.create(Rickshaw.Series, {
         function onSuccess(response) {
           vm.stack = response.data.plain();
           vm.stack.references = vm.stack.references || [];
+          addHotkeys();
         }
 
         function onFailure(response) {
@@ -112396,7 +112572,7 @@ angular.module('app').run(['$templateCache', function($templateCache) {
   'use strict';
 
   $templateCache.put('app/account/manage.tpl.html',
-    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\" active=\"vm.activeTabIndex\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"img-thumbnail\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\" autofocus> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
+    "<div class=\"hbox hbox-auto-xs hbox-auto-sm\"> <div class=\"col\" refresh-on=\"UserChanged ProjectChanged\" refresh-action=\"vm.get(data)\" refresh-debounce=\"1000\"> <div class=\"wrapper-md\"> <div class=\"panel panel-default\"> <div class=\"panel-heading\"><i class=\"fa fa-user\"></i> My Account</div> <div class=\"panel-body m-b-n\"> <uib-tabset class=\"tab-container\" active=\"vm.activeTabIndex\"> <uib-tab heading=\"General\"> <form name=\"fullNameForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <img gravatar-src=\"vm.user.email_address\" gravatar-size=\"100\" alt=\"{{vm.user.full_name}}\" class=\"img-thumbnail\"> <div> <small> Your avatar is generated by requesting a <a href=\"https://gravatar.com\" target=\"_blank\">Gravatar image</a> with the email address below. </small> </div> </div> <div class=\"form-group\"> <label for=\"name\">Full Name</label> <input id=\"name\" name=\"name\" type=\"text\" class=\"form-control\" x-autocompletetype=\"full-name\" autocapitalize=\"words\" autocorrect=\"off\" spellcheck placeholder=\"Your first and last name\" ng-model=\"vm.user.full_name\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveUser(fullNameForm.$valid)\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"fullNameForm.name.$error\" ng-if=\"fullNameForm.$submitted || fullNameForm.name.$touched\"> <small ng-message=\"required\">Full Name is required.</small> </div> </div> </form> <form name=\"vm.emailAddressForm\" role=\"form\" class=\"form-validation\" autocomplete=\"on\"> <div class=\"form-group\"> <label for=\"email\">Email Address</label> <div ng-class=\"{'input-group': vm.emailAddressForm.$pending }\"> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-control\" x-autocompletetype=\"email\" autocorrect=\"off\" spellcheck placeholder=\"Email Address\" ng-model=\"vm.user.email_address\" ng-model-options=\"{ debounce: 1000 }\" ng-change=\"vm.saveEmailAddress()\" email-address-available-validator required> <span class=\"input-group-addon\" ng-if=\"vm.emailAddressForm.$pending\"> <i class=\"fa fa-fw fa-spinner fa-spin\"></i> </span> </div> <div class=\"error\" ng-messages=\"vm.emailAddressForm.email.$error\" ng-if=\"vm.emailAddressForm.$submitted || vm.emailAddressForm.email.$touched\"> <small ng-message=\"required\">Email Address is required.</small> <small ng-message=\"email\">Email Address is required.</small> <small ng-message=\"unique\">A user already exists with this email address.</small> </div> <p ng-if=\"!vm.user.is_email_address_verified\" class=\"help-block\"> Email not verified. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email. </p> </div> </form> </uib-tab> <uib-tab heading=\"Notifications\"> <form role=\"form\" class=\"form-validation\"> <div class=\"alert in fade alert-danger\" ng-if=\"!vm.user.is_email_address_verified || !vm.user.email_notifications_enabled\"> Email notifications are currently disabled. <span ng-if=\"!vm.user.is_email_address_verified\">To enable email notifications you must first verify your email address. <a ng-click=\"vm.resendVerificationEmail()\">Resend</a> verification email.</span> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.user.email_notifications_enabled\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEnableEmailNotification()\"> <i></i> Enable email notifications </label> </div> <div ng-if=\"vm.hasProjects()\"> <hr> <p>Choose how often you want to receive notifications for event occurrences in this project.</p> <select class=\"form-control\" ng-model=\"vm.currentProject\" ng-change=\"vm.getEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\" ng-options=\"project.name group by project.organization_name for project in vm.projects | orderBy: 'name' track by project.id\"></select> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.send_daily_summary\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasEmailNotifications()\"> <i></i> Send daily project summary </label> </div> <hr ng-if=\"!vm.hasPremiumFeatures()\"> <div class=\"alert in fade alert-success\" ng-if=\"!vm.hasPremiumFeatures()\"> <a ng-click=\"vm.showChangePlanDialog()\">Upgrade now</a> to enable occurrence level notifications! </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_errors\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical errors </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_event_regressions\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on error regressions </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_new_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on new events </label> </div> <div class=\"checkbox\"> <label class=\"i-checks\"> <input type=\"checkbox\" ng-model=\"vm.emailNotificationSettings.report_critical_events\" ng-model-options=\"{ debounce: 500 }\" ng-change=\"vm.saveEmailNotificationSettings()\" ng-disabled=\"!vm.hasPremiumEmailNotifications()\"> <i></i> Notify me on critical events </label> </div> </div> </form> </uib-tab> <uib-tab heading=\"Password\"> <form name=\"vm.passwordForm\" role=\"form\" class=\"form-validation\"> <div class=\"form-group\" ng-if=\"vm.hasLocalAccount()\"> <label for=\"current\">Current Password</label> <input id=\"current\" name=\"current\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.current_password\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.current.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.current.$touched\"> <small ng-message=\"required\">Current Password is required.</small> </div> </div> <div class=\"form-group\"> <label for=\"newPassword\">New Password</label> <input id=\"newPassword\" name=\"newPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" required> <div class=\"error\" ng-messages=\"vm.passwordForm.newPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.newPassword.$touched\"> <small ng-message=\"required\">New Password is required.</small> <small ng-message=\"minlength\">New Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">New Password must be less than 101 characters long.</small> </div> </div> <div class=\"form-group\"> <label for=\"confirmPassword\">Confirm password</label> <input id=\"confirmPassword\" name=\"confirmPassword\" type=\"password\" class=\"form-control\" ng-model=\"vm.password.confirm_password\" match=\"vm.password.password\" ng-minlength=\"6\" ng-maxlength=\"100\" ng-required=\"true\"> <div class=\"error\" ng-messages=\"vm.passwordForm.confirmPassword.$error\" ng-if=\"vm.passwordForm.$submitted || vm.passwordForm.confirmPassword.$touched\"> <small ng-message=\"match\">New Password and Confirmation Password fields do not match.</small> <small ng-message=\"required\">Confirm Password is required.</small> <small ng-message=\"minlength\">Confirm Password must be at least 6 characters long.</small> <small ng-message=\"maxlength\">Confirm Password must be less than 101 characters long.</small> </div> </div> <button type=\"submit\" role=\"button\" class=\"btn btn-primary\" promise-button=\"vm.changePassword(vm.passwordForm.$valid)\" promise-button-busy-text=\"{{vm.hasLocalAccount() ? 'Changing Password' : 'Setting Password'}}\">{{vm.hasLocalAccount() ? 'Change Password' : 'Set Password'}}</button> </form> </uib-tab> <uib-tab heading=\"External Logins\" ng-if=\"vm.isExternalLoginEnabled()\"> <h4>Add an external login</h4> <div> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('live')\" ng-if=\"vm.isExternalLoginEnabled('live')\" class=\"btn btn-large image-button icon-login-microsoft\" title=\"Log in using your Microsoft account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('google')\" ng-if=\"vm.isExternalLoginEnabled('google')\" class=\"btn btn-large image-button icon-login-google\" title=\"Log in using your Google account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('facebook')\" ng-if=\"vm.isExternalLoginEnabled('facebook')\" class=\"btn btn-large image-button icon-login-facebook\" title=\"Log in using your Facebook account\"></button> <button type=\"button\" role=\"button\" ng-click=\"vm.authenticate('github')\" ng-if=\"vm.isExternalLoginEnabled('github')\" class=\"btn btn-large image-button icon-login-github\" title=\"Log in using your GitHub account\"></button> </div> <h4>Existing external logins</h4> <div class=\"table-responsive\"> <table class=\"table table-striped table-bordered table-fixed b-t\"> <thead> <tr> <th>Name</th> <th class=\"action\">Actions</th> </tr> </thead> <tbody> <tr ng-repeat=\"account in vm.user.o_auth_accounts\" ng-if=\"vm.hasOAuthAccounts()\"> <td>{{::account.provider}} ({{::account.username || account.provider_user_id}})</td> <td> <button type=\"button\" role=\"button\" class=\"btn btn-sm\" title=\"Remove\" ng-disabled=\"!vm.canRemoveOAuthAccount()\" ng-click=\"vm.unlink(account)\"> <i class=\"fa fa-times\"></i> </button> </td> </tr> <tr ng-if=\"!vm.hasOAuthAccounts()\"> <td colspan=\"2\"> <strong>No external logins were found.</strong> </td> </tr> </tbody> </table> </div> </uib-tab> </uib-tabset> </div> <footer class=\"panel-footer\"> <div class=\"pull-right\"> <div ng-if=\"!vm.currentProject.id\"> <a ui-sref=\"app.dashboard\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> <div ng-if=\"vm.currentProject.id\"> <a ui-sref=\"app.project-dashboard({ projectId: vm.currentProject.id })\" class=\"btn btn-default\" role=\"button\">Go To Dashboard</a> </div> </div> <div class=\"clearfix\"></div> </footer> </div> </div> </div> </div>"
   );
 
 
