@@ -7060,6 +7060,28 @@ var __extends = (this && this.__extends) || function (d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var TraceKit = require('TraceKit');
+var SubmissionResponse = (function () {
+    function SubmissionResponse(statusCode, message) {
+        this.success = false;
+        this.badRequest = false;
+        this.serviceUnavailable = false;
+        this.paymentRequired = false;
+        this.unableToAuthenticate = false;
+        this.notFound = false;
+        this.requestEntityTooLarge = false;
+        this.statusCode = statusCode;
+        this.message = message;
+        this.success = statusCode >= 200 && statusCode <= 299;
+        this.badRequest = statusCode === 400;
+        this.serviceUnavailable = statusCode === 503;
+        this.paymentRequired = statusCode === 402;
+        this.unableToAuthenticate = statusCode === 401 || statusCode === 403;
+        this.notFound = statusCode === 404;
+        this.requestEntityTooLarge = statusCode === 413;
+    }
+    return SubmissionResponse;
+}());
+exports.SubmissionResponse = SubmissionResponse;
 var SettingsManager = (function () {
     function SettingsManager() {
     }
@@ -7071,7 +7093,7 @@ var SettingsManager = (function () {
             return;
         }
         var savedSettings = this.getSavedServerSettings(config);
-        config.log.info('Applying saved settings.');
+        config.log.info("Applying saved settings: v" + savedSettings.version);
         config.settings = Utils.merge(config.settings, savedSettings.settings);
         this.changed(config);
     };
@@ -7095,15 +7117,18 @@ var SettingsManager = (function () {
         if (!config) {
             return;
         }
+        var unableToUpdateMessage = 'Unable to update settings';
         if (!config.isValid) {
-            config.log.error('Unable to update settings: ApiKey is not set.');
+            config.log.error(unableToUpdateMessage + ": ApiKey is not set.");
             return;
         }
         if (!version || version < 0) {
             version = this.getVersion(config);
         }
+        config.log.info("Checking for updated settings from: v" + version + ".");
         config.submissionClient.getSettings(config, version, function (response) {
             if (!config || !response || !response.success || !response.settings) {
+                config.log.warn(unableToUpdateMessage + ": " + response.message);
                 return;
             }
             config.settings = Utils.merge(config.settings, response.settings);
@@ -7119,14 +7144,19 @@ var SettingsManager = (function () {
                 settings: response.settings
             };
             config.storage.settings.save(newSettings);
-            config.log.info('Updated settings');
+            config.log.info("Updated settings: v" + newSettings.version);
             _this.changed(config);
         });
     };
     SettingsManager.changed = function (config) {
         var handlers = this._handlers;
         for (var index = 0; index < handlers.length; index++) {
-            handlers[index](config);
+            try {
+                handlers[index](config);
+            }
+            catch (ex) {
+                config.log.error("Error calling onChanged handler: " + ex);
+            }
         }
     };
     SettingsManager.getSavedServerSettings = function (config) {
@@ -7278,6 +7308,7 @@ var ReferenceIdPlugin = (function () {
 exports.ReferenceIdPlugin = ReferenceIdPlugin;
 var DefaultEventQueue = (function () {
     function DefaultEventQueue(config) {
+        this._handlers = [];
         this._processingQueue = false;
         this._config = config;
     }
@@ -7335,6 +7366,7 @@ var DefaultEventQueue = (function () {
             log.info("Sending " + events_1.length + " events to " + config.serverUrl + ".");
             config.submissionClient.postEvents(events_1.map(function (e) { return e.value; }), config, function (response) {
                 _this.processSubmissionResponse(response, events_1);
+                _this.eventsPosted(events_1.map(function (e) { return e.value; }), response);
                 log.info('Finished processing queue.');
                 _this._processingQueue = false;
             }, isAppExiting);
@@ -7357,6 +7389,20 @@ var DefaultEventQueue = (function () {
         }
         if (clearQueue) {
             config.storage.queue.clear();
+        }
+    };
+    DefaultEventQueue.prototype.onEventsPosted = function (handler) {
+        !!handler && this._handlers.push(handler);
+    };
+    DefaultEventQueue.prototype.eventsPosted = function (events, response) {
+        var handlers = this._handlers;
+        for (var index = 0; index < handlers.length; index++) {
+            try {
+                handlers[index](events, response);
+            }
+            catch (ex) {
+                this._config.log.error("Error calling onEventsPosted handler: " + ex);
+            }
         }
     };
     DefaultEventQueue.prototype.areQueuedItemsDiscarded = function () {
@@ -7678,6 +7724,25 @@ var Utils = (function () {
         }
         return stringifyImpl(data, exclusions);
     };
+    Utils.toBoolean = function (input, defaultValue) {
+        if (defaultValue === void 0) { defaultValue = false; }
+        if (typeof input === 'boolean') {
+            return input;
+        }
+        if (input === null || typeof input !== 'number' && typeof input !== 'string') {
+            return defaultValue;
+        }
+        switch ((input + '').toLowerCase().trim()) {
+            case 'true':
+            case 'yes':
+            case '1': return true;
+            case 'false':
+            case 'no':
+            case '0':
+            case null: return false;
+        }
+        return defaultValue;
+    };
     return Utils;
 }());
 exports.Utils = Utils;
@@ -7689,6 +7754,7 @@ var Configuration = (function () {
         this.lastReferenceIdManager = new DefaultLastReferenceIdManager();
         this.settings = {};
         this._plugins = [];
+        this._handlers = [];
         this._serverUrl = 'https://collector.exceptionless.io';
         this._heartbeatServerUrl = 'https://heartbeat.exceptionless.io';
         this._updateSettingsWhenIdleInterval = 120000;
@@ -7702,6 +7768,7 @@ var Configuration = (function () {
         this.apiKey = configSettings.apiKey;
         this.serverUrl = configSettings.serverUrl;
         this.heartbeatServerUrl = configSettings.heartbeatServerUrl;
+        this.updateSettingsWhenIdleInterval = configSettings.updateSettingsWhenIdleInterval;
         this.environmentInfoCollector = inject(configSettings.environmentInfoCollector);
         this.errorParser = inject(configSettings.errorParser);
         this.lastReferenceIdManager = inject(configSettings.lastReferenceIdManager) || new DefaultLastReferenceIdManager();
@@ -7722,6 +7789,7 @@ var Configuration = (function () {
         set: function (value) {
             this._apiKey = value || null;
             this.log.info("apiKey: " + this._apiKey);
+            this.changed();
         },
         enumerable: true,
         configurable: true
@@ -7742,6 +7810,7 @@ var Configuration = (function () {
                 this._serverUrl = value;
                 this._heartbeatServerUrl = value;
                 this.log.info("serverUrl: " + value);
+                this.changed();
             }
         },
         enumerable: true,
@@ -7755,6 +7824,7 @@ var Configuration = (function () {
             if (!!value) {
                 this._heartbeatServerUrl = value;
                 this.log.info("heartbeatServerUrl: " + value);
+                this.changed();
             }
         },
         enumerable: true,
@@ -7765,14 +7835,18 @@ var Configuration = (function () {
             return this._updateSettingsWhenIdleInterval;
         },
         set: function (value) {
-            if (value > 0 && value < 15000) {
-                value = 15000;
+            if (typeof value !== 'number') {
+                return;
             }
-            else if (value <= 0) {
+            if (value <= 0) {
                 value = -1;
+            }
+            else if (value > 0 && value < 15000) {
+                value = 15000;
             }
             this._updateSettingsWhenIdleInterval = value;
             this.log.info("updateSettingsWhenIdleInterval: " + value);
+            this.changed();
         },
         enumerable: true,
         configurable: true
@@ -7892,6 +7966,20 @@ var Configuration = (function () {
     };
     Configuration.prototype.useDebugLogger = function () {
         this.log = new ConsoleLog();
+    };
+    Configuration.prototype.onChanged = function (handler) {
+        !!handler && this._handlers.push(handler);
+    };
+    Configuration.prototype.changed = function () {
+        var handlers = this._handlers;
+        for (var index = 0; index < handlers.length; index++) {
+            try {
+                handlers[index](this);
+            }
+            catch (ex) {
+                this.log.error("Error calling onChanged handler: " + ex);
+            }
+        }
     };
     Object.defineProperty(Configuration, "defaults", {
         get: function () {
@@ -8096,28 +8184,6 @@ var ContextData = (function () {
     return ContextData;
 }());
 exports.ContextData = ContextData;
-var SubmissionResponse = (function () {
-    function SubmissionResponse(statusCode, message) {
-        this.success = false;
-        this.badRequest = false;
-        this.serviceUnavailable = false;
-        this.paymentRequired = false;
-        this.unableToAuthenticate = false;
-        this.notFound = false;
-        this.requestEntityTooLarge = false;
-        this.statusCode = statusCode;
-        this.message = message;
-        this.success = statusCode >= 200 && statusCode <= 299;
-        this.badRequest = statusCode === 400;
-        this.serviceUnavailable = statusCode === 503;
-        this.paymentRequired = statusCode === 402;
-        this.unableToAuthenticate = statusCode === 401 || statusCode === 403;
-        this.notFound = statusCode === 404;
-        this.requestEntityTooLarge = statusCode === 413;
-    }
-    return SubmissionResponse;
-}());
-exports.SubmissionResponse = SubmissionResponse;
 var ExceptionlessClient = (function () {
     function ExceptionlessClient(settingsOrApiKey, serverUrl) {
         var _this = this;
@@ -8127,12 +8193,9 @@ var ExceptionlessClient = (function () {
         else {
             this.config = new Configuration({ apiKey: settingsOrApiKey, serverUrl: serverUrl });
         }
-        var interval = this.config.updateSettingsWhenIdleInterval;
-        if (interval > 0) {
-            var updateSettings_1 = function () { return SettingsManager.updateSettings(_this.config); };
-            this._timeoutId = setTimeout(updateSettings_1, 5000);
-            this._intervalId = setInterval(function () { return updateSettings_1; }, interval);
-        }
+        this.updateSettingsTimer(5000);
+        this.config.onChanged(function (config) { return _this.updateSettingsTimer(_this._timeoutId > 0 ? 5000 : 0); });
+        this.config.queue.onEventsPosted(function (events, response) { return _this.updateSettingsTimer(); });
     }
     ExceptionlessClient.prototype.createException = function (exception) {
         var pluginContextData = new ContextData();
@@ -8223,8 +8286,7 @@ var ExceptionlessClient = (function () {
             event.tags = [];
         }
         EventPluginManager.run(context, function (ctx) {
-            var client = ctx.client;
-            var config = client.config;
+            var config = ctx.client.config;
             var ev = ctx.event;
             if (!ctx.cancelled) {
                 if (!ev.type || ev.type.length === 0) {
@@ -8238,12 +8300,6 @@ var ExceptionlessClient = (function () {
                     ctx.log.info("Setting last reference id '" + ev.reference_id + "'");
                     config.lastReferenceIdManager.setLast(ev.reference_id);
                 }
-            }
-            clearTimeout(client._timeoutId);
-            clearInterval(client._intervalId);
-            var interval = config.updateSettingsWhenIdleInterval;
-            if (interval > 0) {
-                client._intervalId = setInterval(function () { return SettingsManager.updateSettings(config); }, interval);
             }
             !!callback && callback(ctx);
         });
@@ -8263,6 +8319,20 @@ var ExceptionlessClient = (function () {
     };
     ExceptionlessClient.prototype.getLastReferenceId = function () {
         return this.config.lastReferenceIdManager.getLast();
+    };
+    ExceptionlessClient.prototype.updateSettingsTimer = function (initialDelay) {
+        var _this = this;
+        this.config.log.info("Updating settings timer with delay: " + initialDelay);
+        this._timeoutId = clearTimeout(this._timeoutId);
+        this._timeoutId = clearInterval(this._intervalId);
+        var interval = this.config.updateSettingsWhenIdleInterval;
+        if (interval > 0) {
+            var updateSettings = function () { return SettingsManager.updateSettings(_this.config); };
+            if (initialDelay > 0) {
+                this._timeoutId = setTimeout(updateSettings, initialDelay);
+            }
+            this._intervalId = setInterval(updateSettings, interval);
+        }
     };
     Object.defineProperty(ExceptionlessClient, "default", {
         get: function () {
@@ -8512,24 +8582,27 @@ var EventExclusionPlugin = (function () {
             if (!type) {
                 return defaultValue;
             }
+            var isLog = type === 'log';
             var sourcePrefix = "@@" + type + ":";
-            if (settings[sourcePrefix + source]) {
-                return settings[sourcePrefix + source];
+            var value = settings[sourcePrefix + source];
+            if (value) {
+                return !isLog ? Utils.toBoolean(value) : value;
             }
             for (var key in settings) {
                 if (Utils.startsWith(key.toLowerCase(), sourcePrefix.toLowerCase()) && Utils.isMatch(source, [key.substring(sourcePrefix.length)])) {
-                    return settings[key];
+                    return !isLog ? Utils.toBoolean(settings[key]) : settings[key];
                 }
             }
             return defaultValue;
         }
         var ev = context.event;
+        var log = context.log;
         var settings = context.client.config.settings;
         if (ev.type === 'log') {
             var minLogLevel = getMinLogLevel(settings, ev.source);
             var logLevel = getLogLevel(ev.data['@level']);
             if (logLevel >= 0 && (logLevel > 5 || logLevel < minLogLevel)) {
-                context.log.info('Cancelling log event due to minimum log level.');
+                log.info('Cancelling log event due to minimum log level.');
                 context.cancelled = true;
             }
         }
@@ -8537,14 +8610,14 @@ var EventExclusionPlugin = (function () {
             var error = ev.data['@error'];
             while (!context.cancelled && error) {
                 if (getTypeAndSourceSetting(settings, ev.type, error.type, true) === false) {
-                    context.log.info("Cancelling error from excluded exception type: " + error.type);
+                    log.info("Cancelling error from excluded exception type: " + error.type);
                     context.cancelled = true;
                 }
                 error = error.inner;
             }
         }
         else if (getTypeAndSourceSetting(settings, ev.type, ev.source, true) === false) {
-            context.log.info("Cancelling event from excluded type: " + ev.type + " and source: " + ev.source);
+            log.info("Cancelling event from excluded type: " + ev.type + " and source: " + ev.source);
             context.cancelled = true;
         }
         next && next();
@@ -8992,6 +9065,7 @@ Configuration.prototype.useLocalStorage = function () {
     if (BrowserStorage.isAvailable()) {
         this.storage = new BrowserStorageProvider();
         SettingsManager.applySavedServerSettings(this);
+        this.changed();
     }
 };
 var defaults = Configuration.defaults;
