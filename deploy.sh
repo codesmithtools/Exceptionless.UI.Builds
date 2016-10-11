@@ -68,6 +68,8 @@ echo Updating configuration settings.
 
 cd "$DEPLOYMENT_SOURCE/app_data/jobs/triggered/config"
 npm install
+exitWithMessageOnError "Error installing packages"
+  
 node ./run.js
 
 echo Deploying site content.
