@@ -94,15 +94,13 @@ if [[ ! -n "$KUDU_SYNC_CMD" ]]; then
   fi
 fi
 
-selectNodeVersion
-
 echo Updating configuration settings.
 
 cd "$DEPLOYMENT_SOURCE/app_data/jobs/triggered/config"
-eval $NPM_CMD install
+npm install
 exitWithMessageOnError "Error installing packages"
   
-eval $NODE_EXE ./run.js
+node ./run.js
 
 echo Deploying site content.
 
