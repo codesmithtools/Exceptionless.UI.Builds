@@ -67,8 +67,6 @@ fi
 echo Updating configuration settings.
 
 cd "$DEPLOYMENT_SOURCE/app_data/jobs/triggered/config"
-npm config set strict-ssl false
-npm install -g replace
 npm install
 node ./run.js
 
