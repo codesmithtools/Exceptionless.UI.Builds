@@ -1,8 +1,8 @@
 /* global process */
 /* jslint node: true */
 var fs = require('fs');
-var md5 = require('MD5');
-var replace = require('replace');
+var md5 = require('md5');
+var replace = require("replace");
 
 function updateAppConfig() {
   var baseURL = process.env.Exceptionless_BaseURL ? process.env.Exceptionless_BaseURL : 'http://localhost:50000';
