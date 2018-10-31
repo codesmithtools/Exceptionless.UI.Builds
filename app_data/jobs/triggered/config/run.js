@@ -5,7 +5,7 @@ var md5 = require('md5');
 var replace = require("replace");
 
 function updateAppConfig() {
-  var baseURL = process.env.Exceptionless_BaseURL ? process.env.Exceptionless_BaseURL : 'http://localhost:50000';
+  var baseURL = process.env.Exceptionless_BaseURL ? process.env.Exceptionless_BaseURL : 'http://localhost:5001';
   var exceptionlessApiKey = process.env.Exceptionless_ApiKey ? process.env.Exceptionless_ApiKey : '';
   var exceptionlessServerUrl = process.env.Exceptionless_ServerUrl ? process.env.Exceptionless_ServerUrl : '';
   var facebookAppId = process.env.Exceptionless_FacebookAppId ? process.env.Exceptionless_FacebookAppId : '';
@@ -21,31 +21,27 @@ function updateAppConfig() {
   var enableAccountCreation = process.env.Exceptionless_EnableAccountCreation ? process.env.Exceptionless_EnableAccountCreation === 'true' : true;
 
   var content = [
-    '(function () {',
-    '  \'use strict\';',
-    '',
-    '  angular.module("app.config", [])',
-    '    .constant("BASE_URL", "' + baseURL + '")',
-    '    .constant("EXCEPTIONLESS_API_KEY", "' + exceptionlessApiKey + '")',
-    '    .constant("EXCEPTIONLESS_SERVER_URL", "' + exceptionlessServerUrl + '")',
-    '    .constant("FACEBOOK_APPID", "' + facebookAppId + '")',
-    '    .constant("GITHUB_APPID", "' + gitHubAppId + '")',
-    '    .constant("GOOGLE_APPID", "' + googleAppId + '")',
-    '    .constant("INTERCOM_APPID", "' + intercomId + '")',
-    '    .constant("LIVE_APPID", "' + liveAppId + '")',
-    '    .constant("SLACK_APPID", "' + slackAppId + '")',
-    '    .constant("STRIPE_PUBLISHABLE_KEY", "' + stripePubKey + '")',
-    '    .constant("SYSTEM_NOTIFICATION_MESSAGE", "' + notificationMessage + '")',
-    '    .constant("USE_HTML5_MODE", ' + useHTML5Mode + ')',
-    '    .constant("USE_SSL", ' + useSSL + ')',
-    '    .constant("ENABLE_ACCOUNT_CREATION", "' + enableAccountCreation + '");',
-    '}());'
+    'var environment = {',
+    '    BASE_URL: "' + baseURL + '"',
+    '    EXCEPTIONLESS_API_KEY: "' + exceptionlessApiKey + '"',
+    '    EXCEPTIONLESS_SERVER_URL: "' + exceptionlessServerUrl + '"',
+    '    FACEBOOK_APPID: "' + facebookAppId + '"',
+    '    GITHUB_APPID: "' + gitHubAppId + '"',
+    '    GOOGLE_APPID: "' + googleAppId + '"',
+    '    INTERCOM_APPID: "' + intercomId + '"',
+    '    LIVE_APPID: "' + liveAppId + '"',
+    '    SLACK_APPID: "' + slackAppId + '"',
+    '    STRIPE_PUBLISHABLE_KEY: "' + stripePubKey + '"',
+    '    SYSTEM_NOTIFICATION_MESSAGE: "' + notificationMessage + '"',
+    '    USE_HTML5_MODE: ' + useHTML5Mode + '',
+    '    USE_SSL: ' + useSSL + '',
+    '    ENABLE_ACCOUNT_CREATION: "' + enableAccountCreation + '"};',
+    ';',
+    '//# sourceMappingURL=scripts.js.map'
   ].join('\n');
 
-  var hash = md5(content);
-
 // todo: use cache buster in name
-  var configFile = 'app.config.' + hash + '.js';
+  var configFile = 'scripts.js';
 
   fs.writeFile('../../../../' + configFile, content, function (err) {
     if (err)
@@ -55,7 +51,7 @@ function updateAppConfig() {
   });
 
   replace({
-    regex: "app\.config\.*\.js",
+    regex: "scripts\.*\.js",
     replacement: configFile,
     paths: ['../../../../index.html'],
     recursive: false,
