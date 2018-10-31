@@ -17681,7 +17681,7 @@ var TokenInterceptor = /** @class */ (function () {
                 setHeaders: {
                     Authorization: "Bearer " + this.auth.getToken()
                 },
-                url: environment.BASE_URL + request.url
+                url: environment.BASE_URL + '/api/v2/' + request.url
             });
             return next.handle(request).catch(function (x) { return _this.handleAuthError(x); });
         }
