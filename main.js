@@ -18026,7 +18026,7 @@ var WebsocketService = /** @class */ (function () {
         }());
     }
     WebsocketService.prototype.getPushUrl = function () {
-        var pushUrl = environment.BASE_URL + 'push?access_token=' + this.authService.getToken();
+        var pushUrl = environment.BASE_URL + '/api/v2/push?access_token=' + this.authService.getToken();
         var protoMatch = /^(https?):\/\//;
         if (environment.BASE_URL.startsWith('https:')) {
             return pushUrl.replace(protoMatch, 'wss://');
