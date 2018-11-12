@@ -14,5 +14,3 @@ var environment = {
     USE_SSL: true,
     ENABLE_ACCOUNT_CREATION: true
 };
-
-;
