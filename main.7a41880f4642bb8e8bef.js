@@ -6036,7 +6036,6 @@ var DashboardComponent = /** @class */ /*@__PURE__*/ (function () {
                         return [4 /*yield*/, this.organizationService.getAll('')];
                     case 1:
                         response = _a.sent();
-                        console.log(response);
                         this.organizations = JSON.parse(JSON.stringify(response['body']));
                         return [2 /*return*/, this.organizations];
                     case 2:
@@ -24040,9 +24039,12 @@ __webpack_require__.r(__webpack_exports__);
 var NotificationService = /** @class */ /*@__PURE__*/ (function () {
     function NotificationService(toastr) {
         this.toastr = toastr;
+        this.lastMsgs = [];
     }
     NotificationService.prototype.error = function (title, text) {
-        this.toastr.error(text, title);
+        if (this.checkShowToast(title, text)) {
+            this.toastr.error(text, title);
+        }
     };
     NotificationService.prototype.info = function (title, text) {
         this.toastr.info(text, title);
@@ -24052,6 +24054,29 @@ var NotificationService = /** @class */ /*@__PURE__*/ (function () {
     };
     NotificationService.prototype.warning = function (title, text) {
         this.toastr.warning(text, title);
+    };
+    NotificationService.prototype.checkShowToast = function (title, text) {
+        var curTime = new Date();
+        for (var i = 0; i < this.lastMsgs.length; i++) {
+            var msg = this.lastMsgs[i];
+            var timeDiff = (curTime.getTime() - msg.showTime.getTime()) / 1000;
+            if (msg.title === title && msg.text === text) {
+                if (timeDiff <= 5) {
+                    msg.showTime = curTime;
+                    return false;
+                }
+            }
+            if (timeDiff > 5) {
+                this.lastMsgs.splice(i, 1);
+                i--;
+            }
+        }
+        this.lastMsgs.push({
+            title: title,
+            text: text,
+            showTime: curTime
+        });
+        return true;
     };
     NotificationService.ngInjectableDef = _angular_core__WEBPACK_IMPORTED_MODULE_1__["defineInjectable"]({ factory: function NotificationService_Factory() { return new NotificationService(_angular_core__WEBPACK_IMPORTED_MODULE_1__["inject"](ngx_toastr__WEBPACK_IMPORTED_MODULE_0__["ToastrService"])); }, token: NotificationService, providedIn: "root" });
     return NotificationService;
