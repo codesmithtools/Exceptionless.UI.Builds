@@ -16385,7 +16385,7 @@ var ProjectsComponent = /** @class */ /*@__PURE__*/ (function () {
                         _a.label = 1;
                     case 1:
                         _a.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, this.settings.get(this.currentOptions).toPromise()];
+                        return [4 /*yield*/, this.settings.get(this.currentOptions)];
                     case 2:
                         res = _a.sent();
                         onSuccess(res.body, res.headers.get('link'));
@@ -24346,7 +24346,7 @@ var ProjectService = /** @class */ /*@__PURE__*/ (function () {
         return this.http.get("projects/" + id).toPromise();
     };
     ProjectService.prototype.getByOrganizationId = function (id, options) {
-        return this.http.get("organizations/" + id + "/projects", { observe: 'response', params: options || {} });
+        return this.http.get("organizations/" + id + "/projects", { observe: 'response', params: options || {} }).toPromise();
     };
     ProjectService.prototype.getConfig = function (id) {
         return this.http.get("projects/" + id + "/config").toPromise();
