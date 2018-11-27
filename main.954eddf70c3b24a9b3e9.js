@@ -25111,7 +25111,7 @@ var StacksActionsService = /** @class */ /*@__PURE__*/ (function () {
                                             case 0: return [4 /*yield*/, previous()];
                                             case 1:
                                                 response = _a.sent();
-                                                return [2 /*return*/, action(item.join(',')).toPromise()];
+                                                return [2 /*return*/, action(item.join(','))];
                                         }
                                     });
                                 });
