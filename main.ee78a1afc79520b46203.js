@@ -2860,6 +2860,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _service_notification_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../service/notification.service */ "./src/app/service/notification.service.ts");
 /* harmony import */ var _service_word_translate_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../../service/word-translate.service */ "./src/app/service/word-translate.service.ts");
 /* harmony import */ var _service_filter_service__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../../service/filter.service */ "./src/app/service/filter.service.ts");
+/* harmony import */ var _exceptionlessclient__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../exceptionlessclient */ "./src/app/exceptionlessclient.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try {
@@ -2954,7 +2955,7 @@ var __generator = (undefined && undefined.__generator) || function (thisArg, bod
 
 
 
-// import { $ExceptionlessClient } from '../../../exceptionlessclient';
+
 var LoginComponent = /** @class */ /*@__PURE__*/ (function () {
     function LoginComponent(auth, notificationService, router, filterService, wordTranslateService) {
         this.auth = auth;
@@ -3028,7 +3029,7 @@ var LoginComponent = /** @class */ /*@__PURE__*/ (function () {
             var _this = this;
             return __generator(this, function (_a) {
                 onSuccess = function () {
-                    // $ExceptionlessClient.createFeatureUsage('app.auth.Login.authenticate').addTags(provider).submit();
+                    _exceptionlessclient__WEBPACK_IMPORTED_MODULE_7__["$ExceptionlessClient"].createFeatureUsage('app.auth.Login.authenticate').addTags(provider).submit();
                     return _this.redirectOnLogin();
                 };
                 onFailure = function (response) {
@@ -3037,12 +3038,11 @@ var LoginComponent = /** @class */ /*@__PURE__*/ (function () {
                         return __generator(this, function (_d) {
                             switch (_d.label) {
                                 case 0:
-                                    // $ExceptionlessClient.createFeatureUsage('app.auth.Login.authenticate.error').setProperty('response', response).addTags(provider).submit();
+                                    _exceptionlessclient__WEBPACK_IMPORTED_MODULE_7__["$ExceptionlessClient"].createFeatureUsage('app.auth.Login.authenticate.error').setProperty('response', response).addTags(provider).submit();
                                     _b = (_a = this.notificationService).error;
                                     _c = [''];
                                     return [4 /*yield*/, this.getMessage(response)];
                                 case 1:
-                                    // $ExceptionlessClient.createFeatureUsage('app.auth.Login.authenticate.error').setProperty('response', response).addTags(provider).submit();
                                     _b.apply(_a, _c.concat([_d.sent()]));
                                     return [2 /*return*/];
                             }
@@ -3091,17 +3091,16 @@ var LoginComponent = /** @class */ /*@__PURE__*/ (function () {
                         return [4 /*yield*/, this.auth.login(loginData).toPromise()];
                     case 2:
                         res = _d.sent();
-                        // $ExceptionlessClient.submitFeatureUsage(`${this._source}.login`);
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_7__["$ExceptionlessClient"].submitFeatureUsage(this._source + ".login");
                         this.redirectOnLogin();
                         return [3 /*break*/, 5];
                     case 3:
                         err_1 = _d.sent();
-                        // $ExceptionlessClient.createFeatureUsage(`${this._source}.login.error`).setUserIdentity(this.model.email).submit();
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_7__["$ExceptionlessClient"].createFeatureUsage(this._source + ".login.error").setUserIdentity(this.model.email).submit();
                         _b = (_a = this.notificationService).error;
                         _c = [''];
                         return [4 /*yield*/, this.wordTranslateService.translate('Loggin_Failed_Message')];
                     case 4:
-                        // $ExceptionlessClient.createFeatureUsage(`${this._source}.login.error`).setUserIdentity(this.model.email).submit();
                         _b.apply(_a, _c.concat([_d.sent()]));
                         return [3 /*break*/, 5];
                     case 5: return [2 /*return*/];
@@ -5889,6 +5888,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _service_notification_service__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../../service/notification.service */ "./src/app/service/notification.service.ts");
 /* harmony import */ var rickshaw__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! rickshaw */ "./node_modules/rickshaw/rickshaw.js");
 /* harmony import */ var rickshaw__WEBPACK_IMPORTED_MODULE_9___default = /*#__PURE__*/__webpack_require__.n(rickshaw__WEBPACK_IMPORTED_MODULE_9__);
+/* harmony import */ var _exceptionlessclient__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../../exceptionlessclient */ "./src/app/exceptionlessclient.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try {
@@ -5986,7 +5986,7 @@ var __generator = (undefined && undefined.__generator) || function (thisArg, bod
 
 
 
-// import { $ExceptionlessClient } from '../../../exceptionlessclient';
+
 var DashboardComponent = /** @class */ /*@__PURE__*/ (function () {
     function DashboardComponent(route, filterService, filterStoreService, eventService, stackService, organizationService, notificationService) {
         var _this = this;
@@ -6080,10 +6080,10 @@ var DashboardComponent = /** @class */ /*@__PURE__*/ (function () {
                     var start = moment__WEBPACK_IMPORTED_MODULE_2__["unix"](position.coordMinX).utc().local();
                     var end = moment__WEBPACK_IMPORTED_MODULE_2__["unix"](position.coordMaxX).utc().local();
                     _this.filterService.setTime(start.format('YYYY-MM-DDTHH:mm:ss') + '-' + end.format('YYYY-MM-DDTHH:mm:ss'));
-                    // $ExceptionlessClient.createFeatureUsage('app.session.Dashboard.chart.range.onSelection')
-                    //     .setProperty('start', start)
-                    //     .setProperty('end', end)
-                    //     .submit();
+                    _exceptionlessclient__WEBPACK_IMPORTED_MODULE_10__["$ExceptionlessClient"].createFeatureUsage('app.session.Dashboard.chart.range.onSelection')
+                        .setProperty('start', start)
+                        .setProperty('end', end)
+                        .submit();
                     return false;
                 }
             },
@@ -6418,6 +6418,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _service_project_service__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../../../service/project.service */ "./src/app/service/project.service.ts");
 /* harmony import */ var _service_word_translate_service__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../../../service/word-translate.service */ "./src/app/service/word-translate.service.ts");
 /* harmony import */ var _ng_bootstrap_ng_bootstrap__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! @ng-bootstrap/ng-bootstrap */ "./node_modules/@ng-bootstrap/ng-bootstrap/fesm5/ng-bootstrap.js");
+/* harmony import */ var _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../../../exceptionlessclient */ "./src/app/exceptionlessclient.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try {
@@ -6519,7 +6520,7 @@ var __generator = (undefined && undefined.__generator) || function (thisArg, bod
 
 
 
-// import { $ExceptionlessClient } from '../../../exceptionlessclient';
+
 var EventComponent = /** @class */ /*@__PURE__*/ (function () {
     function EventComponent(router, activatedRoute, hotkeysService, clipboardService, billingService, errorService, eventService, filterService, linkService, notificationService, projectService, wordTranslateService, viewRef) {
         var _this = this;
@@ -6649,19 +6650,19 @@ var EventComponent = /** @class */ /*@__PURE__*/ (function () {
         var _this = this;
         if (this.event['stack_id']) {
             this.hotkeysService.add(new angular2_hotkeys__WEBPACK_IMPORTED_MODULE_2__["Hotkey"]('mod+up', function (event) {
-                // $ExceptionlessClient.createFeatureUsage(`${this._source}.hotkeys.GoToStack`)
-                //     .addTags('hotkeys')
-                //     .setProperty('id', this._eventId)
-                //     .submit();
+                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(_this._source + ".hotkeys.GoToStack")
+                    .addTags('hotkeys')
+                    .setProperty('id', _this._eventId)
+                    .submit();
                 _this.router.navigate(["/type/event/" + _this._eventId]);
                 return false;
             }));
             if (this.clipboardService.isSupported) {
                 this.hotkeysService.add(new angular2_hotkeys__WEBPACK_IMPORTED_MODULE_2__["Hotkey"]('mod+shift+c', function (event) {
-                    // $ExceptionlessClient.createFeatureUsage(`${this._source}.hotkeys.CopyEventJSON`)
-                    //     .addTags('hotkeys')
-                    //     .setProperty('id', this._eventId)
-                    //     .submit();
+                    _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(_this._source + ".hotkeys.CopyEventJSON")
+                        .addTags('hotkeys')
+                        .setProperty('id', _this._eventId)
+                        .submit();
                     _this.clipboardService.copyFromContent(_this.event_json);
                     return false;
                 }));
@@ -6669,20 +6670,20 @@ var EventComponent = /** @class */ /*@__PURE__*/ (function () {
         }
         if (this.previous) {
             this.hotkeysService.add(new angular2_hotkeys__WEBPACK_IMPORTED_MODULE_2__["Hotkey"]('mod+left', function (event) {
-                // $ExceptionlessClient.createFeatureUsage(`${this._source}.hotkeys.PreviousOccurrence`)
-                //     .addTags('hotkeys')
-                //     .setProperty('id', this._eventId)
-                //     .submit();
+                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(_this._source + ".hotkeys.PreviousOccurrence")
+                    .addTags('hotkeys')
+                    .setProperty('id', _this._eventId)
+                    .submit();
                 _this.router.navigate(["/type/event/" + _this.previous], { queryParams: { tab: _this.getCurrentTab() } });
                 return false;
             }));
         }
         if (this.next) {
             this.hotkeysService.add(new angular2_hotkeys__WEBPACK_IMPORTED_MODULE_2__["Hotkey"]('mod+left', function (event) {
-                // $ExceptionlessClient.createFeatureUsage(`${this._source}.hotkeys.NextOccurrence`)
-                //     .addTags('hotkeys')
-                //     .setProperty('id', this._eventId)
-                //     .submit();
+                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(_this._source + ".hotkeys.NextOccurrence")
+                    .addTags('hotkeys')
+                    .setProperty('id', _this._eventId)
+                    .submit();
                 _this.router.navigate(["/type/event/" + _this.next], { queryParams: { tab: _this.getCurrentTab() } });
                 return false;
             }));
@@ -6809,10 +6810,10 @@ var EventComponent = /** @class */ /*@__PURE__*/ (function () {
                 switch (_a.label) {
                     case 0:
                         onSuccess = function () {
-                            // $ExceptionlessClient.createFeatureUsage(`${this._source}.promoteTab.success`)
-                            //     .setProperty('id', this._eventId)
-                            //     .setProperty('TabName', tabName)
-                            //     .submit();
+                            _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(_this._source + ".promoteTab.success")
+                                .setProperty('id', _this._eventId)
+                                .setProperty('TabName', tabName)
+                                .submit();
                             _this.project['promoted_tabs'].splice(indexOf, 1);
                             _this.buildTabs('Extended Data');
                         };
@@ -6822,20 +6823,15 @@ var EventComponent = /** @class */ /*@__PURE__*/ (function () {
                                 return __generator(this, function (_d) {
                                     switch (_d.label) {
                                         case 0:
-                                            // $ExceptionlessClient.createFeatureUsage(`${this._source}.promoteTab.error`)
-                                            //     .setProperty('id', this._eventId)
-                                            //     .setProperty('response', response)
-                                            //     .setProperty('TabName', tabName)
-                                            //     .submit();
+                                            _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(this._source + ".promoteTab.error")
+                                                .setProperty('id', this._eventId)
+                                                .setProperty('response', response)
+                                                .setProperty('TabName', tabName)
+                                                .submit();
                                             _b = (_a = this.notificationService).error;
                                             _c = [''];
                                             return [4 /*yield*/, this.wordTranslateService.translate('An error occurred promoting tab.')];
                                         case 1:
-                                            // $ExceptionlessClient.createFeatureUsage(`${this._source}.promoteTab.error`)
-                                            //     .setProperty('id', this._eventId)
-                                            //     .setProperty('response', response)
-                                            //     .setProperty('TabName', tabName)
-                                            //     .submit();
                                             _b.apply(_a, _c.concat([_d.sent()]));
                                             return [2 /*return*/];
                                     }
@@ -6846,6 +6842,10 @@ var EventComponent = /** @class */ /*@__PURE__*/ (function () {
                         if (indexOf < 0) {
                             return [2 /*return*/];
                         }
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(this._source + ".demoteTab")
+                            .setProperty('id', this._eventId)
+                            .setProperty('TabName', tabName)
+                            .submit();
                         _a.label = 1;
                     case 1:
                         _a.trys.push([1, 3, , 4]);
@@ -7062,36 +7062,37 @@ var EventComponent = /** @class */ /*@__PURE__*/ (function () {
             return __generator(this, function (_d) {
                 switch (_d.label) {
                     case 0:
-                        _d.trys.push([0, 2, , 4]);
-                        return [4 /*yield*/, this.projectService.promoteTab(this.project['id'], tabName)];
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(this._source + ".promoteTab")
+                            .setProperty('id', this._eventId)
+                            .setProperty('TabName', tabName)
+                            .submit();
+                        _d.label = 1;
                     case 1:
+                        _d.trys.push([1, 3, , 5]);
+                        return [4 /*yield*/, this.projectService.promoteTab(this.project['id'], tabName)];
+                    case 2:
                         _d.sent();
-                        // $ExceptionlessClient.createFeatureUsage(`${this._source}.promoteTab.success`)
-                        //     .setProperty('id', this._eventId)
-                        //     .setProperty('TabName', tabName)
-                        //     .submit();
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(this._source + ".promoteTab.success")
+                            .setProperty('id', this._eventId)
+                            .setProperty('TabName', tabName)
+                            .submit();
                         this.project['promoted_tabs'].push(tabName);
                         this.buildTabs(tabName);
-                        return [3 /*break*/, 4];
-                    case 2:
+                        return [3 /*break*/, 5];
+                    case 3:
                         err_5 = _d.sent();
-                        // $ExceptionlessClient.createFeatureUsage(`${this._source}.promoteTab.error`)
-                        //     .setProperty('id', this._eventId)
-                        //     .setProperty('response', err)
-                        //     .setProperty('TabName', tabName)
-                        //     .submit();
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_14__["$ExceptionlessClient"].createFeatureUsage(this._source + ".promoteTab.error")
+                            .setProperty('id', this._eventId)
+                            .setProperty('response', err_5)
+                            .setProperty('TabName', tabName)
+                            .submit();
                         _b = (_a = this.notificationService).error;
                         _c = [''];
                         return [4 /*yield*/, this.wordTranslateService.translate('An error occurred promoting tab.')];
-                    case 3:
-                        // $ExceptionlessClient.createFeatureUsage(`${this._source}.promoteTab.error`)
-                        //     .setProperty('id', this._eventId)
-                        //     .setProperty('response', err)
-                        //     .setProperty('TabName', tabName)
-                        //     .submit();
+                    case 4:
                         _b.apply(_a, _c.concat([_d.sent()]));
-                        return [3 /*break*/, 4];
-                    case 4: return [2 /*return*/];
+                        return [3 /*break*/, 5];
+                    case 5: return [2 /*return*/];
                 }
             });
         });
@@ -22218,6 +22219,26 @@ var SemverDirective = /** @class */ /*@__PURE__*/ (function () {
 
 /***/ }),
 
+/***/ "./src/app/exceptionlessclient.ts":
+/*!****************************************!*\
+  !*** ./src/app/exceptionlessclient.ts ***!
+  \****************************************/
+/*! exports provided: $ExceptionlessClient */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "$ExceptionlessClient", function() { return $ExceptionlessClient; });
+// import * as exceptionless from 'exceptionless/dist/exceptionless';
+var $ExceptionlessClient = exceptionless.ExceptionlessClient.default;
+$ExceptionlessClient.config.apiKey = environment.EXCEPTIONLESS_API_KEY;
+if (environment.EXCEPTIONLESS_SERVER_URL) {
+    $ExceptionlessClient.config.serverUrl = environment.EXCEPTIONLESS_SERVER_URL;
+}
+
+
+/***/ }),
+
 /***/ "./src/app/pipes/obj-ng-for.pipe.ts":
 /*!******************************************!*\
   !*** ./src/app/pipes/obj-ng-for.pipe.ts ***!
@@ -22639,7 +22660,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BillingService", function() { return BillingService; });
 /* harmony import */ var _analytics_service__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./analytics.service */ "./src/app/service/analytics.service.ts");
 /* harmony import */ var _dialog_service__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./dialog.service */ "./src/app/service/dialog.service.ts");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _exceptionlessclient__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../exceptionlessclient */ "./src/app/exceptionlessclient.ts");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try {
@@ -22732,7 +22754,7 @@ var __generator = (undefined && undefined.__generator) || function (thisArg, bod
 
 
 
-// import { $ExceptionlessClient } from '../exceptionlessclient';
+
 var BillingService = /** @class */ /*@__PURE__*/ (function () {
     function BillingService(analyticsService, dialogService) {
         this.analyticsService = analyticsService;
@@ -22743,9 +22765,9 @@ var BillingService = /** @class */ /*@__PURE__*/ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 this.analyticsService.initiateCheckout();
-                // $ExceptionlessClient.createFeatureUsage(`${this.source}.changePlan`)
-                //     .setProperty('OrganizationId', organizationId)
-                //     .submit();
+                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_2__["$ExceptionlessClient"].createFeatureUsage(this.source + ".changePlan")
+                    .setProperty('OrganizationId', organizationId)
+                    .submit();
                 return [2 /*return*/, this.dialogService.changePlan(viewRef, organizationId, function () {
                         return callback;
                     })];
@@ -22756,22 +22778,22 @@ var BillingService = /** @class */ /*@__PURE__*/ (function () {
         return __awaiter(this, void 0, void 0, function () {
             var _this = this;
             return __generator(this, function (_a) {
-                // $ExceptionlessClient.createFeatureUsage(`${this.source}.confirmUpgradePlan`)
-                //     .setMessage(message)
-                //     .setProperty('OrganizationId', organizationId)
-                //     .submit();
+                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_2__["$ExceptionlessClient"].createFeatureUsage(this.source + ".confirmUpgradePlan")
+                    .setMessage(message)
+                    .setProperty('OrganizationId', organizationId)
+                    .submit();
                 return [2 /*return*/, this.dialogService.confirm(viewRef, message, 'Upgrade Plan', function () {
                         return _this.changePlan(viewRef, callback, organizationId);
                     }, function () {
-                        // $ExceptionlessClient.createFeatureUsage(`${this.source}.confirmUpgradePlan.cancel`)
-                        //     .setMessage(message)
-                        //     .setProperty('OrganizationId', organizationId)
-                        //     .submit();
+                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_2__["$ExceptionlessClient"].createFeatureUsage(_this.source + ".confirmUpgradePlan.cancel")
+                            .setMessage(message)
+                            .setProperty('OrganizationId', organizationId)
+                            .submit();
                     })];
             });
         });
     };
-    BillingService.ngInjectableDef = _angular_core__WEBPACK_IMPORTED_MODULE_2__["defineInjectable"]({ factory: function BillingService_Factory() { return new BillingService(_angular_core__WEBPACK_IMPORTED_MODULE_2__["inject"](_analytics_service__WEBPACK_IMPORTED_MODULE_0__["AnalyticsService"]), _angular_core__WEBPACK_IMPORTED_MODULE_2__["inject"](_dialog_service__WEBPACK_IMPORTED_MODULE_1__["DialogService"])); }, token: BillingService, providedIn: "root" });
+    BillingService.ngInjectableDef = _angular_core__WEBPACK_IMPORTED_MODULE_3__["defineInjectable"]({ factory: function BillingService_Factory() { return new BillingService(_angular_core__WEBPACK_IMPORTED_MODULE_3__["inject"](_analytics_service__WEBPACK_IMPORTED_MODULE_0__["AnalyticsService"]), _angular_core__WEBPACK_IMPORTED_MODULE_3__["inject"](_dialog_service__WEBPACK_IMPORTED_MODULE_1__["DialogService"])); }, token: BillingService, providedIn: "root" });
     return BillingService;
 }());
 
@@ -22883,7 +22905,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _dialogs_add_web_hook_dialog_add_web_hook_dialog_component__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../dialogs/add-web-hook-dialog/add-web-hook-dialog.component */ "./src/app/dialogs/add-web-hook-dialog/add-web-hook-dialog.component.ts");
 /* harmony import */ var _dialogs_add_organization_dialog_add_organization_dialog_component__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../dialogs/add-organization-dialog/add-organization-dialog.component */ "./src/app/dialogs/add-organization-dialog/add-organization-dialog.component.ts");
 /* harmony import */ var _app_event_service__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./app-event.service */ "./src/app/service/app-event.service.ts");
-/* harmony import */ var ngx_modal_dialog_src_modal_dialog_service__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ngx-modal-dialog/src/modal-dialog.service */ "./node_modules/ngx-modal-dialog/src/modal-dialog.service.js");
+/* harmony import */ var _exceptionlessclient__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../exceptionlessclient */ "./src/app/exceptionlessclient.ts");
+/* harmony import */ var ngx_modal_dialog_src_modal_dialog_service__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ngx-modal-dialog/src/modal-dialog.service */ "./node_modules/ngx-modal-dialog/src/modal-dialog.service.js");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try {
@@ -22989,7 +23012,7 @@ var __generator = (undefined && undefined.__generator) || function (thisArg, bod
 
 
 
-// import { $ExceptionlessClient } from '../exceptionlessclient';
+
 var DialogService = /** @class */ /*@__PURE__*/ (function () {
     function DialogService(modalDialogService, wordTranslateService, modalParameterService, appEvent) {
         this.modalDialogService = modalDialogService;
@@ -23098,7 +23121,7 @@ var DialogService = /** @class */ /*@__PURE__*/ (function () {
                     case 2:
                         _f = [
                             (_e.text = _h.sent(), _e.buttonClass = 'btn btn-default', _e.onAction = function () {
-                                // $ExceptionlessClient.submitFeatureUsage('app.stack.AddReferenceDialog.cancel');
+                                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_13__["$ExceptionlessClient"].submitFeatureUsage('app.stack.AddReferenceDialog.cancel');
                                 return true;
                             }, _e)
                         ];
@@ -23109,7 +23132,7 @@ var DialogService = /** @class */ /*@__PURE__*/ (function () {
                                 (_g.text = _h.sent(), _g.buttonClass = 'btn btn-primary', _g.onAction = function () {
                                     var url = _this.modalParameterService.getModalParameter('referenceLink');
                                     if (url) {
-                                        // $ExceptionlessClient.createFeatureUsage('app.stack.AddReferenceDialog.save').setProperty('url', url).submit();
+                                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_13__["$ExceptionlessClient"].createFeatureUsage('app.stack.AddReferenceDialog.save').setProperty('url', url).submit();
                                         onConfirm(url);
                                         return;
                                     }
@@ -23218,7 +23241,7 @@ var DialogService = /** @class */ /*@__PURE__*/ (function () {
                     case 2:
                         _f = [
                             (_e.text = _h.sent(), _e.buttonClass = 'btn btn-default', _e.onAction = function () {
-                                // $ExceptionlessClient.submitFeatureUsage('exceptionless.web-hook.AddWebHookDialog.cancel');
+                                _exceptionlessclient__WEBPACK_IMPORTED_MODULE_13__["$ExceptionlessClient"].submitFeatureUsage('exceptionless.web-hook.AddWebHookDialog.cancel');
                                 return true;
                             }, _e)
                         ];
@@ -23229,7 +23252,7 @@ var DialogService = /** @class */ /*@__PURE__*/ (function () {
                                 (_g.text = _h.sent(), _g.buttonClass = 'btn btn-primary', _g.onAction = function () {
                                     var data = _this.modalParameterService.getModalParameter('webhook_data');
                                     if (data && data.url && data.event_types.length > 0) {
-                                        // $ExceptionlessClient.createFeatureUsage('exceptionless.web-hook.AddWebHookDialog.save').setProperty('WebHook', data).submit();
+                                        _exceptionlessclient__WEBPACK_IMPORTED_MODULE_13__["$ExceptionlessClient"].createFeatureUsage('exceptionless.web-hook.AddWebHookDialog.save').setProperty('WebHook', data).submit();
                                         onConfirm(data);
                                         return true;
                                     }
@@ -23378,7 +23401,7 @@ var DialogService = /** @class */ /*@__PURE__*/ (function () {
             });
         });
     };
-    DialogService.ngInjectableDef = _angular_core__WEBPACK_IMPORTED_MODULE_0__["defineInjectable"]({ factory: function DialogService_Factory() { return new DialogService(_angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](ngx_modal_dialog_src_modal_dialog_service__WEBPACK_IMPORTED_MODULE_13__["ModalDialogService"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](_word_translate_service__WEBPACK_IMPORTED_MODULE_3__["WordTranslateService"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](_modal_parameter_service__WEBPACK_IMPORTED_MODULE_6__["ModalParameterService"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](_app_event_service__WEBPACK_IMPORTED_MODULE_12__["AppEventService"])); }, token: DialogService, providedIn: "root" });
+    DialogService.ngInjectableDef = _angular_core__WEBPACK_IMPORTED_MODULE_0__["defineInjectable"]({ factory: function DialogService_Factory() { return new DialogService(_angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](ngx_modal_dialog_src_modal_dialog_service__WEBPACK_IMPORTED_MODULE_14__["ModalDialogService"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](_word_translate_service__WEBPACK_IMPORTED_MODULE_3__["WordTranslateService"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](_modal_parameter_service__WEBPACK_IMPORTED_MODULE_6__["ModalParameterService"]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["inject"](_app_event_service__WEBPACK_IMPORTED_MODULE_12__["AppEventService"])); }, token: DialogService, providedIn: "root" });
     return DialogService;
 }());
 
